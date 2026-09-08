@@ -18,6 +18,12 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // New signups have a profile but no organization — send them to
+  // onboarding before they can access the workspace.
+  if (!userContext.organization) {
+    redirect("/onboarding");
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar

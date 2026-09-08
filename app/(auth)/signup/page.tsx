@@ -37,7 +37,10 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      router.push("/dashboard");
+      // Fresh signups have a profile but no organization yet — point them
+      // straight at onboarding (the /dashboard layout also redirects here
+      // as a safety net if they land on the dashboard first).
+      router.push("/onboarding");
       router.refresh();
     }
   }

@@ -11,7 +11,15 @@ import type {
  * Fetches the current authenticated user's full context in a single joined query:
  * profile, organization, assigned roles, and the array of permission keys.
  *
- * React's `cache()` dedupes concurrent calls within a single render pass.
+ * React's `cache()` dedupes concurrent calls within a single render pass,
+ * so every server component in a request shares one fetch.
+ *
+ * Refetch semantics for mutations (e.g. onboarding): `cache()` is scoped to
+ * the current request only. After a server action writes and calls
+ * `revalidatePath()` + `redirect("/dashboard")`, the redirect triggers a NEW
+ * request — this function runs again with fresh data (completed profile,
+ * organization, owner role + permissions), so the sidebar rendered by the
+ * dashboard layout is always up to date.
  */
 export const getCurrentUserContext = cache(
   async (): Promise<UserContext | null> => {
