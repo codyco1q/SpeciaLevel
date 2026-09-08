@@ -11,7 +11,7 @@ create extension if not exists "uuid-ossp";
 -- ORGANIZATIONS
 -- ============================================================
 create table if not exists public.organizations (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
   created_at timestamptz not null default now(),
@@ -22,7 +22,7 @@ create table if not exists public.organizations (
 -- DEPARTMENTS
 -- ============================================================
 create table if not exists public.departments (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   name text not null,
   description text,
@@ -58,7 +58,7 @@ create index if not exists idx_profiles_department_id on public.profiles(departm
 -- ROLES
 -- ============================================================
 create table if not exists public.roles (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   name text not null,
   key text not null,
@@ -75,7 +75,7 @@ create index if not exists idx_roles_organization_id on public.roles(organizatio
 -- PERMISSIONS
 -- ============================================================
 create table if not exists public.permissions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   key text not null,
   name text not null,
@@ -91,7 +91,7 @@ create index if not exists idx_permissions_organization_id on public.permissions
 -- ROLE_PERMISSIONS (join: roles <-> permissions)
 -- ============================================================
 create table if not exists public.role_permissions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   role_id uuid not null references public.roles(id) on delete cascade,
   permission_id uuid not null references public.permissions(id) on delete cascade,
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -107,7 +107,7 @@ create index if not exists idx_role_permissions_organization_id on public.role_p
 -- USER_ROLES (join: profiles <-> roles)
 -- ============================================================
 create table if not exists public.user_roles (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   role_id uuid not null references public.roles(id) on delete cascade,
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -123,7 +123,7 @@ create index if not exists idx_user_roles_organization_id on public.user_roles(o
 -- ORGANIZATION_MODULES
 -- ============================================================
 create table if not exists public.organization_modules (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   module_key text not null,
   module_name text not null,
@@ -140,7 +140,7 @@ create index if not exists idx_organization_modules_organization_id
 -- TIME_ENTRIES
 -- ============================================================
 create table if not exists public.time_entries (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   clocked_in_at timestamptz not null default now(),
@@ -157,7 +157,7 @@ create index if not exists idx_time_entries_user_id on public.time_entries(user_
 -- CALENDAR_EVENTS
 -- ============================================================
 create table if not exists public.calendar_events (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   title text not null,
