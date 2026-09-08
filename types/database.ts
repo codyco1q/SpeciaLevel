@@ -17,8 +17,10 @@ export interface Profile {
   full_name: string | null;
   email: string | null;
   avatar_url: string | null;
+  job_title: string | null;
   department_id: string | null;
   is_active: boolean;
+  status: string;
   created_at: string;
   updated_at: string;
 }
