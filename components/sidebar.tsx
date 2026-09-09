@@ -54,7 +54,7 @@ export default function Sidebar({
       label: "Time Tracking",
       href: "/time",
       icon: Clock,
-      permission: "time.view",
+      permission: "time_tracking.view_self",
     },
     {
       label: "Employees",

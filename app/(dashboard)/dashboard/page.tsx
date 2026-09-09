@@ -32,7 +32,7 @@ export default async function DashboardPage() {
             </p>
           </div>
         )}
-        {hasPermission("time.view", permissions) && (
+        {hasPermission("time_tracking.view_self", permissions) && (
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="text-sm font-semibold">Time Tracking</h2>
             <p className="mt-1 text-sm text-muted-foreground">

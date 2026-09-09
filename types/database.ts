@@ -71,6 +71,8 @@ export interface TimeEntry {
   user_id: string;
   clocked_in_at: string;
   clocked_out_at: string | null;
+  status: "active" | "completed";
+  duration_seconds: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
