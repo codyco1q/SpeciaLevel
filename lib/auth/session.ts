@@ -53,6 +53,14 @@ export const getCurrentUserContext = cache(
       .single();
 
     if (profileError || !profile) {
+      // Anomalous: valid session but no readable profile (e.g. RLS
+      // misconfiguration or a missing signup-trigger row). Log the code
+      // server-side so a redirect loop like this is diagnosable instead
+      // of silently bouncing between /dashboard and /login.
+      console.error("[auth] profile fetch failed for authed user:", {
+        code: profileError?.code ?? "no-row",
+        message: profileError?.message ?? "no profile row",
+      });
       return null;
     }
 
