@@ -23,17 +23,18 @@ import type {
  */
 export const getCurrentUserContext = cache(
   async (): Promise<UserContext | null> => {
-    const supabase = await createServerClient();
+    try {
+      const supabase = await createServerClient();
 
-    // 1. Get the authenticated user's ID from the session.
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      // 1. Get the authenticated user's ID from the session.
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return null;
-    }
+      if (authError || !user) {
+        return null;
+      }
 
     // 2. Fetch the profile for that user.
     const { data: profile, error: profileError } = await supabase
@@ -111,5 +112,11 @@ export const getCurrentUserContext = cache(
       roles,
       permissions,
     };
+    } catch {
+      // Never throw from here: layouts/pages treat `null` as "signed out"
+      // and redirect to /login. A Supabase outage or transient failure
+      // should degrade to a login redirect, not a 500 crash.
+      return null;
+    }
   }
 );

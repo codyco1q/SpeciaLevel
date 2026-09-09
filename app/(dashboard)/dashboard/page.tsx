@@ -1,12 +1,14 @@
+import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/rbac";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const userContext = await getCurrentUserContext();
 
-  if (!userContext) {
-    return null; // middleware/layout handles redirect
-  }
+  if (!userContext) redirect("/login");
+  if (!userContext.organization) redirect("/onboarding");
 
   const { profile, organization, permissions } = userContext;
 

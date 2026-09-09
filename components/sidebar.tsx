@@ -80,6 +80,12 @@ export default function Sidebar({
     hasPermission(item.permission, permissions)
   );
 
+  // Settings is footer chrome, not a main nav item — but it must still be
+  // permission-driven, not hard-coded visible for every role.
+  const canViewSettings =
+    hasPermission("settings.view", permissions) ||
+    hasPermission("settings.manage", permissions);
+
   return (
     <aside className="flex h-full w-64 flex-col border-r border-border bg-card">
       {/* Logo */}
@@ -133,13 +139,15 @@ export default function Sidebar({
             </p>
           </div>
         </div>
-        <Link
-          href="/settings"
-          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Link>
+        {canViewSettings ? (
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Link>
+        ) : null}
         <form action="/auth/signout" method="post">
           <button
             type="submit"

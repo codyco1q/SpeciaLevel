@@ -17,21 +17,37 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const supabase = createBrowserClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = createBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
+      if (signInError) {
+        // Supabase covers invalid credentials, unconfirmed email, etc.
+        // Always surface the message — never fail silently.
+        setError(signInError.message);
+        return;
+      }
 
-    if (error) {
-      setError(error.message);
-      return;
+      // Session cookies are written by the SSR browser client before this
+      // resolves, so refresh first (server re-reads the session from
+      // cookies) and then navigate. /dashboard's layout forwards users
+      // with no organization on to /onboarding.
+      router.refresh();
+      router.push("/dashboard");
+    } catch (err) {
+      // Misconfiguration (missing env vars) or network failure — show it
+      // instead of hanging on the loading state forever.
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not sign you in. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (
@@ -88,7 +104,9 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
           )}
 
           <button

@@ -1,35 +1,21 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@/lib/supabase/server";
 
-export async function POST() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
-  }
-
-  const cookieStore = await cookies();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        } catch {
-          // Ignore — called from a Server Component.
-        }
-      },
-    },
-  });
-
+/**
+ * Signs the user out (clears the Supabase session cookies) and sends
+ * them back to /login.
+ *
+ * The sidebar posts here via `<form method="post">`, so the redirect
+ * MUST be 303 (See Other → GET). A default 307 would make the browser
+ * re-POST to /login and fail. The origin comes from the request URL so
+ * this works on localhost, preview deploys, and production without an
+ * extra APP_URL env var.
+ */
+export async function POST(request: NextRequest) {
+  const supabase = await createServerClient();
   await supabase.auth.signOut();
 
-  return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
+  return NextResponse.redirect(new URL("/login", request.url), {
+    status: 303,
+  });
 }

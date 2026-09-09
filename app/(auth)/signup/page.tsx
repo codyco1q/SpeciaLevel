@@ -10,38 +10,57 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
 
-    const supabase = createBrowserClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+    try {
+      const supabase = createBrowserClient();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    });
+      });
 
-    setLoading(false);
+      if (signUpError) {
+        // e.g. "User already registered" — always surface it visibly.
+        setError(signUpError.message);
+        return;
+      }
 
-    if (error) {
-      setError(error.message);
-      return;
-    }
+      // If email confirmation is enabled in Supabase, there is a user but
+      // NO session yet — pushing to /onboarding would just bounce back to
+      // /login via the proxy with zero feedback. Tell the user to confirm.
+      if (!data.session) {
+        setNotice(
+          "Account created. Check your inbox to confirm your email, then sign in."
+        );
+        return;
+      }
 
-    if (data.user) {
       // Fresh signups have a profile but no organization yet — point them
       // straight at onboarding (the /dashboard layout also redirects here
       // as a safety net if they land on the dashboard first).
-      router.push("/onboarding");
       router.refresh();
+      router.push("/onboarding");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not create your account. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -108,7 +127,20 @@ export default function SignupPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          {notice && (
+            <p
+              role="status"
+              className="rounded-md border border-border bg-muted/60 px-3 py-2 text-sm"
+            >
+              {notice}
+            </p>
+          )}
 
           <button
             type="submit"
