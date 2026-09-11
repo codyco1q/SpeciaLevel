@@ -9,6 +9,7 @@ import {
   Users,
   Building2,
   ShieldCheck,
+  Puzzle,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -73,6 +74,12 @@ export default function Sidebar({
       href: "/roles",
       icon: ShieldCheck,
       permission: "roles.view",
+    },
+    {
+      label: "Modules",
+      href: "/modules",
+      icon: Puzzle,
+      permission: "dashboard.view",
     },
   ];
 

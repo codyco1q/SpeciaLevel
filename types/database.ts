@@ -82,6 +82,7 @@ export interface CalendarEvent {
   id: string;
   organization_id: string;
   user_id: string;
+  assigned_user_id: string | null;
   title: string;
   description: string | null;
   starts_at: string;
