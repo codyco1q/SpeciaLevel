@@ -55,3 +55,35 @@ export const INVITATION_STATUS_BADGE_VARIANTS: Record<
   revoked: "outline",
   expired: "destructive",
 };
+
+// ---------------------------------------------------------------------------
+// Public invite acceptance (signup?invite=<token>)
+// ---------------------------------------------------------------------------
+
+/**
+ * Browser-storage key for a pending invite token. Saved during invite-aware
+ * sign-up and consumed by the login page after the user confirms their email
+ * and signs in, so the invite can still be finalized without a session.
+ */
+export const PENDING_INVITE_STORAGE_KEY = "uplevel.pendingInviteToken";
+
+/** Public invite context rendered by the sign-up page for a valid token. */
+export interface InvitationDetails {
+  token: string;
+  email: string;
+  organizationName: string;
+  roleName: string;
+  departmentName: string | null;
+  expiresAt: string;
+}
+
+export type InvitationLookupResult =
+  | { status: "valid"; invitation: InvitationDetails }
+  | { status: "expired" }
+  | { status: "revoked" }
+  | { status: "accepted" }
+  | { status: "not_found" };
+
+export type AcceptInvitationResult =
+  | { status: "success" }
+  | { status: "error"; error: string };

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { acceptInvitation } from "@/lib/actions/invites";
+import { PENDING_INVITE_STORAGE_KEY } from "@/lib/validations/invites";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -29,6 +31,24 @@ export default function LoginPage() {
         // Always surface the message — never fail silently.
         setError(signInError.message);
         return;
+      }
+
+      // If the user signed up through an invitation link and then confirmed
+      // their email, the pending token is waiting in sessionStorage —
+      // finalize the invite now that they are authenticated.
+      const pendingInviteToken = sessionStorage.getItem(
+        PENDING_INVITE_STORAGE_KEY
+      );
+      if (pendingInviteToken) {
+        const result = await acceptInvitation(pendingInviteToken);
+        sessionStorage.removeItem(PENDING_INVITE_STORAGE_KEY);
+        if (result.status === "success") {
+          // Invited members skip onboarding — land straight on the dashboard.
+          router.refresh();
+          router.push("/dashboard");
+          return;
+        }
+        // Token expired/revoked/wrong email — fall through to the normal flow.
       }
 
       // Session cookies are written by the SSR browser client before this

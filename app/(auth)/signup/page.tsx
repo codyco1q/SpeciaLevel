@@ -1,163 +1,47 @@
-"use client";
+import { getInvitationByToken } from "@/lib/actions/invites";
+import type { InvitationDetails } from "@/lib/validations/invites";
+import SignupForm from "./signup-form";
 
-import { useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+// Reads searchParams (invite token) and validates it against the database at
+// request time — never prerender the public sign-up page ahead of time.
+export const dynamic = "force-dynamic";
 
-export default function SignupPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+/**
+ * Public sign-up page.
+ *
+ * With `?invite=<token>` the invitation is validated server-side; a valid
+ * token renders the invite-aware form (locked email, org/role preview), an
+ * invalid/expired/revoked one renders a warning plus standard sign-up.
+ */
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invite?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const rawInvite = params.invite;
+  const inviteToken =
+    typeof rawInvite === "string" && rawInvite.trim() ? rawInvite : undefined;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setNotice(null);
-    setLoading(true);
+  let invitation: InvitationDetails | null = null;
+  let inviteError: string | null = null;
 
-    try {
-      const supabase = createBrowserClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
-
-      if (signUpError) {
-        // e.g. "User already registered" — always surface it visibly.
-        setError(signUpError.message);
-        return;
-      }
-
-      // If email confirmation is enabled in Supabase, there is a user but
-      // NO session yet — pushing to /onboarding would just bounce back to
-      // /login via the proxy with zero feedback. Tell the user to confirm.
-      if (!data.session) {
-        setNotice(
-          "Account created. Check your inbox to confirm your email, then sign in."
-        );
-        return;
-      }
-
-      // Fresh signups have a profile but no organization yet — point them
-      // straight at onboarding (the /dashboard layout also redirects here
-      // as a safety net if they land on the dashboard first).
-      router.refresh();
-      router.push("/onboarding");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not create your account. Please try again."
-      );
-    } finally {
-      setLoading(false);
+  if (inviteToken) {
+    const result = await getInvitationByToken(inviteToken);
+    if (result.status === "valid") {
+      invitation = result.invitation;
+    } else {
+      // One generic message — never reveal whether a token was missing,
+      // revoked, expired, or already used.
+      inviteError = "This invitation link is invalid or has expired.";
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <span className="text-lg font-bold">UL</span>
-          </div>
-          <h1 className="text-2xl font-bold">Create your account</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Join UpLevel and start your workspace
-          </p>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="space-y-2">
-            <label htmlFor="fullName" className="text-sm font-medium">
-              Full Name
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              placeholder="Jane Smith"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="At least 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-
-          {notice && (
-            <p
-              role="status"
-              className="rounded-md border border-border bg-muted/60 px-3 py-2 text-sm"
-            >
-              {notice}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-          >
-            {loading ? "Creating account…" : "Create account"}
-          </button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </form>
-      </div>
-    </div>
+    <SignupForm
+      inviteToken={inviteToken}
+      invitation={invitation}
+      inviteError={inviteError}
+    />
   );
 }
