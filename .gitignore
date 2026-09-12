@@ -36,6 +36,9 @@ yarn-error.log*
 supabase/.temp
 supabase/.branches
 
+# marketing site — captured leads (never commit customer data)
+/data
+
 # typescript
 *.tsbuildinfo
 
