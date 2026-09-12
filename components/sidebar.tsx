@@ -9,6 +9,7 @@ import {
   Users,
   Building2,
   ShieldCheck,
+  CheckSquare,
   Puzzle,
   Settings,
   LogOut,
@@ -56,6 +57,12 @@ export default function Sidebar({
       href: "/time",
       icon: Clock,
       permission: "time_tracking.view_self",
+    },
+    {
+      label: "Tasks",
+      href: "/tasks",
+      icon: CheckSquare,
+      permission: "tasks.view",
     },
     {
       label: "Employees",
