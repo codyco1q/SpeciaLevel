@@ -163,6 +163,30 @@ export async function createOrganization(
     }
   }
 
+  // 5b. Seed the default #general channel. `chat_channels.created_by` is
+  // NOT NULL and no profiles exist when the seed_organization() trigger
+  // fires, so brand-new organizations get their channel here (the creator
+  // is the user who just onboarded). Idempotent via the
+  // (organization_id, name) unique constraint.
+  const { error: channelError } = await admin
+    .from("chat_channels")
+    .upsert(
+      {
+        organization_id: organizationId,
+        name: "general",
+        description: "General discussion for your team.",
+        created_by: user.id,
+      },
+      { onConflict: "organization_id,name", ignoreDuplicates: true }
+    );
+
+  if (channelError) {
+    return {
+      status: "error",
+      error: "Your organization was created but the default channel could not be set up. Please try again.",
+    };
+  }
+
   // 6. Bust cached route data so the redirect to /dashboard renders with a
   //    fresh user context (organization, roles, permissions) — the sidebar
   //    shows the org name and full owner permission set.

@@ -112,6 +112,26 @@ export interface Task {
   updated_at: string;
 }
 
+export interface ChatChannel {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  is_private: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  organization_id: string;
+  channel_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 
 export interface OrganizationInvitation {

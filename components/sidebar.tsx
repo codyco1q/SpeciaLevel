@@ -10,6 +10,7 @@ import {
   Building2,
   ShieldCheck,
   CheckSquare,
+  MessageSquare,
   Puzzle,
   Settings,
   LogOut,
@@ -63,6 +64,12 @@ export default function Sidebar({
       href: "/tasks",
       icon: CheckSquare,
       permission: "tasks.view",
+    },
+    {
+      label: "Chat",
+      href: "/chat",
+      icon: MessageSquare,
+      permission: "chat.view",
     },
     {
       label: "Employees",

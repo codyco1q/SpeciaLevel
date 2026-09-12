@@ -97,6 +97,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     icon: CheckSquare,
     link: "/tasks",
   },
+  {
+    key: "chat",
+    name: "Chat",
+    description: "Real-time team messaging and channels.",
+    icon: MessageSquare,
+    link: "/chat",
+  },
 ];
 
 /**
@@ -137,13 +144,6 @@ const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "AI",
     description: "AI-powered agents and business intelligence.",
     icon: Brain,
-    isFuture: true,
-  },
-  {
-    key: "chat",
-    name: "Chat",
-    description: "Internal team messaging and channels.",
-    icon: MessageSquare,
     isFuture: true,
   },
   {
