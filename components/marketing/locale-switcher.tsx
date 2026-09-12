@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useTransition } from "react";
 
 import { setLocale } from "@/lib/actions/locale";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
@@ -25,14 +25,30 @@ const OPTIONS: { value: Locale; label: string; shortLabel: string }[] = [
  */
 export function LocaleSwitcher({ locale, dict, className }: LocaleSwitcherProps) {
   const pathname = usePathname() ?? "/";
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const pendingSwitch = useRef(false);
 
   function switchTo(next: Locale) {
     if (next === locale || isPending) return;
+    pendingSwitch.current = true;
     startTransition(() => {
       void setLocale(next, pathname);
     });
   }
+
+  // The server action redirects to the *same* URL the user is already on, so
+  // the App Router client optimizes that navigation into a no-op and keeps the
+  // previously-rendered server component tree — including the root layout's
+  // `<html lang dir>` shell. Once the transition settles, force a router
+  // refresh so the whole tree (layout + page) is re-fetched with the new
+  // NEXT_LOCALE cookie and re-rendered server-side.
+  useEffect(() => {
+    if (pendingSwitch.current && !isPending) {
+      pendingSwitch.current = false;
+      router.refresh();
+    }
+  }, [isPending, router]);
 
   return (
     <div

@@ -30,6 +30,12 @@ export const metadata: Metadata = {
   description: "Multi-tenant business operating system",
 };
 
+// `lang`/`dir` (and Cairo font activation) are read from the NEXT_LOCALE
+// cookie at request time via getLocale(). Force dynamic rendering so no
+// static/prerendered shell — which would bake in a stale `<html lang="en"
+// dir="ltr">` — can ever be served after the user switches language.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: {

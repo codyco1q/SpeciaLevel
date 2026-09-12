@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
@@ -47,6 +48,13 @@ export async function setLocale(locale: Locale, pathname: string = "/") {
   } catch {
     // Not signed in, or Supabase is unavailable — the local preference still applies.
   }
+
+  // Invalidate the full route tree so the NEXT render is guaranteed to be
+  // executed server-side. Without this, the App Router keeps the cached root
+  // layout (old `lang`/`dir` on <html>) and, because the redirect below
+  // targets the *same* URL the user is already on, the browser never re-fetches
+  // the layout segment — the page would stay in the previous language.
+  revalidatePath("/", "layout");
 
   redirect(safePath);
 }
