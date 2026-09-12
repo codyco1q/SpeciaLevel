@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cairo, Geist, Geist_Mono } from "next/font/google";
+
 import "./globals.css";
+
+import { getLocale } from "@/lib/i18n/get-dictionary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -12,18 +15,34 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/**
+ * Arabic-capable typeface for the RTL locale. Loaded with next/font and
+ * applied only when `html[lang="ar"]` (see globals.css), so English pages
+ * keep Geist and never pay for the Arabic font file.
+ */
+const cairo = Cairo({
+  variable: "--font-cairo",
+  subsets: ["arabic", "latin"],
+});
+
 export const metadata: Metadata = {
   title: "UpLevel",
   description: "Multi-tenant business operating system",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang={locale}
+      dir={locale === "ar" ? "rtl" : "ltr"}
+      className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

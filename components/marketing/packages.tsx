@@ -10,69 +10,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 import { cn } from "@/lib/utils";
 
-const PACKAGES = [
-  {
-    name: "Automation Audit & Blueprint",
-    tagline: "Know exactly where your operations leak time.",
-    ideal: "Ideal for teams that want a clear roadmap before any build.",
-    cta: "Start with an Audit",
-    features: [
-      "Deep discovery & workflow mapping",
-      "Tool-stack & bottleneck analysis",
-      "Automation architecture specification",
-      "Prioritized quick-win roadmap",
-    ],
-    highlight: false,
-  },
-  {
-    name: "Custom Systems Implementation",
-    tagline: "The full build — designed, coded, integrated, deployed.",
-    ideal: "Ideal for businesses ready to ship real systems now.",
-    cta: "Book a Build",
-    features: [
-      "End-to-end workflow & portal development",
-      "Third-party integrations & data migration",
-      "Testing, QA & secure deployment",
-      "Documentation & team hand-off",
-    ],
-    highlight: true,
-  },
-  {
-    name: "Managed Operations & Retainer",
-    tagline: "A partner that keeps your systems improving every week.",
-    ideal: "Ideal for teams that want continuous iteration after launch.",
-    cta: "Get Managed Support",
-    features: [
-      "Continuous iteration & workflow monitoring",
-      "Priority support & rapid turnarounds",
-      "Quarterly optimization sprints",
-      "Scale-ready architecture upkeep",
-    ],
-    highlight: false,
-  },
-];
-
-export function Packages() {
+export function Packages({ dict }: { dict: Dictionary["packages"] }) {
   return (
     <section id="packages" className="scroll-mt-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-indigo-300">
-            Packages
+            {dict.eyebrow}
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">
-            Pick a starting point. We&apos;ll build the rest.
+            {dict.title}
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            Every engagement starts with a conversation. Choose the tier that
-            matches where your operations are today — or let us recommend one.
-          </p>
+          <p className="mt-4 text-muted-foreground">{dict.subtitle}</p>
         </div>
 
         <div className="mt-12 grid gap-4 lg:grid-cols-3">
-          {PACKAGES.map((pkg) => (
+          {dict.tiers.map((pkg) => (
             <Card
               key={pkg.name}
               className={cn(
@@ -83,7 +39,7 @@ export function Packages() {
             >
               {pkg.highlight && (
                 <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-500 text-white shadow-md">
-                  Most Popular
+                  {dict.mostPopular}
                 </Badge>
               )}
               <CardHeader className={cn(pkg.highlight && "pt-8")}>
@@ -116,7 +72,7 @@ export function Packages() {
                 >
                   <a href="#contact">
                     {pkg.cta}
-                    <ArrowRight />
+                    <ArrowRight className="rtl:rotate-180" />
                   </a>
                 </Button>
               </CardFooter>

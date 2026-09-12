@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "title": "SpeciaLevel — Custom AI Automation & Systems Integration",
+    "description": "SpeciaLevel designs and builds custom AI workflow automations, systems integrations, and internal portals that eliminate manual work and connect your operations."
+  },
+  "nav": {
+    "services": "Services",
+    "packages": "Packages",
+    "process": "Process",
+    "faq": "FAQ",
+    "clientPortal": "Client Portal",
+    "bookConsultation": "Book a Consultation",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "hero": {
+    "badge": "Custom AI workflow automation for modern operations",
+    "headlineTop": "Your operations run on manual work.",
+    "headlineHighlight": "Let's change that.",
+    "subtitle": "SpeciaLevel designs and builds custom AI workflows, systems integrations, and internal portals that eliminate manual tasks, connect your disconnected tools, and scale with your operations.",
+    "explorePackages": "Explore Packages",
+    "bookConsultation": "Book a Consultation",
+    "capabilities": [
+      "AI Workflow Automation",
+      "Systems & API Integration",
+      "Bespoke Internal Portals",
+      "Funnel & Lead Engines"
+    ]
+  },
+  "services": {
+    "eyebrow": "Core services",
+    "title": "Everything your operations run on — built custom",
+    "subtitle": "Four practice areas, one goal: take the manual out of your daily operations and put it into systems that never sleep.",
+    "items": [
+      {
+        "title": "AI Workflow Automation",
+        "description": "Custom agentic workflows, document processing, and webhook routing that replace repetitive manual work with reliable, always-on automation.",
+        "deliverables": ["Agentic workflows", "Document AI", "Webhook routing"]
+      },
+      {
+        "title": "Systems & API Integration",
+        "description": "Connect your CRM, ERP, accounting, and communication tools into one system that actually talks to itself.",
+        "deliverables": ["CRM & ERP", "Accounting", "Communications"]
+      },
+      {
+        "title": "Bespoke Internal Portals",
+        "description": "Role-based dashboards, employee portals, and client hubs built around how your business actually operates.",
+        "deliverables": ["Role-based dashboards", "Employee portals", "Client hubs"]
+      },
+      {
+        "title": "Funnel & Lead Automation",
+        "description": "Automated lead enrichment, CRM syncing, and follow-up engines that turn incoming interest into booked conversations.",
+        "deliverables": ["Lead enrichment", "CRM syncing", "Follow-up engines"]
+      }
+    ]
+  },
+  "packages": {
+    "eyebrow": "Packages",
+    "title": "Pick a starting point. We'll build the rest.",
+    "subtitle": "Every engagement starts with a conversation. Choose the tier that matches where your operations are today — or let us recommend one.",
+    "mostPopular": "Most Popular",
+    "tiers": [
+      {
+        "name": "Automation Audit & Blueprint",
+        "tagline": "Know exactly where your operations leak time.",
+        "ideal": "Ideal for teams that want a clear roadmap before any build.",
+        "cta": "Start with an Audit",
+        "features": [
+          "Deep discovery & workflow mapping",
+          "Tool-stack & bottleneck analysis",
+          "Automation architecture specification",
+          "Prioritized quick-win roadmap"
+        ],
+        "highlight": false
+      },
+      {
+        "name": "Custom Systems Implementation",
+        "tagline": "The full build — designed, coded, integrated, deployed.",
+        "ideal": "Ideal for businesses ready to ship real systems now.",
+        "cta": "Book a Build",
+        "features": [
+          "End-to-end workflow & portal development",
+          "Third-party integrations & data migration",
+          "Testing, QA & secure deployment",
+          "Documentation & team hand-off"
+        ],
+        "highlight": true
+      },
+      {
+        "name": "Managed Operations & Retainer",
+        "tagline": "A partner that keeps your systems improving every week.",
+        "ideal": "Ideal for teams that want continuous iteration after launch.",
+        "cta": "Get Managed Support",
+        "features": [
+          "Continuous iteration & workflow monitoring",
+          "Priority support & rapid turnarounds",
+          "Quarterly optimization sprints",
+          "Scale-ready architecture upkeep"
+        ],
+        "highlight": false
+      }
+    ]
+  },
+"process": {
+    "eyebrow": "How we work",
+    "title": "From bottleneck to blueprint to build",
+    "subtitle": "A proven four-step sequence that gets you from “where do we start?” to a shipped, scalable system — without the software project sprawl.",
+    "steps": [
+      {
+        "number": "01",
+        "title": "Discovery & Audit",
+        "description": "We map your workflows, tools, and bottlenecks to pinpoint exactly where time and money leak."
+      },
+      {
+        "number": "02",
+        "title": "Architecture & Blueprint",
+        "description": "You get a clear technical spec — what we build, how it connects, and what it takes."
+      },
+      {
+        "number": "03",
+        "title": "Rapid Build & Integration",
+        "description": "We build, integrate, and test in tight sprints, keeping you in the loop at every milestone."
+      },
+      {
+        "number": "04",
+        "title": "Hand-off & Scaling",
+        "description": "Documented systems, trained teams, and a foundation built to grow with your operations."
+      }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions, answered",
+    "subtitle": "Everything you need to know before we talk. Anything else — the consultation is free.",
+    "items": [
+      {
+        "question": "What kinds of businesses do you work with?",
+        "answer": "Mostly operations-heavy teams — agencies, e-commerce brands, B2B services, and growing startups — that are drowning in manual work and disconnected tools. We also build custom portals and dashboards for larger organizations."
+      },
+      {
+        "question": "How long does a typical implementation take?",
+        "answer": "A full custom build usually ships in 2–6 weeks depending on scope. Audits and blueprints typically land within a week. Retainer clients see continuous improvements every sprint."
+      },
+      {
+        "question": "Do you replace our existing tools or integrate with them?",
+        "answer": "Integrate first. We connect the tools you already pay for — CRM, ERP, accounting, communications — into one coherent system, and only recommend replacing a tool when something better clearly exists."
+      },
+      {
+        "question": "How do you handle data security and access?",
+        "answer": "Every build follows least-privilege access, role-based permissions, and secure storage by default. We ship with documented, encrypted data handling and hand over full ownership of the code and data."
+      },
+      {
+        "question": "We already have some automation in place. Can you still help?",
+        "answer": "Absolutely — that is often the best starting point. We audit what exists, fix what is brittle, and design new automations that layer cleanly on top instead of adding more fragile scripts."
+      }
+    ]
+  },
+  "contact": {
+    "eyebrow": "Book a consultation",
+    "title": "Let's find where the friction is",
+    "subtitle": "Tell us about your operations and we'll show you exactly what's worth automating — and how to get there.",
+    "steps": [
+      "We review your request and schedule a 30-minute consultation.",
+      "We map your bottleneck and recommend the right package.",
+      "You get a blueprint and a clear path — no obligation."
+    ],
+    "email": "hello@specialevel.com",
+    "replyTime": "Replies within one business day",
+    "ndas": "NDAs available on request",
+    "form": {
+      "nameLabel": "Full name",
+      "namePlaceholder": "Jane Smith",
+      "emailLabel": "Work email",
+      "emailPlaceholder": "you@company.com",
+      "companyLabel": "Company",
+      "companyPlaceholder": "Acme Inc.",
+      "bottleneckLabel": "Current bottleneck / project scope",
+      "bottleneckPlaceholder": "Tell us what is slowing your operations down — manual data entry, disconnected tools, missed follow-ups…",
+      "packageLabel": "Package of interest",
+      "packagePlaceholder": "Select a package",
+      "packageOptions": {
+        "not-sure": "Not sure yet — let's figure it out",
+        "audit": "Automation Audit & Blueprint",
+        "implementation": "Custom Systems Implementation",
+        "retainer": "Managed Operations & Retainer"
+      },
+      "submit": "Book my consultation",
+      "sending": "Sending…",
+      "footnote": "No spam, no pressure. We'll reply within one business day.",
+      "successTitle": "Request received",
+      "successBody": "Thanks — we'll review your project and get back to you within one business day with next steps.",
+      "errorTitle": "Something went wrong",
+      "submitError": "We couldn't save your request right now. Please email hello@specialevel.com and we'll get back to you.",
+      "fieldNameMin": "Please enter your full name.",
+      "fieldNameMax": "Name must be 120 characters or fewer.",
+      "fieldEmailInvalid": "Please enter a valid email address.",
+      "fieldCompanyMin": "Please enter your company name.",
+      "fieldCompanyMax": "Company must be 150 characters or fewer.",
+      "fieldBottleneckMin": "Give us a sentence or two about your current bottleneck or project scope.",
+      "fieldBottleneckMax": "Project details must be 2000 characters or fewer."
+    }
+  },
+  "footer": {
+    "tagline": "Custom AI workflow automation, systems integration, and internal portals — built for the way your business actually operates.",
+    "bookConsultation": "Book a Consultation",
+    "rights": "All rights reserved.",
+    "clientLogin": "Client Login"
+  },
+  "langSwitcher": {
+    "label": "Switch language",
+    "english": "English",
+    "arabic": "العربية"
+  }
+}

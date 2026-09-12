@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+ * Arabic (RTL) typography.
+ *
+ * Cairo is loaded via next/font in the root layout (variable
+ * --font-cairo). It is applied only when the active locale is Arabic so
+ * English keeps the Geist stack. The letter-spacing utilities
+ * (tracking-*) visually break the connected Arabic script, so they are
+ * reset for the whole subtree. These rules are unlayered on purpose —
+ * unlayered CSS always beats Tailwind's layered utilities.
+ * ------------------------------------------------------------------ */
+html[lang="ar"] {
+  font-family: var(--font-cairo), "Segoe UI", Tahoma, "Noto Naskh Arabic",
+    sans-serif;
+}
+
+html[lang="ar"] *,
+html[lang="ar"] *::before,
+html[lang="ar"] *::after {
+  letter-spacing: normal;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);

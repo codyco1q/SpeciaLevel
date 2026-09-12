@@ -1,16 +1,11 @@
 import { ArrowRight } from "lucide-react";
 
 import { Monogram } from "@/components/marketing/brand";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
-const FOOTER_LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#packages", label: "Packages" },
-  { href: "#process", label: "Process" },
-  { href: "#faq", label: "FAQ" },
-  { href: "#contact", label: "Book a Consultation" },
-];
+const SECTION_LINKS = ["services", "packages", "process", "faq"] as const;
 
-export function Footer() {
+export function Footer({ dict }: { dict: Dictionary }) {
   const year = new Date().getFullYear();
 
   return (
@@ -25,32 +20,39 @@ export function Footer() {
               </span>
             </a>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Custom AI workflow automation, systems integration, and internal
-              portals — built for the way your business actually operates.
+              {dict.footer.tagline}
             </p>
           </div>
 
           <nav aria-label="Footer" className="flex flex-col gap-2">
-            {FOOTER_LINKS.map((link) => (
+            {SECTION_LINKS.map((key) => (
               <a
-                key={link.href}
-                href={link.href}
+                key={key}
+                href={`#${key}`}
                 className="text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                {link.label}
+                {dict.nav[key]}
               </a>
             ))}
+            <a
+              href="#contact"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {dict.footer.bookConsultation}
+            </a>
           </nav>
         </div>
 
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>© {year} SpeciaLevel. All rights reserved.</p>
+          <p>
+            © {year} SpeciaLevel. {dict.footer.rights}
+          </p>
           <a
             href="/login"
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
           >
-            Client Login
-            <ArrowRight className="size-3.5" />
+            {dict.footer.clientLogin}
+            <ArrowRight className="size-3.5 rtl:rotate-180" />
           </a>
         </div>
       </div>

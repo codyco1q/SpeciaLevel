@@ -2,15 +2,9 @@ import { ArrowRight, CalendarCheck, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
-const CAPABILITIES = [
-  "AI Workflow Automation",
-  "Systems & API Integration",
-  "Bespoke Internal Portals",
-  "Funnel & Lead Engines",
-];
-
-export function Hero() {
+export function Hero({ dict }: { dict: Dictionary["hero"] }) {
   return (
     <section id="top" className="relative isolate overflow-hidden">
       {/* Ambient background glows */}
@@ -26,27 +20,25 @@ export function Hero() {
           className="mb-6 rounded-full border-white/15 bg-white/5 px-3 py-1 font-medium text-muted-foreground"
         >
           <Sparkles className="text-indigo-300" />
-          Custom AI workflow automation for modern operations
+          {dict.badge}
         </Badge>
 
         <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight text-balance sm:text-6xl">
-          Your operations run on manual work.{" "}
+          {dict.headlineTop}{" "}
           <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
-            Let&apos;s change that.
+            {dict.headlineHighlight}
           </span>
         </h1>
 
         <p className="mt-6 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
-          SpeciaLevel designs and builds custom AI workflows, systems
-          integrations, and internal portals that eliminate manual tasks,
-          connect your disconnected tools, and scale with your operations.
+          {dict.subtitle}
         </p>
 
         <div className="mt-10 flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
           <Button asChild size="lg" className="w-full sm:w-auto">
             <a href="#packages">
-              Explore Packages
-              <ArrowRight />
+              {dict.explorePackages}
+              <ArrowRight className="rtl:rotate-180" />
             </a>
           </Button>
           <Button
@@ -57,13 +49,13 @@ export function Hero() {
           >
             <a href="#contact">
               <CalendarCheck />
-              Book a Consultation
+              {dict.bookConsultation}
             </a>
           </Button>
         </div>
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
-          {CAPABILITIES.map((item) => (
+          {dict.capabilities.map((item) => (
             <span
               key={item}
               className="rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-muted-foreground"

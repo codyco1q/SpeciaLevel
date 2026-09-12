@@ -1,21 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Lock, Menu, X } from "lucide-react";
 
+import { LocaleSwitcher } from "@/components/marketing/locale-switcher";
 import { Button } from "@/components/ui/button";
 import { Monogram } from "@/components/marketing/brand";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
-const NAV_LINKS = [
-  { href: "#services", label: "Services" },
-  { href: "#packages", label: "Packages" },
-  { href: "#process", label: "Process" },
-  { href: "#faq", label: "FAQ" },
-];
+interface NavbarProps {
+  dict: Dictionary;
+  locale: Locale;
+}
 
-export function Navbar() {
+export function Navbar({ dict, locale }: NavbarProps) {
   const [open, setOpen] = useState(false);
+
+  const NAV_LINKS = useMemo(
+    () => [
+      { href: "#services", label: dict.nav.services },
+      { href: "#packages", label: dict.nav.packages },
+      { href: "#process", label: dict.nav.process },
+      { href: "#faq", label: dict.nav.faq },
+    ],
+    [dict]
+  );
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl">
@@ -43,6 +53,7 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
+          <LocaleSwitcher locale={locale} dict={dict.langSwitcher} />
           <Button
             asChild
             variant="ghost"
@@ -51,27 +62,29 @@ export function Navbar() {
           >
             <Link href="/login">
               <Lock />
-              Client Portal
+              {dict.nav.clientPortal}
             </Link>
           </Button>
           <Button asChild size="lg">
             <a href="#contact">
-              Book a Consultation
-              <ArrowRight />
+              {dict.nav.bookConsultation}
+              <ArrowRight className="rtl:rotate-180" />
             </a>
           </Button>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          aria-expanded={open}
-          aria-label={open ? "Close menu" : "Open menu"}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X /> : <Menu />}
-        </Button>
+        <div className="flex items-center gap-2 md:hidden">
+          <LocaleSwitcher locale={locale} dict={dict.langSwitcher} />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-expanded={open}
+            aria-label={open ? dict.nav.closeMenu : dict.nav.openMenu}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? <X /> : <Menu />}
+          </Button>
+        </div>
       </nav>
 
       {open && (
@@ -90,13 +103,13 @@ export function Navbar() {
             <div className="mt-2 flex flex-col gap-2">
               <Button asChild size="lg">
                 <a href="#contact" onClick={() => setOpen(false)}>
-                  Book a Consultation
-                  <ArrowRight />
+                  {dict.nav.bookConsultation}
+                  <ArrowRight className="rtl:rotate-180" />
                 </a>
               </Button>
               <Button asChild variant="outline" size="lg">
                 <Link href="/login" onClick={() => setOpen(false)}>
-                  Client Portal
+                  {dict.nav.clientPortal}
                 </Link>
               </Button>
             </div>

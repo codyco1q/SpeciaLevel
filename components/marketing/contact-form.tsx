@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -18,18 +18,25 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { submitMarketingLead } from "@/lib/actions/marketing-leads";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 import {
+  createMarketingLeadSchema,
   initialMarketingLeadState,
   MARKETING_PACKAGE_OPTIONS,
-  marketingLeadSchema,
   type MarketingLeadFormValues,
 } from "@/lib/validations/marketing-leads";
 
-export function ContactForm() {
+export function ContactForm({
+  dict,
+}: {
+  dict: Dictionary["contact"]["form"];
+}) {
   const [state, formAction, isPending] = useActionState(
     submitMarketingLead,
     initialMarketingLeadState
   );
+
+  const schema = useMemo(() => createMarketingLeadSchema(dict), [dict]);
 
   const {
     register,
@@ -37,7 +44,7 @@ export function ContactForm() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<MarketingLeadFormValues>({
-    resolver: zodResolver(marketingLeadSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       name: "",
       email: "",
@@ -68,11 +75,10 @@ export function ContactForm() {
       <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-6 py-16 text-center">
         <CheckCircle2 className="size-10 text-emerald-400" />
         <h3 className="mt-4 text-xl font-semibold text-foreground">
-          Request received
+          {dict.successTitle}
         </h3>
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          Thanks — we&apos;ll review your project and get back to you within
-          one business day with next steps.
+          {dict.successBody}
         </p>
       </div>
     );
@@ -82,11 +88,11 @@ export function ContactForm() {
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="name">Full name</Label>
+          <Label htmlFor="name">{dict.nameLabel}</Label>
           <Input
             id="name"
             type="text"
-            placeholder="Jane Smith"
+            placeholder={dict.namePlaceholder}
             autoComplete="name"
             aria-invalid={Boolean(fieldError("name"))}
             {...register("name")}
@@ -97,11 +103,11 @@ export function ContactForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Work email</Label>
+          <Label htmlFor="email">{dict.emailLabel}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="you@company.com"
+            placeholder={dict.emailPlaceholder}
             autoComplete="email"
             aria-invalid={Boolean(fieldError("email"))}
             {...register("email")}
@@ -113,11 +119,11 @@ export function ContactForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="company">Company</Label>
+        <Label htmlFor="company">{dict.companyLabel}</Label>
         <Input
           id="company"
           type="text"
-          placeholder="Acme Inc."
+          placeholder={dict.companyPlaceholder}
           autoComplete="organization"
           aria-invalid={Boolean(fieldError("company"))}
           {...register("company")}
@@ -128,11 +134,11 @@ export function ContactForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="bottleneck">Current bottleneck / project scope</Label>
+        <Label htmlFor="bottleneck">{dict.bottleneckLabel}</Label>
         <Textarea
           id="bottleneck"
           rows={4}
-          placeholder="Tell us what is slowing your operations down — manual data entry, disconnected tools, missed follow-ups…"
+          placeholder={dict.bottleneckPlaceholder}
           aria-invalid={Boolean(fieldError("bottleneck"))}
           {...register("bottleneck")}
         />
@@ -144,7 +150,7 @@ export function ContactForm() {
       </div>
 
       <div className="space-y-2">
-        <Label id="package-label">Package of interest</Label>
+        <Label id="package-label">{dict.packageLabel}</Label>
         <Controller
           name="packageOfInterest"
           control={control}
@@ -155,12 +161,12 @@ export function ContactForm() {
                 size="md"
                 className="h-9 w-full"
               >
-                <SelectValue placeholder="Select a package" />
+                <SelectValue placeholder={dict.packagePlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 {MARKETING_PACKAGE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {dict.packageOptions[option.value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -171,7 +177,7 @@ export function ContactForm() {
 
       {state.status === "error" && state.error && (
         <Alert variant="destructive">
-          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertTitle>{dict.errorTitle}</AlertTitle>
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       )}
@@ -180,15 +186,15 @@ export function ContactForm() {
         {pending ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            Sending…
+            {dict.sending}
           </>
         ) : (
-          "Book my consultation"
+          dict.submit
         )}
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        No spam, no pressure. We&apos;ll reply within one business day.
+        {dict.footnote}
       </p>
     </form>
   );

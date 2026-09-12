@@ -6,9 +6,10 @@ import path from "node:path";
 import { z } from "zod";
 
 import {
-  marketingLeadSchema,
+  createMarketingLeadSchema,
   type MarketingLeadState,
 } from "@/lib/validations/marketing-leads";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 function parseFieldErrors(
   issues: z.ZodIssue[]
@@ -44,7 +45,12 @@ export async function submitMarketingLead(
     packageOfInterest: formData.get("packageOfInterest"),
   };
 
-  const parsed = marketingLeadSchema.safeParse(payload);
+  // Validate with messages matching the visitor's active locale so
+  // server-side field errors render in the same language as the form.
+  const dict = await getDictionary();
+  const parsed = createMarketingLeadSchema(
+    dict.contact.form
+  ).safeParse(payload);
   if (!parsed.success) {
     return {
       status: "error",
@@ -69,8 +75,7 @@ export async function submitMarketingLead(
   } catch {
     return {
       status: "error",
-      error:
-        "We couldn't save your request right now. Please email hello@specialevel.com and we'll get back to you.",
+      error: dict.contact.form.submitError,
     };
   }
 
