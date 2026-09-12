@@ -94,6 +94,24 @@ export interface CalendarEvent {
   updated_at: string;
 }
 
+export type TaskStatus = "todo" | "in_progress" | "review" | "done";
+
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+export interface Task {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigned_to: string | null;
+  created_by: string;
+  due_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 
 export interface OrganizationInvitation {

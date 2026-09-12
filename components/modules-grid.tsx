@@ -90,6 +90,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     icon: ShieldCheck,
     link: "/roles",
   },
+  {
+    key: "tasks",
+    name: "Tasks",
+    description: "Manage tasks and track team progress.",
+    icon: CheckSquare,
+    link: "/tasks",
+  },
 ];
 
 /**
@@ -137,13 +144,6 @@ const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "Chat",
     description: "Internal team messaging and channels.",
     icon: MessageSquare,
-    isFuture: true,
-  },
-  {
-    key: "tasks",
-    name: "Tasks",
-    description: "Task management and assignment tracking.",
-    icon: CheckSquare,
     isFuture: true,
   },
   {
