@@ -7,7 +7,7 @@ export function Faq({ dict }: { dict: Dictionary["faq"] }) {
     <section id="faq" className="scroll-mt-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-300">
+          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-500 dark:text-indigo-300">
             {dict.eyebrow}
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">
@@ -20,7 +20,7 @@ export function Faq({ dict }: { dict: Dictionary["faq"] }) {
           {dict.items.map((faq) => (
             <details
               key={faq.question}
-              className="group rounded-xl border border-white/10 bg-white/5"
+              className="group rounded-xl border border-border bg-card/60"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-medium sm:text-base [&::-webkit-details-marker]:hidden">
                 {faq.question}

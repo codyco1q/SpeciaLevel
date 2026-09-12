@@ -519,7 +519,7 @@ const systemRoles = roles.filter((role) => role.isSystem);
             Roles &amp; Permissions
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Control what each role can see and do across UpLevel.
+            Control what each role can see and do across SpeciaLevel.
           </p>
         </div>
         {canManage && (

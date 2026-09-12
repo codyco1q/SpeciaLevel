@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { hasPermission } from "@/lib/auth/rbac";
 import { cn } from "@/lib/utils";
+import { Monogram } from "@/components/brand";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { DashboardLocaleSwitcher } from "@/components/dashboard/locale-switcher";
 
@@ -112,11 +114,9 @@ export default function Sidebar({
     <aside className="flex h-full w-64 flex-col border-e border-border bg-card">
       {/* Logo */}
       <div className="flex items-center gap-2 border-b border-border px-6 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <span className="text-sm font-bold">UL</span>
-        </div>
+        <Monogram className="size-8 rounded-lg" />
         <div>
-          <p className="text-sm font-semibold">UpLevel</p>
+          <p className="text-sm font-semibold">SpeciaLevel</p>
           {organizationName && (
             <p className="text-xs text-muted-foreground">{organizationName}</p>
           )}
@@ -148,15 +148,24 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="border-t border-border p-4">
-        <div className="mb-2">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {t.languageLabel}
-          </p>
-          <DashboardLocaleSwitcher
-            locale={locale}
-            label={t.languageLabel}
-            english={platform.settings.languageEnglish}
-            arabic={platform.settings.languageArabic}
+        <div className="mb-2 flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {t.languageLabel}
+            </p>
+            <DashboardLocaleSwitcher
+              locale={locale}
+              label={t.languageLabel}
+              english={platform.settings.languageEnglish}
+              arabic={platform.settings.languageArabic}
+            />
+          </div>
+          {/* Theme toggle sits flush against the language switcher; under
+              dir="rtl" the flex row flips and it lands on the inline-start. */}
+          <ThemeToggle
+            labels={platform.theme}
+            aria-label={platform.theme.toggle}
+            className="size-8"
           />
         </div>
 

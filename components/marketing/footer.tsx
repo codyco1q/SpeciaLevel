@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
 
-import { Monogram } from "@/components/marketing/brand";
+import { Monogram } from "@/components/brand";
 import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
 const SECTION_LINKS = ["services", "packages", "process", "faq"] as const;
@@ -9,7 +9,7 @@ export function Footer({ dict }: { dict: Dictionary }) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-white/10 bg-background">
+    <footer className="border-t border-border bg-background">
       <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-sm space-y-3">
@@ -43,7 +43,7 @@ export function Footer({ dict }: { dict: Dictionary }) {
           </nav>
         </div>
 
-        <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-10 flex flex-col gap-3 border-t border-border pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>
             © {year} SpeciaLevel. {dict.footer.rights}
           </p>

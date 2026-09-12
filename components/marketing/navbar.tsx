@@ -5,8 +5,9 @@ import Link from "next/link";
 import { ArrowRight, Lock, Menu, X } from "lucide-react";
 
 import { LocaleSwitcher } from "@/components/marketing/locale-switcher";
+import { Monogram } from "@/components/brand";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Monogram } from "@/components/marketing/brand";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface NavbarProps {
@@ -28,14 +29,14 @@ export function Navbar({ dict, locale }: NavbarProps) {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-background/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
       <nav
         aria-label="Main navigation"
         className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
       >
         <a href="#top" className="flex items-center gap-2.5">
           <Monogram />
-          <span className="text-lg font-bold tracking-tight text-foreground">
+          <span className="hidden text-lg font-bold tracking-tight text-foreground sm:inline">
             SpeciaLevel
           </span>
         </a>
@@ -45,7 +46,7 @@ export function Navbar({ dict, locale }: NavbarProps) {
             <a
               key={link.href}
               href={link.href}
-              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
             >
               {link.label}
             </a>
@@ -53,6 +54,7 @@ export function Navbar({ dict, locale }: NavbarProps) {
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
+          <ThemeToggle variant="ghost" labels={dict.platform.theme} />
           <LocaleSwitcher locale={locale} dict={dict.langSwitcher} />
           <Button
             asChild
@@ -74,6 +76,7 @@ export function Navbar({ dict, locale }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle variant="ghost" labels={dict.platform.theme} />
           <LocaleSwitcher locale={locale} dict={dict.langSwitcher} />
           <Button
             variant="ghost"
@@ -88,14 +91,14 @@ export function Navbar({ dict, locale }: NavbarProps) {
       </nav>
 
       {open && (
-        <div className="border-t border-white/10 bg-background/95 px-4 pb-4 pt-2 backdrop-blur-xl md:hidden">
+        <div className="border-t border-border bg-background/95 px-4 pb-4 pt-2 backdrop-blur-xl md:hidden">
           <div className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                className="rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
                 {link.label}
               </a>

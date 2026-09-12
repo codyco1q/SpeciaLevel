@@ -17,7 +17,7 @@ export function Services({ dict }: { dict: Dictionary["services"] }) {
     <section id="services" className="scroll-mt-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-300">
+          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-500 dark:text-indigo-300">
             {dict.eyebrow}
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">
@@ -32,11 +32,11 @@ export function Services({ dict }: { dict: Dictionary["services"] }) {
             return (
               <Card
                 key={service.title}
-                className="border-white/10 bg-white/5 shadow-none"
+                className="border-border shadow-none"
               >
                 <CardHeader>
-                  <div className="flex size-11 items-center justify-center rounded-lg border border-white/10 bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20">
-                    <Icon className="size-5 text-indigo-300" />
+                  <div className="flex size-11 items-center justify-center rounded-lg border border-border bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20">
+                    <Icon className="size-5 text-indigo-500 dark:text-indigo-300" />
                   </div>
                   <CardTitle className="pt-2 text-base">
                     {service.title}
@@ -49,9 +49,9 @@ export function Services({ dict }: { dict: Dictionary["services"] }) {
                   {service.deliverables.map((item) => (
                     <span
                       key={item}
-                      className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-muted-foreground"
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-card/60 px-2.5 py-1 text-xs text-muted-foreground"
                     >
-                      <Check className="size-3 text-indigo-300" />
+                      <Check className="size-3 text-indigo-500 dark:text-indigo-300" />
                       {item}
                     </span>
                   ))}

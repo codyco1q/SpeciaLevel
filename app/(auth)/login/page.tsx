@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { acceptInvitation } from "@/lib/actions/invites";
+import { Monogram } from "@/components/brand";
 import { PENDING_INVITE_STORAGE_KEY } from "@/lib/validations/invites";
 
 export default function LoginPage() {
@@ -74,12 +75,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <span className="text-lg font-bold">UL</span>
-          </div>
+          <Monogram className="mx-auto mb-4 size-12 rounded-xl" />
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sign in to your UpLevel workspace
+            Sign in to your SpeciaLevel workspace
           </p>
         </div>
 

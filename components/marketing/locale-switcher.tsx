@@ -55,7 +55,7 @@ export function LocaleSwitcher({ locale, dict, className }: LocaleSwitcherProps)
       role="group"
       aria-label={dict.label}
       className={cn(
-        "inline-flex items-center rounded-full border border-white/10 bg-white/5 p-0.5 transition-opacity",
+        "inline-flex items-center rounded-full border border-border bg-card/60 p-0.5 transition-opacity",
         isPending && "pointer-events-none opacity-60",
         className
       )}
@@ -72,7 +72,7 @@ export function LocaleSwitcher({ locale, dict, className }: LocaleSwitcherProps)
             className={cn(
               "rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
               active
-                ? "bg-white/15 text-foreground shadow-sm"
+                ? "bg-accent text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >

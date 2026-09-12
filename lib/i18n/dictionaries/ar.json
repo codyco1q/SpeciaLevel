@@ -225,6 +225,12 @@
       "copyLink": "نسخ الرابط",
       "revoke": "إلغاء"
     },
+    "theme": {
+      "toggle": "تبديل المظهر",
+      "light": "فاتح",
+      "dark": "داكن",
+      "system": "النظام"
+    },
     "sidebar": {
       "languageLabel": "اللغة",
       "dashboard": "لوحة التحكم",

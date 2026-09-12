@@ -62,7 +62,6 @@ export function TaskDialog({
   members,
   onSaved,
   platform,
-  locale,
 }: TaskDialogProps) {
   const isEdit = task !== null;
   const t = platform.tasks;

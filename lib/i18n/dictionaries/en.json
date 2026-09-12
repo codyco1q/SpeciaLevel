@@ -225,6 +225,12 @@
       "copyLink": "Copy link",
       "revoke": "Revoke"
     },
+    "theme": {
+      "toggle": "Toggle theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
     "sidebar": {
       "languageLabel": "Language",
       "dashboard": "Dashboard",

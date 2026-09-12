@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { MarketingDarkMode } from "@/components/marketing/dark-mode";
 import { Footer } from "@/components/marketing/footer";
 import { Navbar } from "@/components/marketing/navbar";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
@@ -12,10 +11,12 @@ import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
  * footer stay completely separate from the authenticated app
  * (/login, /signup, /onboarding, /dashboard, ...).
  *
- * The site is dark-mode-first: the wrapper carries the `.dark` class (so the
- * SSR HTML renders dark immediately) and <MarketingDarkMode /> mirrors it onto
- * <html> after mount so portaled UI (Select popover) inherits dark tokens
- * too. On unmount the class is removed, keeping the rest of the app light.
+ * Theming: dark mode is no longer hard-coded here. The root layout wraps the
+ * whole app in a next-themes <ThemeProvider> (attribute="class",
+ * defaultTheme="system"), so the marketing site follows the user's system
+ * preference and the ThemeToggle in the navbar controls Light / Dark /
+ * System exactly like the client portal. All section components use shadcn
+ * theme tokens so they render correctly in both modes.
  *
  * i18n: the layout reads the NEXT_LOCALE cookie, loads the matching
  * dictionary, and hands it to the Navbar/Footer. The `<html>` element in the
@@ -60,9 +61,8 @@ export default async function MarketingLayout({
     <div
       lang={locale}
       dir={locale === "ar" ? "rtl" : "ltr"}
-      className="dark flex min-h-screen flex-col bg-background text-foreground"
+      className="flex min-h-screen flex-col bg-background text-foreground"
     >
-      <MarketingDarkMode />
       <Navbar dict={dict} locale={locale} />
       <main className="flex-1">{children}</main>
       <Footer dict={dict} />

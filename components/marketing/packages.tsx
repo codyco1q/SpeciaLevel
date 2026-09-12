@@ -18,7 +18,7 @@ export function Packages({ dict }: { dict: Dictionary["packages"] }) {
     <section id="packages" className="scroll-mt-24">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-300">
+          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-500 dark:text-indigo-300">
             {dict.eyebrow}
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">
@@ -32,7 +32,7 @@ export function Packages({ dict }: { dict: Dictionary["packages"] }) {
             <Card
               key={pkg.name}
               className={cn(
-                "relative border-white/10 bg-white/5 shadow-none",
+                "relative border-border shadow-none",
                 pkg.highlight &&
                   "border-indigo-400/60 bg-indigo-500/10 shadow-xl shadow-indigo-500/10"
               )}
@@ -55,12 +55,12 @@ export function Packages({ dict }: { dict: Dictionary["packages"] }) {
                       key={feature}
                       className="flex items-start gap-2.5 text-sm text-muted-foreground"
                     >
-                      <Check className="mt-0.5 size-4 shrink-0 text-indigo-300" />
+                      <Check className="mt-0.5 size-4 shrink-0 text-indigo-500 dark:text-indigo-300" />
                       {feature}
                     </li>
                   ))}
                 </ul>
-                <p className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs text-muted-foreground">
+                <p className="rounded-md border border-border bg-card/60 px-3 py-2 text-xs text-muted-foreground">
                   {pkg.ideal}
                 </p>
               </CardContent>

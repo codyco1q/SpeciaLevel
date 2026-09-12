@@ -17,15 +17,15 @@ export function Hero({ dict }: { dict: Dictionary["hero"] }) {
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-24 pt-20 text-center sm:px-6 sm:pb-28 sm:pt-28">
         <Badge
           variant="outline"
-          className="mb-6 rounded-full border-white/15 bg-white/5 px-3 py-1 font-medium text-muted-foreground"
+          className="mb-6 rounded-full border-border bg-card/60 px-3 py-1 font-medium text-muted-foreground"
         >
-          <Sparkles className="text-indigo-300" />
+          <Sparkles className="text-indigo-500 dark:text-indigo-300" />
           {dict.badge}
         </Badge>
 
         <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight text-balance sm:text-6xl">
           {dict.headlineTop}{" "}
-          <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent dark:from-indigo-300 dark:via-violet-300 dark:to-fuchsia-300">
             {dict.headlineHighlight}
           </span>
         </h1>
@@ -58,7 +58,7 @@ export function Hero({ dict }: { dict: Dictionary["hero"] }) {
           {dict.capabilities.map((item) => (
             <span
               key={item}
-              className="rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-muted-foreground"
+              className="rounded-full border border-border bg-card/60 px-3.5 py-1.5 text-xs font-medium text-muted-foreground"
             >
               {item}
             </span>

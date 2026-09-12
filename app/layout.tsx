@@ -3,6 +3,7 @@ import { Cairo, Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 
+import { ThemeProvider } from "@/components/theme-provider";
 import { getLocale } from "@/lib/i18n/get-dictionary";
 
 const geistSans = Geist({
@@ -26,7 +27,7 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "UpLevel",
+  title: "SpeciaLevel",
   description: "Multi-tenant business operating system",
 };
 
@@ -43,13 +44,26 @@ export default async function RootLayout({
 }) {
   const locale = await getLocale();
 
+  // suppressHydrationWarning: next-themes patches <html> with the resolved
+  // theme class (per the NEXT_THEME storage / OS preference) before hydration,
+  // so the server-rendered shell intentionally carries no theme class.
   return (
     <html
       lang={locale}
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

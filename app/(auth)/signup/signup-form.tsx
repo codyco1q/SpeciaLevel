@@ -140,7 +140,7 @@ export default function SignupForm({
             <>
               <h1 className="text-2xl font-bold">Create your account</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Join UpLevel and start your workspace
+                Join SpeciaLevel and start your workspace
               </p>
             </>
           )}
