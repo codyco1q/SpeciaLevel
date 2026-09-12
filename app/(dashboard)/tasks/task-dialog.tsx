@@ -27,10 +27,9 @@ import { taskInputSchema, type TaskInput } from "@/lib/validations/tasks";
 import { createTask, updateTask, type TaskRow } from "@/lib/actions/tasks";
 import {
   TASK_PRIORITIES,
-  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
-  TASK_STATUS_LABELS,
 } from "./task-meta";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 export interface TaskMemberOption {
   id: string;
@@ -46,6 +45,9 @@ interface TaskDialogProps {
   /** Active organization members available for assignment. */
   members: TaskMemberOption[];
   onSaved: () => void;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /**
@@ -59,8 +61,12 @@ export function TaskDialog({
   task,
   members,
   onSaved,
+  platform,
+  locale,
 }: TaskDialogProps) {
   const isEdit = task !== null;
+  const t = platform.tasks;
+  const common = platform.common;
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -115,7 +121,7 @@ export function TaskDialog({
 
       if (result.status === "error") {
         setServerError(
-          result.error ?? "Something went wrong. Please try again."
+          result.error ?? (isEdit ? t.errors.updateFailed : t.errors.createFailed)
         );
         if (result.fieldErrors) {
           for (const [key, messages] of Object.entries(result.fieldErrors)) {
@@ -138,21 +144,19 @@ export function TaskDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckSquare className="h-4 w-4 text-muted-foreground" />
-            {isEdit ? "Edit task" : "New task"}
+            {isEdit ? t.editTask : t.newTask}
           </DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? "Update the task details below."
-              : "Create a task for your organization."}
+            {isEdit ? t.editTaskDescription : t.createTaskDescription}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="task-title">Title</Label>
+            <Label htmlFor="task-title">{t.titleLabel}</Label>
             <Input
               id="task-title"
-              placeholder="e.g. Prepare Q3 report"
+              placeholder={t.titlePlaceholder}
               {...register("title")}
               aria-invalid={Boolean(errors.title)}
             />
@@ -165,7 +169,7 @@ export function TaskDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="task-status">Status</Label>
+              <Label htmlFor="task-status">{t.tableStatus}</Label>
               <Controller
                 name="status"
                 control={control}
@@ -182,7 +186,7 @@ export function TaskDialog({
                     <SelectContent>
                       {TASK_STATUSES.map((status) => (
                         <SelectItem key={status} value={status}>
-                          {TASK_STATUS_LABELS[status]}
+                          {t.status[status]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -192,7 +196,7 @@ export function TaskDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="task-priority">Priority</Label>
+              <Label htmlFor="task-priority">{t.tablePriority}</Label>
               <Controller
                 name="priority"
                 control={control}
@@ -209,7 +213,7 @@ export function TaskDialog({
                     <SelectContent>
                       {TASK_PRIORITIES.map((priority) => (
                         <SelectItem key={priority} value={priority}>
-                          {TASK_PRIORITY_LABELS[priority]}
+                          {t.priority[priority]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -221,7 +225,7 @@ export function TaskDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="task-assignee">Assign to</Label>
+              <Label htmlFor="task-assignee">{t.assignTo}</Label>
               <Controller
                 name="assignedTo"
                 control={control}
@@ -233,13 +237,13 @@ export function TaskDialog({
                     }
                   >
                     <SelectTrigger id="task-assignee" className="w-full">
-                      <SelectValue placeholder="Unassigned" />
+                      <SelectValue placeholder={t.unassigned} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Unassigned</SelectItem>
+                      <SelectItem value="none">{t.unassigned}</SelectItem>
                       {members.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.fullName ?? member.email ?? "Unnamed"}
+                          {member.fullName ?? member.email ?? t.unnamed}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -248,7 +252,7 @@ export function TaskDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="task-due">Due date</Label>
+              <Label htmlFor="task-due">{t.dueDateLabel}</Label>
               <Input
                 id="task-due"
                 type="date"
@@ -264,10 +268,10 @@ export function TaskDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="task-description">Description</Label>
+            <Label htmlFor="task-description">{t.descriptionLabel}</Label>
             <Textarea
               id="task-description"
-              placeholder="Details, links, acceptance criteria…"
+              placeholder={t.descriptionPlaceholder}
               rows={3}
               {...register("description")}
               aria-invalid={Boolean(errors.description)}
@@ -295,13 +299,13 @@ export function TaskDialog({
               onClick={() => onOpenChange(false)}
               disabled={isPending}
             >
-              Cancel
+              {common.cancel}
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending && (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               )}
-              {isEdit ? "Save changes" : "Create task"}
+              {isEdit ? t.saveChanges : t.createTask}
             </Button>
           </DialogFooter>
         </form>

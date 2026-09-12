@@ -22,6 +22,8 @@ export interface Profile {
   department_id: string | null;
   is_active: boolean;
   status: string;
+  /** UI locale the user chose ('en' | 'ar'); read by getLocale() when no cookie is set. */
+  preferred_language: string;
   created_at: string;
   updated_at: string;
 }

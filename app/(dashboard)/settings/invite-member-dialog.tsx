@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createInvitation } from "@/lib/actions/invites";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 import {
   initialInviteActionState,
   invitationSchema,
@@ -36,6 +37,8 @@ interface InviteMemberDialogProps {
   onOpenChange: (open: boolean) => void;
   roles: { id: string; name: string; isSystem: boolean }[];
   departments: { id: string; name: string }[];
+  /** Localized copy for the current render. */
+  platform: Dictionary["platform"];
 }
 
 export function InviteMemberDialog({
@@ -43,7 +46,9 @@ export function InviteMemberDialog({
   onOpenChange,
   roles,
   departments,
+  platform,
 }: InviteMemberDialogProps) {
+  const t = platform.settings;
   const [state, formAction, isPending] = useActionState(
     async (_prevState: InviteActionState, formData: FormData) =>
       createInvitation({
@@ -98,20 +103,17 @@ export function InviteMemberDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Invite a member</DialogTitle>
-          <DialogDescription>
-            They&apos;ll get a signup link with a role and optional department.
-            The link expires in 7 days.
-          </DialogDescription>
+          <DialogTitle>{t.inviteMember}</DialogTitle>
+          <DialogDescription>{t.inviteMemberDescription}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="invite-email">Email</Label>
+            <Label htmlFor="invite-email">{t.emailLabel}</Label>
             <Input
               id="invite-email"
               type="email"
-              placeholder="teammate@example.com"
+              placeholder={t.emailPlaceholder}
               autoComplete="off"
               aria-invalid={Boolean(emailError)}
               {...register("email")}
@@ -125,7 +127,7 @@ export function InviteMemberDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="invite-role">Role</Label>
+              <Label htmlFor="invite-role">{t.roleLabel}</Label>
               <Controller
                 control={control}
                 name="role_id"
@@ -137,14 +139,14 @@ export function InviteMemberDialog({
                     }
                   >
                     <SelectTrigger id="invite-role" className="w-full">
-                      <SelectValue placeholder="Select a role" />
+                      <SelectValue placeholder={t.selectRole} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Select a role</SelectItem>
+                      <SelectItem value="none">{t.selectRole}</SelectItem>
                       {roles.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
                           {role.name}
-                          {role.isSystem ? " (system)" : ""}
+                          {role.isSystem ? t.roleSystemSuffix : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -159,7 +161,7 @@ export function InviteMemberDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="invite-department">Department (optional)</Label>
+              <Label htmlFor="invite-department">{t.departmentLabel}</Label>
               <Controller
                 control={control}
                 name="department_id"
@@ -171,10 +173,10 @@ export function InviteMemberDialog({
                     }
                   >
                     <SelectTrigger id="invite-department" className="w-full">
-                      <SelectValue placeholder="No department" />
+                      <SelectValue placeholder={t.noDepartment} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No department</SelectItem>
+                      <SelectItem value="none">{t.noDepartment}</SelectItem>
                       {departments.map((department) => (
                         <SelectItem key={department.id} value={department.id}>
                           {department.name}
@@ -201,14 +203,14 @@ export function InviteMemberDialog({
           {state.status === "success" && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="size-4 shrink-0" />
-              Invitation sent — share the link from the list.
+              {t.invitationSent}
             </div>
           )}
 
           <DialogFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? <Loader2 className="animate-spin" /> : <UserPlus />}
-              Send invitation
+              {t.sendInvitation}
             </Button>
           </DialogFooter>
         </form>

@@ -9,6 +9,7 @@ import {
   type ActiveTimeEntry,
 } from "@/lib/actions/time-tracking";
 import { formatDurationCompact, formatElapsed } from "@/app/(dashboard)/time/format";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface QuickClockButtonProps {
   activeEntry: ActiveTimeEntry | null;
@@ -17,6 +18,9 @@ interface QuickClockButtonProps {
   serverNowIso: string;
   /** Whether the caller may clock in/out (time_tracking.manage_self). */
   canManageSelf: boolean;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /**
@@ -29,7 +33,10 @@ export function QuickClockButton({
   todayTotalSeconds,
   serverNowIso,
   canManageSelf,
+  platform,
+  locale,
 }: QuickClockButtonProps) {
+  const t = platform.time;
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +58,7 @@ export function QuickClockButton({
     startTransition(async () => {
       const result = await clockIn();
       if (result.status === "error") {
-        setError(result.error ?? "Could not clock you in. Please try again.");
+        setError(result.error ?? t.errors.clockInFailed);
       }
     });
   }
@@ -61,7 +68,7 @@ export function QuickClockButton({
     startTransition(async () => {
       const result = await clockOut();
       if (result.status === "error") {
-        setError(result.error ?? "Could not clock you out. Please try again.");
+        setError(result.error ?? t.errors.clockOutFailed);
       }
     });
   }
@@ -72,10 +79,10 @@ export function QuickClockButton({
         {isClockedIn ? (
           <Badge variant="default">
             <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-            Clocked In
+            {t.clockedIn}
           </Badge>
         ) : (
-          <Badge variant="secondary">Clocked Out</Badge>
+          <Badge variant="secondary">{t.clockedOut}</Badge>
         )}
       </div>
 
@@ -83,10 +90,19 @@ export function QuickClockButton({
         className="font-mono text-3xl font-bold tracking-tight tabular-nums"
         aria-live="off"
       >
-        {isClockedIn ? formatElapsed(activeSeconds) : "00:00:00"}
+        {isClockedIn ? formatElapsed(activeSeconds, locale) : "00:00:00"}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Today: {formatDurationCompact(todayTotalSeconds)}
+        {platform.dashboard.today}:{" "}
+        {formatDurationCompact(
+          todayTotalSeconds,
+          {
+            hours: t.durationHours,
+            minutes: t.durationMinutes,
+            seconds: t.durationSeconds,
+          },
+          locale
+        )}
       </p>
 
       {error && (
@@ -103,17 +119,17 @@ export function QuickClockButton({
               disabled={isPending}
               onClick={handleClockOut}
             >
-              {isPending ? "Clocking out…" : "Clock Out"}
+              {isPending ? t.clockingOut : t.clockOut}
             </Button>
           ) : (
             <Button disabled={isPending} onClick={handleClockIn}>
-              {isPending ? "Clocking in…" : "Clock In"}
+              {isPending ? t.clockingIn : t.clockIn}
             </Button>
           )}
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">
-          You don&apos;t have permission to clock in or out.
+          {t.noClockPermission}
         </p>
       )}
     </div>

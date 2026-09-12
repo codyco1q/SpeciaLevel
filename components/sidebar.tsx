@@ -17,19 +17,17 @@ import {
 } from "lucide-react";
 import { hasPermission } from "@/lib/auth/rbac";
 import { cn } from "@/lib/utils";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
+import { DashboardLocaleSwitcher } from "@/components/dashboard/locale-switcher";
 
-export interface SidebarNavItem {
-  label: string;
-  href: string;
-  icon: typeof LayoutDashboard;
-  permission: string;
-}
-
-interface SidebarProps {
+export interface SidebarProps {
   permissions: string[];
   organizationName?: string;
   userFullName?: string;
   userEmail?: string;
+  locale: Locale;
+  /** Platform dictionary slice — drives every label in the shell. */
+  platform: Dictionary["platform"];
 }
 
 export default function Sidebar({
@@ -37,65 +35,68 @@ export default function Sidebar({
   organizationName,
   userFullName,
   userEmail,
+  locale,
+  platform,
 }: SidebarProps) {
   const pathname = usePathname();
+  const t = platform.sidebar;
 
-  const navItems: SidebarNavItem[] = [
+  const navItems = [
     {
-      label: "Dashboard",
+      label: t.dashboard,
       href: "/dashboard",
       icon: LayoutDashboard,
       permission: "dashboard.view",
     },
     {
-      label: "Calendar",
+      label: t.calendar,
       href: "/calendar",
       icon: CalendarDays,
       permission: "calendar.view",
     },
     {
-      label: "Time Tracking",
+      label: t.timeTracking,
       href: "/time",
       icon: Clock,
       permission: "time_tracking.view_self",
     },
     {
-      label: "Tasks",
+      label: t.tasks,
       href: "/tasks",
       icon: CheckSquare,
       permission: "tasks.view",
     },
     {
-      label: "Chat",
+      label: t.chat,
       href: "/chat",
       icon: MessageSquare,
       permission: "chat.view",
     },
     {
-      label: "Employees",
+      label: t.employees,
       href: "/employees",
       icon: Users,
       permission: "employees.view",
     },
     {
-      label: "Departments",
+      label: t.departments,
       href: "/departments",
       icon: Building2,
       permission: "departments.view",
     },
     {
-      label: "Roles & Permissions",
+      label: t.roles,
       href: "/roles",
       icon: ShieldCheck,
       permission: "roles.view",
     },
     {
-      label: "Modules",
+      label: t.modules,
       href: "/modules",
       icon: Puzzle,
       permission: "dashboard.view",
     },
-  ];
+  ] as const;
 
   const visibleItems = navItems.filter((item) =>
     hasPermission(item.permission, permissions)
@@ -108,7 +109,7 @@ export default function Sidebar({
     hasPermission("settings.manage", permissions);
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-border bg-card">
+    <aside className="flex h-full w-64 flex-col border-e border-border bg-card">
       {/* Logo */}
       <div className="flex items-center gap-2 border-b border-border px-6 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -147,13 +148,25 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="border-t border-border p-4">
-        <div className="mb-2 flex items-center gap-3">
+        <div className="mb-2">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {t.languageLabel}
+          </p>
+          <DashboardLocaleSwitcher
+            locale={locale}
+            label={t.languageLabel}
+            english={platform.settings.languageEnglish}
+            arabic={platform.settings.languageArabic}
+          />
+        </div>
+
+        <div className="mb-2 mt-3 flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-            {(userFullName || userEmail || "U").charAt(0).toUpperCase()}
+            {(userFullName || userEmail || t.user).charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
-              {userFullName || "User"}
+              {userFullName || t.user}
             </p>
             <p className="truncate text-xs text-muted-foreground">
               {userEmail}
@@ -166,7 +179,7 @@ export default function Sidebar({
             className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Settings className="h-4 w-4" />
-            Settings
+            {t.settings}
           </Link>
         ) : null}
         <form action="/auth/signout" method="post">
@@ -174,8 +187,8 @@ export default function Sidebar({
             type="submit"
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <LogOut className="h-4 w-4" />
-            Sign out
+            <LogOut className="h-4 w-4 rtl:rotate-180" />
+            {t.logout}
           </button>
         </form>
       </div>

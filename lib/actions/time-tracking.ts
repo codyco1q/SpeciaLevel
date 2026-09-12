@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 import type { ClockActionState } from "@/lib/validations/time-tracking";
 
 /**
@@ -61,11 +62,13 @@ async function authorizeTimeTracking(
   permission: "time_tracking.view_self" | "time_tracking.manage_self"
 ): Promise<AuthResult> {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.time.errors;
 
   if (!userContext) {
     return {
       ok: false,
-      error: { status: "error", error: "You must be signed in to do this." },
+      error: { status: "error", error: err.signedIn },
     };
   }
 
@@ -76,7 +79,7 @@ async function authorizeTimeTracking(
       ok: false,
       error: {
         status: "error",
-        error: "Set up your organization before tracking time.",
+        error: err.setupOrganization,
       },
     };
   }
@@ -86,7 +89,7 @@ async function authorizeTimeTracking(
       ok: false,
       error: {
         status: "error",
-        error: "You don't have permission to track time.",
+        error: err.noPermission,
       },
     };
   }
@@ -125,6 +128,9 @@ export async function clockIn(): Promise<ClockActionState> {
     return auth.error;
   }
 
+  const dict = await getDictionary();
+  const err = dict.platform.time.errors;
+
   const supabase = await createServerClient();
 
   const { entry, error: lookupError } = await findOpenEntry(
@@ -136,14 +142,14 @@ export async function clockIn(): Promise<ClockActionState> {
   if (lookupError) {
     return {
       status: "error",
-      error: "Could not check your current status. Please try again.",
+      error: err.checkStatusFailed,
     };
   }
 
   if (entry) {
     return {
       status: "error",
-      error: "You're already clocked in. Clock out before clocking in again.",
+      error: err.alreadyClockedIn,
     };
   }
 
@@ -159,12 +165,12 @@ export async function clockIn(): Promise<ClockActionState> {
     if (error.code === "23505") {
       return {
         status: "error",
-        error: "You're already clocked in. Clock out before clocking in again.",
+        error: err.alreadyClockedIn,
       };
     }
     return {
       status: "error",
-      error: "Could not clock you in. Please try again.",
+      error: err.clockInFailed,
     };
   }
 
@@ -185,6 +191,9 @@ export async function clockOut(): Promise<ClockActionState> {
     return auth.error;
   }
 
+  const dict = await getDictionary();
+  const err = dict.platform.time.errors;
+
   const supabase = await createServerClient();
 
   const { entry, error: lookupError } = await findOpenEntry(
@@ -196,14 +205,14 @@ export async function clockOut(): Promise<ClockActionState> {
   if (lookupError) {
     return {
       status: "error",
-      error: "Could not check your current status. Please try again.",
+      error: err.checkStatusFailed,
     };
   }
 
   if (!entry) {
     return {
       status: "error",
-      error: "You're not clocked in. Clock in before clocking out.",
+      error: err.notClockedIn,
     };
   }
 
@@ -229,7 +238,7 @@ export async function clockOut(): Promise<ClockActionState> {
   if (error) {
     return {
       status: "error",
-      error: "Could not clock you out. Please try again.",
+      error: err.clockOutFailed,
     };
   }
 

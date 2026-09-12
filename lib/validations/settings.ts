@@ -3,30 +3,66 @@ import { z } from "zod";
 /**
  * Zod schemas + shared types for the Settings module
  * (General Settings + Personal Profile tabs).
+ *
+ * i18n: validation messages are parameterized through the
+ * `createOrganizationSettingsSchema(messages)` / `createProfileSchema(messages)`
+ * factories so the client forms and server actions can pass localized
+ * messages from the active dictionary. The exported `organizationSettingsSchema`
+ * / `profileSchema` keep the English defaults as a fallback.
  */
 
-export const organizationSettingsSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Organization name must be at least 2 characters.")
-    .max(100, "Organization name must be 100 characters or fewer."),
-  timezone: z.string().trim().min(1, "Select a timezone."),
-});
+/** Localized string messages consumed by the settings schemas. */
+export interface SettingsValidationMessages {
+  orgNameMin: string;
+  orgNameMax: string;
+  selectTimezone: string;
+  fullNameRequired: string;
+  fullNameMax: string;
+  jobTitleMax: string;
+}
 
-export const profileSchema = z.object({
-  full_name: z
-    .string()
-    .trim()
-    .min(1, "Full name is required.")
-    .max(120, "Full name must be 120 characters or fewer."),
-  job_title: z
-    .string()
-    .trim()
-    .max(100, "Job title must be 100 characters or fewer.")
-    .optional()
-    .or(z.literal("")),
-});
+export const DEFAULT_SETTINGS_VALIDATION_MESSAGES: SettingsValidationMessages = {
+  orgNameMin: "Organization name must be at least 2 characters.",
+  orgNameMax: "Organization name must be 100 characters or fewer.",
+  selectTimezone: "Select a timezone.",
+  fullNameRequired: "Full name is required.",
+  fullNameMax: "Full name must be 120 characters or fewer.",
+  jobTitleMax: "Job title must be 100 characters or fewer.",
+};
+
+export function createOrganizationSettingsSchema(
+  messages: SettingsValidationMessages = DEFAULT_SETTINGS_VALIDATION_MESSAGES
+) {
+  return z.object({
+    name: z
+      .string()
+      .trim()
+      .min(2, messages.orgNameMin)
+      .max(100, messages.orgNameMax),
+    timezone: z.string().trim().min(1, messages.selectTimezone),
+  });
+}
+
+export function createProfileSchema(
+  messages: SettingsValidationMessages = DEFAULT_SETTINGS_VALIDATION_MESSAGES
+) {
+  return z.object({
+    full_name: z
+      .string()
+      .trim()
+      .min(1, messages.fullNameRequired)
+      .max(120, messages.fullNameMax),
+    job_title: z
+      .string()
+      .trim()
+      .max(100, messages.jobTitleMax)
+      .optional()
+      .or(z.literal("")),
+  });
+}
+
+export const organizationSettingsSchema = createOrganizationSettingsSchema();
+export const profileSchema = createProfileSchema();
 
 export type OrganizationSettingsValues = z.infer<
   typeof organizationSettingsSchema

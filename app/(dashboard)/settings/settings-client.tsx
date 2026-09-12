@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import type { InvitationRow } from "./page";
 import { GeneralSettingsTab } from "./general-settings-tab";
 import { InvitationsTab } from "./invitations-tab";
@@ -14,6 +15,9 @@ export interface SettingsClientProps {
   departments: { id: string; name: string }[];
   invitations: InvitationRow[];
   canManage: boolean;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 export function SettingsClient({
@@ -24,25 +28,31 @@ export function SettingsClient({
   departments,
   invitations,
   canManage,
+  platform,
+  locale,
 }: SettingsClientProps) {
+  const t = platform.settings;
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your organization, member invitations, and personal profile.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
 
       <Tabs defaultValue="general">
         <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="invitations">Invitations</TabsTrigger>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
+          <TabsTrigger value="invitations">{t.tabInvitations}</TabsTrigger>
+          <TabsTrigger value="profile">{t.tabProfile}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
-          <GeneralSettingsTab organization={organization} canManage={canManage} />
+          <GeneralSettingsTab
+            organization={organization}
+            canManage={canManage}
+            platform={platform}
+          />
         </TabsContent>
 
         <TabsContent value="invitations">
@@ -51,11 +61,18 @@ export function SettingsClient({
             roles={roles}
             departments={departments}
             canManage={canManage}
+            platform={platform}
+            locale={locale}
           />
         </TabsContent>
 
         <TabsContent value="profile">
-          <ProfileTab profile={profile} userEmail={userEmail} />
+          <ProfileTab
+            profile={profile}
+            userEmail={userEmail}
+            platform={platform}
+            locale={locale}
+          />
         </TabsContent>
       </Tabs>
     </div>

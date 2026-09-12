@@ -22,12 +22,15 @@ import {
   type ChannelFormValues,
 } from "@/lib/validations/chat";
 import { createChannel, type ChatChannelRow } from "@/lib/actions/chat";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
 interface ChannelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Called with the persisted channel after a successful create. */
   onCreated: (channel: ChatChannelRow) => void;
+  /** Localized copy for the current render. */
+  platform: Dictionary["platform"];
 }
 
 /**
@@ -39,7 +42,9 @@ export function ChannelDialog({
   open,
   onOpenChange,
   onCreated,
+  platform,
 }: ChannelDialogProps) {
+  const t = platform.chat;
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -82,9 +87,7 @@ export function ChannelDialog({
             }
           }
         }
-        setServerError(
-          result.error ?? "Could not create the channel. Please try again."
-        );
+        setServerError(result.error ?? t.errors.createFailed);
         return;
       }
 
@@ -97,19 +100,16 @@ export function ChannelDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a channel</DialogTitle>
-          <DialogDescription>
-            Channels organize conversations by topic. Anyone with chat access
-            can browse and post to them.
-          </DialogDescription>
+          <DialogTitle>{t.createChannelTitle}</DialogTitle>
+          <DialogDescription>{t.createChannelDescription}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="channel-name">Channel name</Label>
+            <Label htmlFor="channel-name">{t.channelName}</Label>
             <Input
               id="channel-name"
-              placeholder="e.g. product-launch"
+              placeholder={t.channelNamePlaceholder}
               {...register("name")}
               aria-invalid={Boolean(errors.name)}
             />
@@ -122,11 +122,14 @@ export function ChannelDialog({
 
           <div className="grid gap-2">
             <Label htmlFor="channel-description">
-              Description <span className="text-muted-foreground">(optional)</span>
+              {t.descriptionField}{" "}
+              <span className="text-muted-foreground">
+                ({t.descriptionOptional})
+              </span>
             </Label>
             <Textarea
               id="channel-description"
-              placeholder="What is this channel about?"
+              placeholder={t.descriptionPlaceholder}
               rows={2}
               {...register("description")}
               aria-invalid={Boolean(errors.description)}
@@ -151,7 +154,7 @@ export function ChannelDialog({
               )}
             />
             <Label htmlFor="channel-private" className="text-sm font-normal">
-              Make this channel private
+              {t.privateChannel}
             </Label>
           </div>
 
@@ -171,11 +174,11 @@ export function ChannelDialog({
               onClick={() => onOpenChange(false)}
               disabled={isPending}
             >
-              Cancel
+              {platform.common.cancel}
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              Create channel
+              {t.createChannel}
             </Button>
           </DialogFooter>
         </form>

@@ -5,6 +5,7 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import { getTasks } from "@/lib/actions/tasks";
 import { createServerClient } from "@/lib/supabase/server";
 import { TasksView } from "./tasks-view";
+import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import type { TaskMemberOption } from "./task-dialog";
 
 export const dynamic = "force-dynamic";
@@ -14,14 +15,16 @@ export default async function TasksPage() {
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
 
+  const { platform } = await getDictionary();
+  const locale = await getLocale();
+  const t = platform.tasks;
+
   if (!hasPermission("tasks.view", userContext.permissions)) {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            You don&apos;t have permission to view tasks.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t.noPermissionBody}</p>
         </div>
       </div>
     );
@@ -54,6 +57,8 @@ export default async function TasksPage() {
         canManage={hasPermission("tasks.manage", userContext.permissions)}
         currentUserId={userContext.user.id}
         todayIso={new Date().toISOString()}
+        platform={platform}
+        locale={locale}
       />
     </div>
   );

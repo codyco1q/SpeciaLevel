@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
 export interface ActiveModuleRow {
   module_key: string;
@@ -25,15 +26,33 @@ export interface ActiveModuleRow {
   is_enabled?: boolean;
 }
 
+type ModulesKey =
+  | "dashboard"
+  | "calendar"
+  | "time"
+  | "employees"
+  | "departments"
+  | "roles"
+  | "tasks"
+  | "chat"
+  | "crm"
+  | "marketing"
+  | "telecommunications"
+  | "automations"
+  | "ai"
+  | "analytics";
+
 interface ModulesGridProps {
   /** Modules enabled for the current organization (from organization_modules). */
   activeModules: ActiveModuleRow[];
   /** Compact layout for embedding in the dashboard. */
   compact?: boolean;
+  /** Localized module copy — falls back to English defaults when omitted. */
+  platform?: Dictionary["platform"];
 }
 
 interface ModuleDefinition {
-  key: string;
+  key: ModulesKey;
   name: string;
   description: string;
   icon: LucideIcon;
@@ -163,7 +182,28 @@ const FUTURE_VISIBLE_IN_COMPACT = 4;
  * link to their routes; future modules render disabled with a "Coming Soon"
  * badge. Server component — no interactivity required.
  */
-export function ModulesGrid({ activeModules, compact = false }: ModulesGridProps) {
+function localizedName(
+  key: ModulesKey,
+  fallback: string,
+  platform?: Dictionary["platform"]
+): string {
+  return platform?.modules[key] ?? fallback;
+}
+
+function localizedDescription(
+  key: ModulesKey,
+  fallback: string,
+  platform?: Dictionary["platform"]
+): string {
+  const dict = platform?.modules as Record<string, string> | undefined;
+  return dict?.[`${key}Description`] ?? fallback;
+}
+
+export function ModulesGrid({
+  activeModules,
+  compact = false,
+  platform,
+}: ModulesGridProps) {
   const enabledKeys = new Set(
     activeModules.filter((m) => m.is_enabled !== false).map((m) => m.module_key)
   );
@@ -178,7 +218,8 @@ export function ModulesGrid({ activeModules, compact = false }: ModulesGridProps
     enabledKeys.has(mod.key)
   ).map((mod) => ({
     ...mod,
-    name: recordedNames.get(mod.key) ?? mod.name,
+    name: localizedName(mod.key, recordedNames.get(mod.key) ?? mod.name, platform),
+    description: localizedDescription(mod.key, mod.description, platform),
   }));
 
   const futureCards = FUTURE_MODULE_DEFINITIONS.filter(
@@ -199,13 +240,14 @@ export function ModulesGrid({ activeModules, compact = false }: ModulesGridProps
       <section>
         {!compact && (
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Available now
+            {platform?.modules.availableNow ?? "Available now"}
           </h3>
         )}
         {activeCards.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No modules are enabled yet. Check back soon.
+              {platform?.modules.noModulesEnabled ??
+                "No modules are enabled yet. Check back soon."}
             </p>
           </div>
         ) : (
@@ -246,7 +288,7 @@ export function ModulesGrid({ activeModules, compact = false }: ModulesGridProps
         <section>
           {!compact && (
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Coming soon
+              {platform?.common.comingSoon ?? "Coming Soon"}
             </h3>
           )}
           <div className={gridClass}>
@@ -273,7 +315,7 @@ export function ModulesGrid({ activeModules, compact = false }: ModulesGridProps
                         variant="outline"
                         className="px-1.5 py-0 text-[10px] font-normal"
                       >
-                        Coming Soon
+                        {platform?.common.comingSoon ?? "Coming Soon"}
                       </Badge>
                     </div>
                     {!compact && (
@@ -292,7 +334,10 @@ export function ModulesGrid({ activeModules, compact = false }: ModulesGridProps
                   compact ? "p-3" : "p-4"
                 )}
               >
-                +{hiddenFutureCount} more coming soon
+                {(platform?.common.moreComingSoon ?? "+{count} more coming soon").replace(
+                  "{count}",
+                  String(hiddenFutureCount)
+                )}
               </div>
             )}
           </div>

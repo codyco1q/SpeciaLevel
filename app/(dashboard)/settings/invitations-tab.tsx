@@ -21,11 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import type { InvitationRow } from "./page";
-import {
-  INVITATION_STATUS_BADGE_VARIANTS,
-  INVITATION_STATUS_LABELS,
-} from "@/lib/validations/invites";
+import { INVITATION_STATUS_BADGE_VARIANTS } from "@/lib/validations/invites";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { RevokeInvitationDialog } from "./revoke-invitation-dialog";
 
@@ -34,17 +32,38 @@ interface InvitationsTabProps {
   roles: { id: string; name: string; isSystem: boolean }[];
   departments: { id: string; name: string }[];
   canManage: boolean;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+/** Maps a stored invitation status to its localized label key. */
+const INVITATION_STATUS_LABEL_KEYS = {
+  pending: "statusPending",
+  accepted: "statusAccepted",
+  revoked: "statusRevoked",
+  expired: "statusExpired",
+} as const;
+
+function formatDate(value: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(
+    locale.startsWith("ar") ? "ar-EG" : locale,
+    {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }
+  ).format(new Date(value));
 }
 
-function InviteLinkButton({ token }: { token: string }) {
+function InviteLinkButton({
+  token,
+  platform,
+}: {
+  token: string;
+  platform: Dictionary["platform"];
+}) {
+  const t = platform.settings;
   const [copied, setCopied] = useState(false);
 
   async function copyLink() {
@@ -64,10 +83,10 @@ function InviteLinkButton({ token }: { token: string }) {
       variant="ghost"
       size="sm"
       onClick={copyLink}
-      title="Copy the signup link for this invitation"
+      title={t.inviteLinkTitle}
     >
       {copied ? <Check /> : <Copy />}
-      {copied ? "Copied" : "Copy link"}
+      {copied ? platform.common.copied : platform.common.copyLink}
     </Button>
   );
 }
@@ -77,7 +96,10 @@ export function InvitationsTab({
   roles,
   departments,
   canManage,
+  platform,
+  locale,
 }: InvitationsTabProps) {
+  const t = platform.settings;
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [revoking, setRevoking] = useState<InvitationRow | null>(null);
@@ -98,7 +120,7 @@ export function InvitationsTab({
         setRevoking(null);
         router.refresh();
       } else {
-        setRevokeError(result.error ?? "Could not revoke the invitation.");
+        setRevokeError(result.error ?? t.revokeError);
       }
     });
   }
@@ -109,20 +131,19 @@ export function InvitationsTab({
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
-              Member Invitations
+              {t.invitationsTitle}
               {pendingCount > 0 && (
-                <Badge variant="secondary">{pendingCount} pending</Badge>
+                <Badge variant="secondary">
+                  {t.pendingCount.replace("{count}", String(pendingCount))}
+                </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              Invite teammates with a signup link. Invitations expire after 7
-              days.
-            </CardDescription>
+            <CardDescription>{t.invitationsDescription}</CardDescription>
           </div>
           {canManage && (
             <Button onClick={() => setInviteOpen(true)}>
               <UserPlus />
-              Invite member
+              {t.inviteMember}
             </Button>
           )}
         </CardHeader>
@@ -130,24 +151,26 @@ export function InvitationsTab({
           {invitations.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-12 text-center">
               <Mail className="size-6 text-muted-foreground" />
-              <p className="text-sm font-medium">No invitations yet</p>
+              <p className="text-sm font-medium">{t.emptyInvitations}</p>
               <p className="text-sm text-muted-foreground">
                 {canManage
-                  ? "Invite your first teammate to get started."
-                  : "Invitations sent by your organization will appear here."}
+                  ? t.emptyInvitationsHintManage
+                  : t.emptyInvitationsHintView}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Sent</TableHead>
-                  <TableHead>Expiration</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t.tableEmail}</TableHead>
+                  <TableHead>{t.tableRole}</TableHead>
+                  <TableHead>{t.tableDepartment}</TableHead>
+                  <TableHead>{t.tableSent}</TableHead>
+                  <TableHead>{t.tableExpiration}</TableHead>
+                  <TableHead>{t.tableStatus}</TableHead>
+                  <TableHead className="text-right">
+                    {platform.common.actions}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -161,10 +184,10 @@ export function InvitationsTab({
                       {invitation.departmentName ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(invitation.createdAt)}
+                      {formatDate(invitation.createdAt, locale)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(invitation.expiresAt)}
+                      {formatDate(invitation.expiresAt, locale)}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -174,7 +197,7 @@ export function InvitationsTab({
                           ] ?? "secondary"
                         }
                       >
-                        {INVITATION_STATUS_LABELS[invitation.status] ??
+                        {t[INVITATION_STATUS_LABEL_KEYS[invitation.status]] ??
                           invitation.status}
                       </Badge>
                     </TableCell>
@@ -182,7 +205,7 @@ export function InvitationsTab({
                       <div className="flex items-center justify-end gap-1">
                         {invitation.status === "pending" && (
                           <>
-                            <InviteLinkButton token={invitation.token} />
+                            <InviteLinkButton token={invitation.token} platform={platform} />
                             {canManage && (
                               <Button
                                 type="button"
@@ -195,7 +218,7 @@ export function InvitationsTab({
                                 }}
                               >
                                 <Trash2 />
-                                Revoke
+                                {platform.common.revoke}
                               </Button>
                             )}
                           </>
@@ -216,6 +239,7 @@ export function InvitationsTab({
           isPending={isRevoking}
           onCancel={() => setRevoking(null)}
           onConfirm={handleRevoke}
+          platform={platform}
         />
       )}
       {canManage && (
@@ -224,6 +248,7 @@ export function InvitationsTab({
           onOpenChange={setInviteOpen}
           roles={roles}
           departments={departments}
+          platform={platform}
         />
       )}
     </>

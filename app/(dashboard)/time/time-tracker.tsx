@@ -9,7 +9,8 @@ import {
   clockOut,
   type ActiveTimeEntry,
 } from "@/lib/actions/time-tracking";
-import { formatDurationCompact, formatElapsed } from "./format";
+import { formatDurationCompact, formatElapsed, localizeDigits } from "./format";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface TimeTrackerProps {
   activeEntry: ActiveTimeEntry | null;
@@ -17,6 +18,9 @@ interface TimeTrackerProps {
   /** Server render timestamp — seeds the timer so first paint is exact. */
   serverNowIso: string;
   canManageSelf: boolean;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /**
@@ -31,7 +35,10 @@ export function TimeTracker({
   todayTotalSeconds,
   serverNowIso,
   canManageSelf,
+  platform,
+  locale,
 }: TimeTrackerProps) {
+  const t = platform.time;
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +60,7 @@ export function TimeTracker({
     startTransition(async () => {
       const result = await clockIn();
       if (result.status === "error") {
-        setError(result.error ?? "Could not clock you in. Please try again.");
+        setError(result.error ?? t.errors.clockInFailed);
       }
     });
   }
@@ -63,7 +70,7 @@ export function TimeTracker({
     startTransition(async () => {
       const result = await clockOut();
       if (result.status === "error") {
-        setError(result.error ?? "Could not clock you out. Please try again.");
+        setError(result.error ?? t.errors.clockOutFailed);
       }
     });
   }
@@ -75,15 +82,15 @@ export function TimeTracker({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Current session</h2>
+            <h2 className="text-sm font-semibold">{t.currentSession}</h2>
           </div>
           {isClockedIn ? (
             <Badge variant="default">
               <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-              Clocked in
+              {t.clockedIn}
             </Badge>
           ) : (
-            <Badge variant="secondary">Clocked out</Badge>
+            <Badge variant="secondary">{t.clockedOut}</Badge>
           )}
         </div>
 
@@ -91,12 +98,10 @@ export function TimeTracker({
           className="mt-4 font-mono text-4xl font-bold tracking-tight tabular-nums"
           aria-live="off"
         >
-          {isClockedIn ? formatElapsed(activeSeconds) : "00:00:00"}
+          {isClockedIn ? formatElapsed(activeSeconds, locale) : "00:00:00"}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {isClockedIn
-            ? "Session in progress — timer updates live."
-            : "You're off the clock. Clock in to start a session."}
+          {isClockedIn ? t.sessionInProgress : t.sessionIdle}
         </p>
 
         {error && (
@@ -115,7 +120,7 @@ export function TimeTracker({
                 disabled={isPending}
                 onClick={handleClockOut}
               >
-                {isPending ? "Clocking out…" : "Clock out"}
+                {isPending ? t.clockingOut : t.clockOut}
               </Button>
             ) : (
               <Button
@@ -124,12 +129,12 @@ export function TimeTracker({
                 disabled={isPending}
                 onClick={handleClockIn}
               >
-                {isPending ? "Clocking in…" : "Clock in"}
+                {isPending ? t.clockingIn : t.clockIn}
               </Button>
             )
           ) : (
             <p className="text-sm text-muted-foreground">
-              You don&apos;t have permission to clock in or out.
+              {t.noClockPermission}
             </p>
           )}
         </div>
@@ -137,13 +142,23 @@ export function TimeTracker({
 
       {/* Today's total card */}
       <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold">Today&apos;s total</h2>
+        <h2 className="text-sm font-semibold">{t.todayTotal}</h2>
         <p className="mt-4 font-mono text-4xl font-bold tracking-tight tabular-nums">
-          {formatDurationCompact(todayTotalSeconds)}
+          {formatDurationCompact(
+            todayTotalSeconds,
+            {
+              hours: t.durationHours,
+              minutes: t.durationMinutes,
+              seconds: t.durationSeconds,
+            },
+            locale
+          )}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {(todayTotalSeconds / 3600).toFixed(2)} hours across all
-          sessions since midnight (UTC).
+          {t.todayTotalHint.replace(
+            "{hours}",
+            localizeDigits((todayTotalSeconds / 3600).toFixed(2), locale)
+          )}
         </p>
       </div>
     </div>

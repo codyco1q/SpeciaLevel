@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TimeTracker } from "./time-tracker";
+import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import {
   formatDate,
   formatDurationCompact,
@@ -29,14 +30,16 @@ export default async function TimeTrackingPage() {
   const organization = userContext.organization;
   if (!organization) redirect("/onboarding");
 
+  const { platform } = await getDictionary();
+  const locale = await getLocale();
+  const t = platform.time;
+
   if (!hasPermission("time_tracking.view_self", userContext.permissions)) {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Time Tracking</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            You don&apos;t have permission to view time tracking.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t.noPermissionTitle}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t.noPermissionBody}</p>
         </div>
       </div>
     );
@@ -48,10 +51,8 @@ export default async function TimeTrackingPage() {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Time Tracking</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Could not load your time entries. Please try again.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t.loadError}</p>
         </div>
       </div>
     );
@@ -60,10 +61,8 @@ export default async function TimeTrackingPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Time Tracking</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Clock in when you start work, clock out when you stop.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
 
       <TimeTracker
@@ -71,18 +70,20 @@ export default async function TimeTrackingPage() {
         todayTotalSeconds={data.todayTotalSeconds}
         serverNowIso={data.serverNowIso}
         canManageSelf={data.canManageSelf}
+        platform={platform}
+        locale={locale}
       />
 
       {/* Personal log */}
       <div className="mt-8">
         <h2 className="mb-3 text-lg font-semibold tracking-tight">
-          My recent entries
+          {t.recentEntries}
         </h2>
         {data.recentEntries.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-12 text-center">
-            <p className="text-sm font-medium">No time entries yet</p>
+            <p className="text-sm font-medium">{t.noEntriesYet}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Your clock in / clock out history will appear here.
+              {t.noEntriesYetHint}
             </p>
           </div>
         ) : (
@@ -90,33 +91,43 @@ export default async function TimeTrackingPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Clock in</TableHead>
-                  <TableHead>Clock out</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t.date}</TableHead>
+                  <TableHead>{t.clockInTime}</TableHead>
+                  <TableHead>{t.clockOutTime}</TableHead>
+                  <TableHead>{t.duration}</TableHead>
+                  <TableHead>{t.status}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.recentEntries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="font-medium">
-                      {formatDate(entry.clockedInAt)}
+                      {formatDate(entry.clockedInAt, locale)}
                     </TableCell>
-                    <TableCell>{formatTime(entry.clockedInAt)}</TableCell>
+                    <TableCell>{formatTime(entry.clockedInAt, locale)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {entry.clockedOutAt ? formatTime(entry.clockedOutAt) : "—"}
+                      {entry.clockedOutAt
+                        ? formatTime(entry.clockedOutAt, locale)
+                        : "—"}
                     </TableCell>
                     <TableCell className="font-mono tabular-nums">
                       {entry.status === "active"
-                        ? "In progress"
-                        : formatDurationCompact(entry.durationSeconds)}
+                        ? t.inProgress
+                        : formatDurationCompact(
+                            entry.durationSeconds,
+                            {
+                              hours: t.durationHours,
+                              minutes: t.durationMinutes,
+                              seconds: t.durationSeconds,
+                            },
+                            locale
+                          )}
                     </TableCell>
                     <TableCell>
                       {entry.status === "active" ? (
-                        <Badge variant="default">Active</Badge>
+                        <Badge variant="default">{t.active}</Badge>
                       ) : (
-                        <Badge variant="secondary">Completed</Badge>
+                        <Badge variant="secondary">{t.completed}</Badge>
                       )}
                     </TableCell>
                   </TableRow>
@@ -133,13 +144,13 @@ export default async function TimeTrackingPage() {
           <div className="mb-3 flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-lg font-semibold tracking-tight">
-              Team attendance
+              {t.teamAttendance}
             </h2>
           </div>
           {data.teamNow.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Nobody is clocked in right now.
+                {t.nobodyClockedIn}
               </p>
             </div>
           ) : (
@@ -147,10 +158,10 @@ export default async function TimeTrackingPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Clocked in</TableHead>
-                    <TableHead>Elapsed</TableHead>
+                    <TableHead>{t.employee}</TableHead>
+                    <TableHead>{t.department}</TableHead>
+                    <TableHead>{t.clockedInAt}</TableHead>
+                    <TableHead>{t.elapsed}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,9 +182,9 @@ export default async function TimeTrackingPage() {
                         <TableCell className="text-muted-foreground">
                           {member.departmentName ?? "—"}
                         </TableCell>
-                        <TableCell>{formatTime(member.clockedInAt)}</TableCell>
+                        <TableCell>{formatTime(member.clockedInAt, locale)}</TableCell>
                         <TableCell className="font-mono tabular-nums">
-                          {formatElapsed(elapsedSeconds)}
+                          {formatElapsed(elapsedSeconds, locale)}
                         </TableCell>
                       </TableRow>
                     );

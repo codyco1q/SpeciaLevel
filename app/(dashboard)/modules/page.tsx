@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import { ModulesGrid } from "@/components/modules-grid";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export default async function ModulesPage() {
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
 
+  const { platform } = await getDictionary();
+
   const supabase = await createServerClient();
 
   const { data: modules } = await supabase
@@ -30,16 +33,15 @@ export default async function ModulesPage() {
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-muted-foreground" />
           <h1 className="text-2xl font-bold tracking-tight">
-            Modules &amp; Apps
+            {platform.modules.title}
           </h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Explore the modules available for your organization. New modules
-          are added as the platform grows.
+          {platform.modules.subtitle}
         </p>
       </div>
 
-      <ModulesGrid activeModules={modules ?? []} />
+      <ModulesGrid activeModules={modules ?? []} platform={platform} />
     </div>
   );
 }

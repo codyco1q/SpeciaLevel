@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateOrganizationSettings } from "@/lib/actions/settings";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 import {
   initialSettingsActionState,
   organizationSettingsSchema,
@@ -34,12 +35,16 @@ import {
 interface GeneralSettingsTabProps {
   organization: { id: string; name: string; slug: string; timezone: string };
   canManage: boolean;
+  /** Localized copy for the current render. */
+  platform: Dictionary["platform"];
 }
 
 export function GeneralSettingsTab({
   organization,
   canManage,
+  platform,
 }: GeneralSettingsTabProps) {
+  const t = platform.settings;
   const [state, formAction, isPending] = useActionState(
     async (_prevState: SettingsActionState, formData: FormData) =>
       updateOrganizationSettings({
@@ -88,19 +93,17 @@ export function GeneralSettingsTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>General Settings</CardTitle>
-        <CardDescription>
-          Update your organization&apos;s name and default timezone.
-        </CardDescription>
+        <CardTitle>{t.generalTitle}</CardTitle>
+        <CardDescription>{t.generalDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <fieldset disabled={!canManage} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="org-name">Organization name</Label>
+              <Label htmlFor="org-name">{t.orgName}</Label>
               <Input
                 id="org-name"
-                placeholder="e.g. Acme Inc."
+                placeholder={t.orgNamePlaceholder}
                 autoComplete="off"
                 aria-invalid={Boolean(nameError)}
                 {...register("name")}
@@ -112,7 +115,7 @@ export function GeneralSettingsTab({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="org-slug">Organization URL</Label>
+              <Label htmlFor="org-slug">{t.orgUrl}</Label>
               <Input
                 id="org-slug"
                 value={organization.slug}
@@ -120,14 +123,11 @@ export function GeneralSettingsTab({
                 disabled
                 className="bg-muted/50 text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">
-                Used in your organization&apos;s unique URL and cannot be
-                changed.
-              </p>
+              <p className="text-xs text-muted-foreground">{t.orgUrlHint}</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="org-timezone">Timezone</Label>
+              <Label htmlFor="org-timezone">{t.timezone}</Label>
               <Controller
                 name="timezone"
                 control={control}
@@ -138,7 +138,7 @@ export function GeneralSettingsTab({
                     disabled={!canManage}
                   >
                     <SelectTrigger id="org-timezone" className="w-full sm:w-96">
-                      <SelectValue placeholder="Select a timezone" />
+                      <SelectValue placeholder={t.selectTimezone} />
                     </SelectTrigger>
                     <SelectContent className="max-h-72">
                       {TIMEZONE_OPTIONS.map((option) => (
@@ -167,10 +167,7 @@ export function GeneralSettingsTab({
           {!canManage && (
             <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/50 px-4 py-3">
               <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                You can view these settings, but don&apos;t have permission to
-                change them.
-              </p>
+              <p className="text-sm text-muted-foreground">{t.noManageNote}</p>
             </div>
           )}
 
@@ -182,14 +179,14 @@ export function GeneralSettingsTab({
                 ) : (
                   <Save />
                 )}
-                Save changes
+                {platform.common.saveChanges}
               </Button>
             )}
 
             {state.status === "success" && (
               <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="size-4" />
-                Organization settings saved.
+                {t.orgSaved}
               </span>
             )}
           </div>

@@ -15,6 +15,7 @@ import {
   type ChatPerson,
 } from "@/lib/actions/chat";
 import { cn } from "@/lib/utils";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { ChannelDialog } from "./channel-dialog";
 import {
   formatMessageDateTitle,
@@ -41,6 +42,9 @@ interface ChatViewProps {
   canManage: boolean;
   /** The signed-in user, used for optimistic sends and "own message" styling. */
   currentUser: ChatPerson;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /**
@@ -59,7 +63,10 @@ export function ChatView({
   activeChannelId: initialActiveChannelId,
   canManage,
   currentUser,
+  platform,
+  locale,
 }: ChatViewProps) {
+  const t = platform.chat;
   const [channelList, setChannelList] = useState<ChatChannelRow[]>(channels);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(
     initialActiveChannelId
@@ -202,9 +209,7 @@ export function ChatView({
     const result = await sendMessage(activeChannelId, content);
 
     if (result.status === "error") {
-      setSendError(
-        result.error ?? "Could not send the message. Please try again."
-      );
+      setSendError(result.error ?? t.errors.sendFailed);
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setComposer(content);
       setSendPending(false);
@@ -242,7 +247,7 @@ export function ChatView({
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Channels</h2>
+            <h2 className="text-sm font-semibold">{t.channels}</h2>
           </div>
           {canManage && (
             <Button
@@ -250,7 +255,7 @@ export function ChatView({
               size="icon"
               className="h-7 w-7"
               onClick={() => setCreateOpen(true)}
-              aria-label="Create channel"
+              aria-label={t.createChannelAria}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -259,14 +264,14 @@ export function ChatView({
 
         {channelList.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
-            <p className="text-sm text-muted-foreground">No channels yet.</p>
+            <p className="text-sm text-muted-foreground">{t.noChannelsYet}</p>
             {canManage && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setCreateOpen(true)}
               >
-                <Plus className="h-4 w-4" /> Create a channel
+                <Plus className="h-4 w-4" /> {t.createChannel}
               </Button>
             )}
           </div>
@@ -294,7 +299,7 @@ export function ChatView({
                         variant="outline"
                         className="ml-auto px-1.5 py-0 text-[10px]"
                       >
-                        Private
+                        {t.private}
                       </Badge>
                     )}
                   </button>
@@ -311,7 +316,7 @@ export function ChatView({
           <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
             <h1 className="text-sm font-semibold">
-              {activeChannel ? activeChannel.name : "Chat"}
+              {activeChannel ? activeChannel.name : t.title}
             </h1>
             {activeChannel?.description && (
               <p className="truncate text-xs text-muted-foreground">
@@ -333,10 +338,10 @@ export function ChatView({
             <div className="flex h-full flex-col items-center justify-center text-center">
               <Hash className="h-8 w-8 text-muted-foreground/40" />
               <p className="mt-2 text-sm font-medium">
-                {activeChannel ? `#${activeChannel.name}` : "Chat"}
+                {activeChannel ? `#${activeChannel.name}` : t.title}
               </p>
               <p className="text-sm text-muted-foreground">
-                No messages yet — say hi!
+                {t.noMessagesYet}
               </p>
             </div>
           ) : (
@@ -346,6 +351,8 @@ export function ChatView({
                   key={message.id}
                   message={message}
                   isOwn={message.userId === currentUser.id}
+                  platform={platform}
+                  locale={locale}
                 />
               ))}
             </div>
@@ -360,8 +367,8 @@ export function ChatView({
               onKeyDown={handleComposerKeyDown}
               placeholder={
                 activeChannel
-                  ? `Message #${activeChannel.name}`
-                  : "Select a channel to start chatting"
+                  ? t.messagePlaceholder.replace("{channel}", activeChannel.name)
+                  : t.selectChannelPlaceholder
               }
               rows={2}
               maxLength={2000}
@@ -374,7 +381,7 @@ export function ChatView({
             )}
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground">
-                Shift + Enter for a new line
+                {t.shiftEnterHint}
               </p>
               <Button
                 type="submit"
@@ -384,9 +391,9 @@ export function ChatView({
                 {sendPending ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <Send className="h-4 w-4 rtl:rotate-180" />
                 )}
-                Send
+                {t.send}
               </Button>
             </div>
           </form>
@@ -397,6 +404,7 @@ export function ChatView({
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={handleChannelCreated}
+        platform={platform}
       />
     </div>
   );
@@ -405,12 +413,16 @@ export function ChatView({
 interface MessageBubbleProps {
   message: ChatMessageRow;
   isOwn: boolean;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /** Single chat message: avatar, sender name + time, and the content bubble. */
-function MessageBubble({ message, isOwn }: MessageBubbleProps) {
+function MessageBubble({ message, isOwn, platform, locale }: MessageBubbleProps) {
+  const t = platform.chat;
   const senderName =
-    message.user.fullName ?? message.user.email ?? "Team member";
+    message.user.fullName ?? message.user.email ?? t.teamMember;
   const initials = getInitials(senderName);
 
   return (
@@ -430,9 +442,9 @@ function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           <time
             className="text-xs text-muted-foreground"
             dateTime={message.createdAt}
-            title={formatMessageDateTitle(message.createdAt)}
+            title={formatMessageDateTitle(message.createdAt, locale)}
           >
-            {formatMessageTime(message.createdAt)}
+            {formatMessageTime(message.createdAt, locale)}
           </time>
         </div>
         <p

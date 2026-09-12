@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { InvitationRow } from "./page";
+import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
 interface RevokeInvitationDialogProps {
   invitation: InvitationRow;
@@ -19,6 +20,8 @@ interface RevokeInvitationDialogProps {
   isPending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  /** Localized copy for the current render. */
+  platform: Dictionary["platform"];
 }
 
 export function RevokeInvitationDialog({
@@ -27,15 +30,16 @@ export function RevokeInvitationDialog({
   isPending,
   onCancel,
   onConfirm,
+  platform,
 }: RevokeInvitationDialogProps) {
+  const t = platform.settings;
+
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Revoke invitation?</DialogTitle>
-          <DialogDescription>
-            Revoking this invitation invalidates its signup link immediately.
-          </DialogDescription>
+          <DialogTitle>{t.revokeTitle}</DialogTitle>
+          <DialogDescription>{t.revokeDescription}</DialogDescription>
         </DialogHeader>
 
         <p className="break-all rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium">
@@ -51,7 +55,7 @@ export function RevokeInvitationDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {platform.common.cancel}
           </Button>
           <Button
             type="button"
@@ -60,7 +64,7 @@ export function RevokeInvitationDialog({
             disabled={isPending}
           >
             {isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            Revoke invitation
+            {t.revokeInvitation}
           </Button>
         </DialogFooter>
       </DialogContent>

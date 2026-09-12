@@ -32,10 +32,9 @@ import type { TaskStatus } from "@/types/database";
 import {
   formatDueDate,
   TASK_PRIORITY_BADGE_CLASSES,
-  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
-  TASK_STATUS_LABELS,
 } from "./task-meta";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface TaskDetailDialogProps {
   open: boolean;
@@ -46,6 +45,9 @@ interface TaskDetailDialogProps {
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onEditRequest: (task: TaskRow) => void;
   onDeleted: () => void;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /**
@@ -61,7 +63,11 @@ export function TaskDetailDialog({
   onStatusChange,
   onEditRequest,
   onDeleted,
+  platform,
+  locale,
 }: TaskDetailDialogProps) {
+  const t = platform.tasks;
+  const common = platform.common;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusPending, setStatusPending] = useState(false);
@@ -92,7 +98,7 @@ export function TaskDetailDialog({
     setRequestError(null);
     const result = await deleteTask(task.id);
     if (result.status === "error") {
-      setRequestError(result.error ?? "Could not delete the task.");
+      setRequestError(result.error ?? t.errors.deleteFailed);
       setDeleting(false);
       setConfirmingDelete(false);
       return;
@@ -117,15 +123,19 @@ export function TaskDetailDialog({
             {task.title}
           </DialogTitle>
           <DialogDescription>
-            Created {formatDueDate(task.createdAt)} by{" "}
-            {task.createdBy.fullName ?? task.createdBy.email ?? "a member"}
+            {t.createdBy
+              .replace("{date}", formatDueDate(task.createdAt, locale))
+              .replace(
+                "{name}",
+                task.createdBy.fullName ?? task.createdBy.email ?? t.member
+              )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="rounded-lg border border-border/70 bg-muted/30 p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Status</span>
+              <span className="text-muted-foreground">{t.tableStatus}</span>
               <div className="flex items-center gap-2">
                 {statusPending && (
                   <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -142,21 +152,21 @@ export function TaskDetailDialog({
                     <SelectContent>
                       {TASK_STATUSES.map((status) => (
                         <SelectItem key={status} value={status}>
-                          {TASK_STATUS_LABELS[status]}
+                          {t.status[status]}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
                   <span className="font-medium">
-                    {TASK_STATUS_LABELS[task.status]}
+                    {t.status[task.status]}
                   </span>
                 )}
               </div>
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Priority</span>
+              <span className="text-muted-foreground">{t.tablePriority}</span>
               <Badge
                 variant="outline"
                 className={cn(
@@ -164,25 +174,25 @@ export function TaskDetailDialog({
                   TASK_PRIORITY_BADGE_CLASSES[task.priority]
                 )}
               >
-                {TASK_PRIORITY_LABELS[task.priority]}
+                {t.priority[task.priority]}
               </Badge>
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Assignee</span>
+              <span className="text-muted-foreground">{t.tableAssignee}</span>
               <span className="flex items-center gap-1.5 font-medium">
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
                 {task.assignedTo?.fullName ??
                   task.assignedTo?.email ??
-                  "Unassigned"}
+                  t.unassigned}
               </span>
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Due date</span>
+              <span className="text-muted-foreground">{t.tableDue}</span>
               <span className="flex items-center gap-1.5 font-medium">
                 <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-                {task.dueDate ? formatDueDate(task.dueDate) : "No due date"}
+                {task.dueDate ? formatDueDate(task.dueDate, locale) : t.noDueDate}
               </span>
             </div>
           </div>
@@ -190,13 +200,15 @@ export function TaskDetailDialog({
           {task.description ? (
             <div>
               <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Description
+                {t.descriptionLabel}
               </h4>
               <p className="text-sm leading-relaxed whitespace-pre-wrap">
                 {task.description}
               </p>
             </div>
-          ) : null}
+          ) : (
+            <p className="text-sm text-muted-foreground">{t.noDescription}</p>
+          )}
 
           {requestError && (
             <p
@@ -221,7 +233,7 @@ export function TaskDetailDialog({
               ) : (
                 <Trash2 className="h-4 w-4" />
               )}
-              {confirmingDelete ? "Confirm delete" : "Delete"}
+              {confirmingDelete ? common.confirmDelete : common.delete}
             </Button>
             <Button
               type="button"
@@ -232,7 +244,7 @@ export function TaskDetailDialog({
               disabled={deleting || statusPending}
             >
               <Pencil className="h-4 w-4" />
-              Edit
+              {common.edit}
             </Button>
           </DialogFooter>
         )}

@@ -27,5 +27,26 @@ export async function setLocale(locale: Locale, pathname: string = "/") {
     maxAge: 60 * 60 * 24 * 365,
   });
 
+  // Persist the preference on the signed-in user's profile (best-effort) so
+  // any new browser/device inherits the same language via the profile
+  // fallback in getLocale(). The cookie alone still switches the page, so
+  // a failure here never blocks the redirect.
+  try {
+    const { createServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      await supabase
+        .from("profiles")
+        .update({ preferred_language: target })
+        .eq("id", user.id);
+    }
+  } catch {
+    // Not signed in, or Supabase is unavailable — the local preference still applies.
+  }
+
   redirect(safePath);
 }

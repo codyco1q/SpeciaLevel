@@ -7,11 +7,12 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
-  taskInputSchema,
+  createTaskInputSchema,
   taskStatusSchema,
   type TaskActionState,
   type TaskInput,
 } from "@/lib/validations/tasks";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 import type { TaskPriority, TaskStatus } from "@/types/database";
 
 /**
@@ -83,11 +84,13 @@ async function requireTaskPermission(
   permission: "tasks.view" | "tasks.manage"
 ): Promise<TaskAuthResult> {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.tasks.errors;
 
   if (!userContext) {
     return {
       ok: false,
-      error: { status: "error", error: "You must be signed in to do this." },
+      error: { status: "error", error: err.signedIn },
     };
   }
 
@@ -96,7 +99,7 @@ async function requireTaskPermission(
       ok: false,
       error: {
         status: "error",
-        error: "You don't have permission to perform this action.",
+        error: err.noPermission,
       },
     };
   }
@@ -108,7 +111,7 @@ async function requireTaskPermission(
       ok: false,
       error: {
         status: "error",
-        error: "No organization found for your account.",
+        error: err.noOrg,
       },
     };
   }
@@ -238,11 +241,13 @@ export async function createTask(data: TaskInput): Promise<TaskActionState> {
   const auth = await requireTaskPermission("tasks.manage");
   if (!auth.ok) return auth.error;
 
-  const parsed = taskInputSchema.safeParse(data);
+  const dict = await getDictionary();
+  const err = dict.platform.tasks.errors;
+  const parsed = createTaskInputSchema(dict.platform.tasks.errors).safeParse(data);
   if (!parsed.success) {
     return {
       status: "error",
-      error: "Please fix the highlighted fields.",
+      error: err.highlightFields,
       fieldErrors: parseFieldErrors(parsed.error.issues),
     };
   }
@@ -269,7 +274,7 @@ export async function createTask(data: TaskInput): Promise<TaskActionState> {
     console.error("[tasks] create failed:", error.message);
     return {
       status: "error",
-      error: "Could not create the task. Please try again.",
+      error: err.createFailed,
     };
   }
 
@@ -287,10 +292,13 @@ export async function updateTaskStatus(
   status: TaskStatus
 ): Promise<TaskActionState> {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.tasks.errors;
+
   if (!userContext) {
     return {
       status: "error",
-      error: "You must be signed in to do this.",
+      error: err.signedIn,
     };
   }
 
@@ -298,7 +306,7 @@ export async function updateTaskStatus(
   if (!organizationId) {
     return {
       status: "error",
-      error: "No organization found for your account.",
+      error: err.noOrg,
     };
   }
 
@@ -308,18 +316,18 @@ export async function updateTaskStatus(
   if (!canManage && !canView) {
     return {
       status: "error",
-      error: "You don't have permission to update tasks.",
+      error: err.noPermission,
     };
   }
 
   if (!taskId) {
-    return { status: "error", error: "Missing task ID." };
+    return { status: "error", error: err.missingId };
   }
 
   // Re-validate the status server-side even though the client is typed.
   const parsedStatus = taskStatusSchema.safeParse(status);
   if (!parsedStatus.success) {
-    return { status: "error", error: "Invalid status." };
+    return { status: "error", error: err.invalidStatus };
   }
 
   const supabase = await createServerClient();
@@ -336,7 +344,7 @@ export async function updateTaskStatus(
     if (!task || task.assigned_to !== userContext.user.id) {
       return {
         status: "error",
-        error: "You can only update status on tasks assigned to you.",
+        error: err.onlyOwnStatus,
       };
     }
   }
@@ -355,14 +363,14 @@ export async function updateTaskStatus(
     console.error("[tasks] status update failed:", error.message);
     return {
       status: "error",
-      error: "Could not update the task. Please try again.",
+      error: err.updateFailed,
     };
   }
 
   if (!updated || updated.length === 0) {
     return {
       status: "error",
-      error: "Task not found, or you don't have access to it.",
+      error: err.notFound,
     };
   }
 
@@ -381,15 +389,18 @@ export async function updateTask(
   const auth = await requireTaskPermission("tasks.manage");
   if (!auth.ok) return auth.error;
 
+  const dict = await getDictionary();
+  const err = dict.platform.tasks.errors;
+
   if (!taskId) {
-    return { status: "error", error: "Missing task ID." };
+    return { status: "error", error: err.missingId };
   }
 
-  const parsed = taskInputSchema.partial().safeParse(data);
+  const parsed = createTaskInputSchema(err).partial().safeParse(data);
   if (!parsed.success) {
     return {
       status: "error",
-      error: "Please fix the highlighted fields.",
+      error: err.highlightFields,
       fieldErrors: parseFieldErrors(parsed.error.issues),
     };
   }
@@ -427,14 +438,14 @@ export async function updateTask(
     console.error("[tasks] update failed:", error.message);
     return {
       status: "error",
-      error: "Could not update the task. Please try again.",
+      error: err.updateFailed,
     };
   }
 
   if (!updated || updated.length === 0) {
     return {
       status: "error",
-      error: "Task not found, or you don't have access to it.",
+      error: err.notFound,
     };
   }
 
@@ -449,8 +460,11 @@ export async function deleteTask(taskId: string): Promise<TaskActionState> {
   const auth = await requireTaskPermission("tasks.manage");
   if (!auth.ok) return auth.error;
 
+  const dict = await getDictionary();
+  const err = dict.platform.tasks.errors;
+
   if (!taskId) {
-    return { status: "error", error: "Missing task ID." };
+    return { status: "error", error: err.missingId };
   }
 
   const supabase = await createServerClient();
@@ -466,14 +480,14 @@ export async function deleteTask(taskId: string): Promise<TaskActionState> {
     console.error("[tasks] delete failed:", error.message);
     return {
       status: "error",
-      error: "Could not delete the task. Please try again.",
+      error: err.deleteFailed,
     };
   }
 
   if (!deleted || deleted.length === 0) {
     return {
       status: "error",
-      error: "Task not found, or you don't have access to it.",
+      error: err.notFound,
     };
   }
 

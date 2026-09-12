@@ -16,6 +16,7 @@ import { getTimeTrackingData } from "@/lib/actions/time-tracking";
 import { Badge } from "@/components/ui/badge";
 import { QuickClockButton } from "./quick-clock-button";
 import { ModulesGrid } from "@/components/modules-grid";
+import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,10 @@ export const dynamic = "force-dynamic";
 
 /** Highest-priority role for a user's assignment list. */
 function getHighestRole(
-  roles: { name: string; key: string }[]
+  roles: { name: string; key: string }[],
+  fallbackLabel: string
 ): { label: string; variant: "default" | "secondary" | "outline" } {
-  if (roles.length === 0) return { label: "Member", variant: "outline" };
+  if (roles.length === 0) return { label: fallbackLabel, variant: "outline" };
   const priority: Record<string, number> = {
     owner: 0,
     admin: 1,
@@ -43,8 +45,8 @@ function getHighestRole(
   };
 }
 
-function formatFullDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
+function formatFullDate(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale.startsWith("ar") ? "ar-EG" : locale, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -52,15 +54,15 @@ function formatFullDate(date: Date): string {
   }).format(date);
 }
 
-function formatEventTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+function formatEventTime(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale.startsWith("ar") ? "ar-EG" : locale, {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso));
 }
 
-function formatEventDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+function formatEventDate(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale.startsWith("ar") ? "ar-EG" : locale, {
     month: "short",
     day: "numeric",
   }).format(new Date(iso));
@@ -132,6 +134,8 @@ export default async function DashboardPage() {
 
   const { profile, organization, permissions, roles } = userContext;
   const organizationId = organization.id;
+  const { platform } = await getDictionary();
+  const locale = await getLocale();
 
   const supabase = await createServerClient();
 
@@ -211,7 +215,7 @@ export default async function DashboardPage() {
   const upcomingEvents = eventsResult.data ?? [];
   const orgModulesData = modulesResult.data ?? [];
   const departmentName = departmentResult.data?.name ?? null;
-  const roleBadge = getHighestRole(roles);
+  const roleBadge = getHighestRole(roles, platform.roles.employee);
   const now = new Date();
 
   return (
@@ -221,7 +225,7 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Welcome back
+              {platform.dashboard.welcomeBack}
               {profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -235,7 +239,7 @@ export default async function DashboardPage() {
                   {departmentName}
                 </span>
               ) : (
-                <span>No department assigned</span>
+                <span>{platform.dashboard.noDepartment}</span>
               )}
               <span className="text-border">·</span>
               <Badge variant={roleBadge.variant} className="text-xs font-medium">
@@ -243,19 +247,23 @@ export default async function DashboardPage() {
               </Badge>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">{formatFullDate(now)}</p>
+          <p className="text-sm text-muted-foreground">
+            {formatFullDate(now, locale)}
+          </p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ── Quick status & time tracking ───────────────────── */}
         {canViewTime && timeData ? (
-          <SectionCard icon={Clock} title="Time Tracking">
+          <SectionCard icon={Clock} title={platform.dashboard.timeTracking}>
             <QuickClockButton
               activeEntry={timeData.activeEntry}
               todayTotalSeconds={timeData.todayTotalSeconds}
               serverNowIso={timeData.serverNowIso}
               canManageSelf={timeData.canManageSelf}
+              platform={platform}
+              locale={locale}
             />
           </SectionCard>
         ) : null}
@@ -264,23 +272,25 @@ export default async function DashboardPage() {
         {canViewCalendar ? (
           <SectionCard
             icon={CalendarDays}
-            title="Upcoming Events"
+            title={platform.dashboard.upcomingEvents}
             className="lg:col-span-2"
             action={
               <Link
                 href="/calendar"
                 className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
-                View calendar
-                <ArrowRight className="h-3 w-3" />
+                {platform.dashboard.viewCalendar}
+                <ArrowRight className="h-3 w-3 rtl:rotate-180" />
               </Link>
             }
           >
             {upcomingEvents.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-8 text-center">
-                <p className="text-sm font-medium">No upcoming events</p>
+                <p className="text-sm font-medium">
+                  {platform.dashboard.noUpcomingEvents}
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Your upcoming events will appear here.
+                  {platform.dashboard.noUpcomingEventsHint}
                 </p>
               </div>
             ) : (
@@ -300,9 +310,10 @@ export default async function DashboardPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {isToday
-                            ? "Today"
-                            : formatEventDate(event.starts_at)}{" "}
-                          at {formatEventTime(event.starts_at)}
+                            ? platform.dashboard.today
+                            : formatEventDate(event.starts_at, locale)}{" "}
+                          {platform.dashboard.at}{" "}
+                          {formatEventTime(event.starts_at, locale)}
                           {event.location && (
                             <span className="ml-1.5">· {event.location}</span>
                           )}
@@ -323,25 +334,25 @@ export default async function DashboardPage() {
           {canViewEmployees && (
             <MetricCard
               icon={Users}
-              label="Employees"
+              label={platform.dashboard.metricEmployees}
               value={employeeCountResult.count ?? 0}
-              hint="Active team members"
+              hint={platform.dashboard.metricEmployeesHint}
             />
           )}
           {canViewDepartments && (
             <MetricCard
               icon={Building2}
-              label="Departments"
+              label={platform.dashboard.metricDepartments}
               value={departmentCountResult.count ?? 0}
-              hint="Active departments"
+              hint={platform.dashboard.metricDepartmentsHint}
             />
           )}
           {canViewTeamTime && (
             <MetricCard
               icon={Clock}
-              label="Clocked In"
+              label={platform.dashboard.metricClockedIn}
               value={clockedInCountResult.count ?? 0}
-              hint="Currently working"
+              hint={platform.dashboard.metricClockedInHint}
             />
           )}
         </div>
@@ -351,18 +362,22 @@ export default async function DashboardPage() {
       <div className="mt-8">
         <SectionCard
           icon={Sparkles}
-          title="Modules"
+          title={platform.dashboard.modules}
           action={
             <Link
               href="/modules"
               className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
             >
-              Explore apps
-              <ArrowRight className="h-3 w-3" />
+              {platform.dashboard.exploreApps}
+              <ArrowRight className="h-3 w-3 rtl:rotate-180" />
             </Link>
           }
         >
-          <ModulesGrid activeModules={orgModulesData} compact />
+          <ModulesGrid
+            activeModules={orgModulesData}
+            compact
+            platform={platform}
+          />
         </SectionCard>
       </div>
     </div>

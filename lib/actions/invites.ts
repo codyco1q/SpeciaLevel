@@ -8,11 +8,12 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { createServerClient } from "@/lib/supabase/server";
 import {
-  invitationSchema,
+  createInvitationSchema,
   type AcceptInvitationResult,
   type InvitationLookupResult,
   type InviteActionState,
 } from "@/lib/validations/invites";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 function parseFieldErrors(
   issues: z.ZodIssue[]
@@ -43,10 +44,13 @@ async function requireInviteManage(): Promise<
   | { ok: false; error: InviteActionState }
 > {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+
   if (!userContext) {
     return {
       ok: false,
-      error: { status: "error", error: "You must be signed in to do this." },
+      error: { status: "error", error: err.signedIn },
     };
   }
 
@@ -55,7 +59,7 @@ async function requireInviteManage(): Promise<
       ok: false,
       error: {
         status: "error",
-        error: "You don't have permission to manage invitations.",
+        error: err.noPermissionInvites,
       },
     };
   }
@@ -66,7 +70,7 @@ async function requireInviteManage(): Promise<
       ok: false,
       error: {
         status: "error",
-        error: "No organization found for your account.",
+        error: err.noOrg,
       },
     };
   }
@@ -92,7 +96,10 @@ export async function createInvitation(data: {
   const auth = await requireInviteManage();
   if (!auth.ok) return auth.error;
 
-  const parsed = invitationSchema.safeParse(data);
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+
+  const parsed = createInvitationSchema(err).safeParse(data);
   if (!parsed.success) {
     return {
       status: "error",
@@ -121,7 +128,7 @@ export async function createInvitation(data: {
   if (!role) {
     return {
       status: "error",
-      error: "Role not found, or you don't have access to it.",
+      error: err.roleNotFound,
     };
   }
 
@@ -137,7 +144,7 @@ export async function createInvitation(data: {
     if (!department) {
       return {
         status: "error",
-        error: "Department not found, or you don't have access to it.",
+        error: err.departmentNotFound,
       };
     }
   }
@@ -154,7 +161,7 @@ export async function createInvitation(data: {
   if (duplicate) {
     return {
       status: "error",
-      error: "An invitation for this email is already pending.",
+      error: err.invitePending,
     };
   }
 
@@ -169,7 +176,7 @@ export async function createInvitation(data: {
   if (existingMember) {
     return {
       status: "error",
-      error: "This person is already a member of your organization.",
+      error: err.alreadyMember,
     };
   }
 
@@ -191,7 +198,7 @@ export async function createInvitation(data: {
   if (insertError) {
     return {
       status: "error",
-      error: "Could not create the invitation. Please try again.",
+      error: err.inviteCreateFailed,
     };
   }
 
@@ -209,6 +216,9 @@ export async function revokeInvitation(
   const auth = await requireInviteManage();
   if (!auth.ok) return auth.error;
 
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+
   const supabase = await createServerClient();
 
   const { data: invitation, error: fetchError } = await supabase
@@ -220,21 +230,21 @@ export async function revokeInvitation(
   if (fetchError || !invitation) {
     return {
       status: "error",
-      error: "Invitation not found, or you don't have access to it.",
+      error: err.inviteNotFound,
     };
   }
 
   if (invitation.organization_id !== auth.organizationId) {
     return {
       status: "error",
-      error: "Invitation not found, or you don't have access to it.",
+      error: err.inviteNotFound,
     };
   }
 
   if (invitation.status === "accepted") {
     return {
       status: "error",
-      error: "This invitation has already been accepted.",
+      error: err.inviteAlreadyAccepted,
     };
   }
 
@@ -251,7 +261,7 @@ export async function revokeInvitation(
   if (updateError) {
     return {
       status: "error",
-      error: "Could not revoke the invitation. Please try again.",
+      error: err.inviteRevokeFailed,
     };
   }
 

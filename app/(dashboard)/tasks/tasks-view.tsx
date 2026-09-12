@@ -34,13 +34,12 @@ import {
   formatDueDate,
   isTaskOverdue,
   TASK_PRIORITY_BADGE_CLASSES,
-  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
   TASK_STATUS_DOT_CLASSES,
-  TASK_STATUS_LABELS,
 } from "./task-meta";
 import { TaskDialog, type TaskMemberOption } from "./task-dialog";
 import { TaskDetailDialog } from "./task-detail-dialog";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface TasksViewProps {
   initialTasks: TaskRow[];
@@ -49,6 +48,9 @@ interface TasksViewProps {
   currentUserId: string;
   /** ISO string of today (server-rendered) for overdue highlighting. */
   todayIso: string;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 interface TaskCardProps {
@@ -57,6 +59,9 @@ interface TaskCardProps {
   canChangeStatus: boolean;
   onOpen: (task: TaskRow) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
 /** Single kanban card: click body opens details, footer selects status. */
@@ -66,7 +71,10 @@ function TaskCard({
   canChangeStatus,
   onOpen,
   onStatusChange,
+  platform,
+  locale,
 }: TaskCardProps) {
+  const t = platform.tasks;
   const overdue =
     task.dueDate &&
     isTaskOverdue(task.dueDate, todayIso) &&
@@ -93,12 +101,12 @@ function TaskCard({
               TASK_PRIORITY_BADGE_CLASSES[task.priority]
             )}
           >
-            {TASK_PRIORITY_LABELS[task.priority]}
+            {t.priority[task.priority]}
           </Badge>
           {task.assignedTo && (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <User className="h-3 w-3" />
-              {task.assignedTo.fullName ?? task.assignedTo.email ?? "Member"}
+              {task.assignedTo.fullName ?? task.assignedTo.email ?? t.member}
             </span>
           )}
           {task.dueDate && (
@@ -111,7 +119,7 @@ function TaskCard({
               )}
             >
               <CalendarDays className="h-3 w-3" />
-              {formatDueDate(task.dueDate)}
+              {formatDueDate(task.dueDate, locale)}
             </span>
           )}
         </div>
@@ -130,14 +138,14 @@ function TaskCard({
             <SelectContent>
               {TASK_STATUSES.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {TASK_STATUS_LABELS[status]}
+                  {t.status[status]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         ) : (
           <span className="text-xs font-medium text-muted-foreground">
-            {TASK_STATUS_LABELS[task.status]}
+            {t.status[task.status]}
           </span>
         )}
       </div>
@@ -155,7 +163,10 @@ export function TasksView({
   canManage,
   currentUserId,
   todayIso,
+  platform,
+  locale,
 }: TasksViewProps) {
+  const t = platform.tasks;
   const [tasks, setTasks] = useState<TaskRow[]>(initialTasks);
   const [view, setView] = useState<"board" | "list">("board");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -185,7 +196,7 @@ export function TasksView({
   async function handleStatusChange(taskId: string, status: TaskStatus) {
     const result = await updateTaskStatus(taskId, status);
     if (result.status === "error") {
-      setActionError(result.error ?? "Could not update the task.");
+      setActionError(result.error ?? t.errors.updateFailed);
       return;
     }
     setActionError(null);
@@ -213,7 +224,7 @@ export function TasksView({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <CheckSquare className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
           {refreshing && (
             <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
@@ -232,7 +243,7 @@ export function TasksView({
               )}
             >
               <LayoutGrid className="h-4 w-4" />
-              Board
+              {t.board}
             </button>
             <button
               type="button"
@@ -245,14 +256,14 @@ export function TasksView({
               )}
             >
               <List className="h-4 w-4" />
-              List
+              {t.list}
             </button>
           </div>
 
           {canManage && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" />
-              New Task
+              {t.newTask}
             </Button>
           )}
         </div>
@@ -275,10 +286,10 @@ export function TasksView({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="all">{t.allStatuses}</SelectItem>
               {TASK_STATUSES.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {TASK_STATUS_LABELS[status]}
+                  {t.status[status]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -288,11 +299,11 @@ export function TasksView({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All members</SelectItem>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
+              <SelectItem value="all">{t.allMembers}</SelectItem>
+              <SelectItem value="unassigned">{t.unassigned}</SelectItem>
               {members.map((member) => (
                 <SelectItem key={member.id} value={member.id}>
-                  {member.fullName ?? member.email ?? "Unnamed"}
+                  {member.fullName ?? member.email ?? t.unnamed}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -303,11 +314,9 @@ export function TasksView({
       {tasks.length === 0 && (
         <div className="mb-4 rounded-xl border border-dashed border-border/80 bg-card/50 p-10 text-center">
           <CheckSquare className="mx-auto h-8 w-8 text-muted-foreground" />
-          <h2 className="mt-2 text-sm font-semibold">No tasks yet</h2>
+          <h2 className="mt-2 text-sm font-semibold">{t.noTasksYet}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {canManage
-              ? "Create your first task to get your team moving."
-              : "Tasks created for your organization will appear here."}
+            {canManage ? t.noTasksYetHintManage : t.noTasksYetHintView}
           </p>
         </div>
       )}
@@ -333,7 +342,7 @@ export function TasksView({
                       )}
                     />
                     <span className="text-sm font-semibold">
-                      {TASK_STATUS_LABELS[status]}
+                      {t.status[status]}
                     </span>
                   </div>
                   <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
@@ -353,11 +362,13 @@ export function TasksView({
                       onStatusChange={(taskId, status) =>
                         handleStatusChange(taskId, status)
                       }
+                      platform={platform}
+                      locale={locale}
                     />
                   ))}
                   {columnTasks.length === 0 && (
                     <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">
-                      No tasks
+                      {t.noTasksInColumn}
                     </div>
                   )}
                 </div>
@@ -372,11 +383,11 @@ export function TasksView({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Task</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Assignee</TableHead>
-                <TableHead>Due date</TableHead>
+                <TableHead>{t.tableTask}</TableHead>
+                <TableHead>{t.tableStatus}</TableHead>
+                <TableHead>{t.tablePriority}</TableHead>
+                <TableHead>{t.tableAssignee}</TableHead>
+                <TableHead>{t.tableDue}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -386,7 +397,7 @@ export function TasksView({
                     colSpan={5}
                     className="py-10 text-center text-sm text-muted-foreground"
                   >
-                    No tasks match your filters.
+                    {t.noTasksMatchFilters}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -429,14 +440,14 @@ export function TasksView({
                             <SelectContent>
                               {TASK_STATUSES.map((status) => (
                                 <SelectItem key={status} value={status}>
-                                  {TASK_STATUS_LABELS[status]}
+                                  {t.status[status]}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         ) : (
                           <span className="text-sm">
-                            {TASK_STATUS_LABELS[task.status]}
+                            {t.status[task.status]}
                           </span>
                         )}
                       </TableCell>
@@ -448,15 +459,15 @@ export function TasksView({
                             TASK_PRIORITY_BADGE_CLASSES[task.priority]
                           )}
                         >
-                          {TASK_PRIORITY_LABELS[task.priority]}
+                          {t.priority[task.priority]}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {task.assignedTo
                           ? task.assignedTo.fullName ??
                             task.assignedTo.email ??
-                            "Member"
-                          : "Unassigned"}
+                            t.member
+                          : t.unassigned}
                       </TableCell>
                       <TableCell
                         className={cn(
@@ -466,7 +477,7 @@ export function TasksView({
                             : "text-muted-foreground"
                         )}
                       >
-                        {task.dueDate ? formatDueDate(task.dueDate) : "—"}
+                        {task.dueDate ? formatDueDate(task.dueDate, locale) : "—"}
                       </TableCell>
                     </TableRow>
                   );
@@ -496,6 +507,8 @@ export function TasksView({
           setDetailTask(null);
           await refreshTasks();
         }}
+        platform={platform}
+        locale={locale}
       />
 
       <TaskDialog
@@ -508,6 +521,8 @@ export function TasksView({
         }}
         task={editingTask}
         members={members}
+        platform={platform}
+        locale={locale}
         onSaved={async () => {
           setCreateOpen(false);
           setEditingTask(null);

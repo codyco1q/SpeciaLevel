@@ -4,28 +4,54 @@ import type { Badge } from "@/components/ui/badge";
 
 /**
  * Zod schema + shared types for the Member Invitations tab.
+ *
+ * i18n: validation messages are parameterized through
+ * `createInvitationSchema(messages)` so the invite dialog and the server
+ * action can pass localized messages from the active dictionary. The
+ * exported `invitationSchema` keeps the English defaults as a fallback.
  */
 
-export const invitationSchema = z.object({
-  email: z.string().trim().email("Enter a valid email address."),
-  role_id: z
-    .string()
-    .trim()
-    .min(1, "Select a role.")
-    .uuid("Select a valid role."),
-  // "none" is the sentinel value used by the Radix Select for "no department".
-  department_id: z
-    .string()
-    .trim()
-    .refine(
-      (value) =>
-        value === "" ||
-        value === "none" ||
-        z.string().uuid().safeParse(value).success,
-      "Select a valid department."
-    )
-    .optional(),
-});
+/** Localized string messages consumed by the invitation schema. */
+export interface InviteValidationMessages {
+  emailInvalid: string;
+  selectRole: string;
+  selectValidRole: string;
+  selectValidDepartment: string;
+}
+
+export const DEFAULT_INVITE_VALIDATION_MESSAGES: InviteValidationMessages = {
+  emailInvalid: "Enter a valid email address.",
+  selectRole: "Select a role.",
+  selectValidRole: "Select a valid role.",
+  selectValidDepartment: "Select a valid department.",
+};
+
+export function createInvitationSchema(
+  messages: InviteValidationMessages = DEFAULT_INVITE_VALIDATION_MESSAGES
+) {
+  return z.object({
+    email: z.string().trim().email(messages.emailInvalid),
+    role_id: z
+      .string()
+      .trim()
+      .min(1, messages.selectRole)
+      .uuid(messages.selectValidRole),
+    // "none" is the sentinel value used by the Radix Select for "no department".
+    department_id: z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          value === "" ||
+          value === "none" ||
+          z.string().uuid().safeParse(value).success,
+        messages.selectValidDepartment
+      )
+      .optional(),
+  });
+}
+
+export const invitationSchema = createInvitationSchema();
 
 export type InvitationFormValues = z.infer<typeof invitationSchema>;
 

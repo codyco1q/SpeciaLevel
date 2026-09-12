@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DashboardLocaleSwitcher } from "@/components/dashboard/locale-switcher";
 import { updateProfile } from "@/lib/actions/settings";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import {
   initialSettingsActionState,
   profileSchema,
@@ -26,9 +28,13 @@ import {
 interface ProfileTabProps {
   profile: { fullName: string | null; jobTitle: string | null };
   userEmail: string;
+  /** Localized copy + formatters for the current render. */
+  platform: Dictionary["platform"];
+  locale: Locale;
 }
 
-export function ProfileTab({ profile, userEmail }: ProfileTabProps) {
+export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabProps) {
+  const t = platform.settings;
   const [state, formAction, isPending] = useActionState(
     async (_prevState: SettingsActionState, formData: FormData) =>
       updateProfile({
@@ -73,17 +79,16 @@ export function ProfileTab({ profile, userEmail }: ProfileTabProps) {
   }
 
   return (
-    <Card>
+    <>
+      <Card>
       <CardHeader>
-        <CardTitle>Personal Profile</CardTitle>
-        <CardDescription>
-          Your name and job title are shown to your teammates.
-        </CardDescription>
+        <CardTitle>{t.profileTitle}</CardTitle>
+        <CardDescription>{t.profileDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="profile-email">Email</Label>
+            <Label htmlFor="profile-email">{t.emailLabel}</Label>
             <Input
               id="profile-email"
               type="email"
@@ -92,16 +97,14 @@ export function ProfileTab({ profile, userEmail }: ProfileTabProps) {
               disabled
               className="bg-muted/50 text-muted-foreground"
             />
-            <p className="text-xs text-muted-foreground">
-              Your sign-in email cannot be changed here.
-            </p>
+            <p className="text-xs text-muted-foreground">{t.emailHint}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="profile-full-name">Full name</Label>
+            <Label htmlFor="profile-full-name">{t.fullName}</Label>
             <Input
               id="profile-full-name"
-              placeholder="Jane Smith"
+              placeholder={t.fullNamePlaceholder}
               autoComplete="off"
               aria-invalid={Boolean(fullNameError)}
               {...register("full_name")}
@@ -114,10 +117,10 @@ export function ProfileTab({ profile, userEmail }: ProfileTabProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="profile-job-title">Job title</Label>
+            <Label htmlFor="profile-job-title">{t.jobTitle}</Label>
             <Input
               id="profile-job-title"
-              placeholder="e.g. Account Executive"
+              placeholder={t.jobTitlePlaceholder}
               autoComplete="off"
               aria-invalid={Boolean(jobTitleError)}
               {...register("job_title")}
@@ -138,18 +141,36 @@ export function ProfileTab({ profile, userEmail }: ProfileTabProps) {
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <Button type="submit" disabled={isPending}>
               {isPending ? <Loader2 className="animate-spin" /> : <Save />}
-              Save changes
+              {platform.common.saveChanges}
             </Button>
 
             {state.status === "success" && (
               <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="size-4" />
-                Profile saved.
+                {t.profileSaved}
               </span>
             )}
           </div>
         </form>
       </CardContent>
     </Card>
+
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>{t.languageLabel}</CardTitle>
+        <CardDescription>{t.languageHint}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="w-full max-w-sm">
+          <DashboardLocaleSwitcher
+            locale={locale}
+            label={t.languageLabel}
+            english={t.languageEnglish}
+            arabic={t.languageArabic}
+          />
+        </div>
+      </CardContent>
+    </Card>
+    </>
   );
 }

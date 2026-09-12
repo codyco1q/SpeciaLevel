@@ -48,9 +48,9 @@ export const TASK_PRIORITY_BADGE_CLASSES: Record<TaskPriority, string> = {
 };
 
 /** "Sep 12, 2026" — empty string when no due date is set. */
-export function formatDueDate(iso: string | null): string {
+export function formatDueDate(iso: string | null, locale = "en-US"): string {
   if (!iso) return "";
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(locale.startsWith("ar") ? "ar-EG" : locale, {
     month: "short",
     day: "numeric",
     year: "numeric",

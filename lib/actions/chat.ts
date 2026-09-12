@@ -7,10 +7,11 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
-  channelInputSchema,
-  messageContentSchema,
+  createChannelInputSchema,
+  createMessageContentSchema,
   type CreateChannelState,
 } from "@/lib/validations/chat";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 /**
  * Chat server actions.
@@ -84,25 +85,25 @@ async function requireChatPermission(
   permission: "chat.view" | "chat.manage"
 ): Promise<ChatAuthResult> {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
 
   if (!userContext) {
-    return { ok: false, error: "You must be signed in to do this." };
+    return { ok: false, error: err.signedIn };
   }
 
   if (!hasPermission(permission, userContext.permissions)) {
     return {
       ok: false,
       error:
-        permission === "chat.manage"
-          ? "You don't have permission to create channels."
-          : "You don't have permission to use chat.",
+        permission === "chat.manage" ? err.noPermissionManage : err.noPermissionView,
     };
   }
 
   const organizationId = userContext.organization?.id;
 
   if (!organizationId) {
-    return { ok: false, error: "No organization found for your account." };
+    return { ok: false, error: err.noOrg };
   }
 
   return {
@@ -253,15 +254,18 @@ export async function sendMessage(
   const auth = await requireChatPermission("chat.view");
   if (!auth.ok) return { status: "error", error: auth.error };
 
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
+
   if (!channelId) {
-    return { status: "error", error: "Missing channel." };
+    return { status: "error", error: err.missingChannel };
   }
 
-  const parsed = messageContentSchema.safeParse(content);
+  const parsed = createMessageContentSchema(err).safeParse(content);
   if (!parsed.success) {
     return {
       status: "error",
-      error: parsed.error.issues[0]?.message ?? "Invalid message.",
+      error: parsed.error.issues[0]?.message ?? err.invalidMessage,
     };
   }
 
@@ -278,7 +282,7 @@ export async function sendMessage(
   if (!channel) {
     return {
       status: "error",
-      error: "Channel not found, or you don't have access to it.",
+      error: err.channelNotFound,
     };
   }
 
@@ -306,7 +310,7 @@ export async function sendMessage(
     console.error("[chat] send failed:", error.message);
     return {
       status: "error",
-      error: "Could not send the message. Please try again.",
+      error: err.sendFailed,
     };
   }
 
@@ -334,11 +338,14 @@ export async function createChannel(
   const auth = await requireChatPermission("chat.manage");
   if (!auth.ok) return { status: "error", error: auth.error };
 
-  const parsed = channelInputSchema.safeParse(data);
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
+
+  const parsed = createChannelInputSchema(err).safeParse(data);
   if (!parsed.success) {
     return {
       status: "error",
-      error: "Please fix the highlighted fields.",
+      error: err.highlightFields,
       fieldErrors: parseFieldErrors(parsed.error.issues),
     };
   }
@@ -366,13 +373,13 @@ export async function createChannel(
     if (error.code === "23505") {
       return {
         status: "error",
-        error: "A channel with that name already exists.",
+        error: err.channelExists,
       };
     }
 
     return {
       status: "error",
-      error: "Could not create the channel. Please try again.",
+      error: err.createFailed,
     };
   }
 

@@ -7,10 +7,11 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
-  organizationSettingsSchema,
-  profileSchema,
+  createOrganizationSettingsSchema,
+  createProfileSchema,
   type SettingsActionState,
 } from "@/lib/validations/settings";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 function parseFieldErrors(
   issues: z.ZodIssue[]
@@ -30,10 +31,13 @@ async function requireSettingsManage(): Promise<
   | { ok: false; error: SettingsActionState }
 > {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+
   if (!userContext) {
     return {
       ok: false,
-      error: { status: "error", error: "You must be signed in to do this." },
+      error: { status: "error", error: err.signedIn },
     };
   }
 
@@ -42,7 +46,7 @@ async function requireSettingsManage(): Promise<
       ok: false,
       error: {
         status: "error",
-        error: "You don't have permission to manage settings.",
+        error: err.noPermission,
       },
     };
   }
@@ -53,7 +57,7 @@ async function requireSettingsManage(): Promise<
       ok: false,
       error: {
         status: "error",
-        error: "No organization found for your account.",
+        error: err.noOrg,
       },
     };
   }
@@ -72,7 +76,9 @@ export async function updateOrganizationSettings(data: {
   const auth = await requireSettingsManage();
   if (!auth.ok) return auth.error;
 
-  const parsed = organizationSettingsSchema.safeParse(data);
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+  const parsed = createOrganizationSettingsSchema(err).safeParse(data);
   if (!parsed.success) {
     return {
       status: "error",
@@ -93,7 +99,7 @@ export async function updateOrganizationSettings(data: {
   if (error) {
     return {
       status: "error",
-      error: "Could not update organization settings. Please try again.",
+      error: err.updateOrgFailed,
     };
   }
 
@@ -115,14 +121,17 @@ export async function updateProfile(data: {
   job_title?: string;
 }): Promise<SettingsActionState> {
   const userContext = await getCurrentUserContext();
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+
   if (!userContext) {
     return {
       status: "error",
-      error: "You must be signed in to do this.",
+      error: err.signedIn,
     };
   }
 
-  const parsed = profileSchema.safeParse(data);
+  const parsed = createProfileSchema(err).safeParse(data);
   if (!parsed.success) {
     return {
       status: "error",
@@ -143,7 +152,7 @@ export async function updateProfile(data: {
   if (error) {
     return {
       status: "error",
-      error: "Could not update your profile. Please try again.",
+      error: err.updateProfileFailed,
     };
   }
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
+import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { SettingsClient } from "./settings-client";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,10 @@ export default async function SettingsPage() {
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
 
+  const { platform } = await getDictionary();
+  const locale = await getLocale();
+  const t = platform.settings;
+
   const canView = hasPermission("settings.view", userContext.permissions);
   const canManage = hasPermission("settings.manage", userContext.permissions);
 
@@ -62,9 +67,9 @@ export default async function SettingsPage() {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            You don&apos;t have permission to view settings.
+            {t.noPermissionBody}
           </p>
         </div>
       </div>
@@ -150,6 +155,8 @@ export default async function SettingsPage() {
         }))}
         invitations={invitations}
         canManage={canManage}
+        platform={platform}
+        locale={locale}
       />
     </div>
   );

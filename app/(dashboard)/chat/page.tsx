@@ -7,6 +7,7 @@ import {
   getMessages,
   type ChatPerson,
 } from "@/lib/actions/chat";
+import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { ChatView } from "./chat-view";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +17,17 @@ export default async function ChatPage() {
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
 
+  const { platform } = await getDictionary();
+  const locale = await getLocale();
+  const t = platform.chat;
+
   if (!hasPermission("chat.view", userContext.permissions)) {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Chat</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            You don&apos;t have permission to view chat.
+            {t.noPermissionBody}
           </p>
         </div>
       </div>
@@ -50,6 +55,8 @@ export default async function ChatPage() {
       activeChannelId={activeChannelId}
       canManage={hasPermission("chat.manage", userContext.permissions)}
       currentUser={currentUser}
+      platform={platform}
+      locale={locale}
     />
   );
 }
