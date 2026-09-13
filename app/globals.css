@@ -102,3 +102,33 @@ html[lang="ar"] *::after {
     @apply bg-background text-foreground;
   }
 }
+
+/* ------------------------------------------------------------------
+ * Print — dedicated print-friendly invoice view (/invoicing/[id]).
+ * Neutralise the fixed-height dashboard shell so the A4 document
+ * defines its own flow on paper. The `.print-document` wrapper forces
+ * black-on-white output regardless of the active theme, and the
+ * invoice page uses Tailwind's print-* modifiers for fine-grained
+ * chrome control (hiding actions, stripping card chrome).
+ * ------------------------------------------------------------------ */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .print-document,
+  .print-document * {
+    color: #0a0a0a !important;
+    background-color: #fff !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}

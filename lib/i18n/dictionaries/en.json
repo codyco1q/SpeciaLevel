@@ -610,9 +610,11 @@
       },
       "detail": {
         "title": "Invoice",
+        "invoiceNumber": "Invoice #",
         "issued": "Issued",
         "due": "Due",
         "billedTo": "Billed to",
+        "noClient": "No client linked",
         "description": "Description",
         "quantity": "Qty",
         "unitPrice": "Unit price",
@@ -622,8 +624,13 @@
         "total": "Total",
         "notes": "Notes",
         "markPaid": "Mark as paid",
+        "print": "Print / Save as PDF",
+        "back": "Back to invoices",
+        "openPage": "Open full page",
         "close": "Close",
-        "confirmDelete": "Confirm delete"
+        "confirmDelete": "Confirm delete",
+        "notFound": "Invoice not found",
+        "notFoundHint": "This invoice doesn't exist, or you don't have access to it."
       },
       "errors": {
         "signedIn": "You must be signed in to do this.",

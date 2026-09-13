@@ -20,6 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Monogram } from "@/components/brand";
 import type { InvoiceRow } from "@/lib/actions/invoicing";
@@ -217,6 +219,19 @@ export function InvoiceDetailDialog({
         </div>
 
         <DialogFooter className="px-6 pb-6 pt-2">
+          <Button
+            type="button"
+            asChild
+            variant="ghost"
+            size="sm"
+            className="me-auto"
+            disabled={busy}
+          >
+            <Link href={`/invoicing/${invoice.id}`}>
+              <ExternalLink className="size-4" />
+              {t.detail.openPage}
+            </Link>
+          </Button>
           <Button
             type="button"
             variant="outline"

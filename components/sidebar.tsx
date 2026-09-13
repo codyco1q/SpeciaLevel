@@ -163,7 +163,7 @@ export default function Sidebar({
     hasPermission("settings.manage", permissions);
 
   return (
-    <aside className="flex h-full w-64 flex-col border-e border-border bg-card">
+    <aside className="flex h-full w-64 flex-col border-e border-border bg-card print:hidden">
       {/* Logo */}
       <div className="flex items-center gap-2 border-b border-border px-6 py-5">
         <Monogram className="size-8 rounded-lg" />
@@ -179,7 +179,8 @@ export default function Sidebar({
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {visibleItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive =
+            pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
               key={item.href}
