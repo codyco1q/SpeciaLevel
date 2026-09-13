@@ -29,8 +29,14 @@ import { RevokeInvitationDialog } from "./revoke-invitation-dialog";
 
 interface InvitationsTabProps {
   invitations: InvitationRow[];
-  roles: { id: string; name: string; isSystem: boolean }[];
+  roles: { id: string; name: string; key: string; isSystem: boolean }[];
   departments: { id: string; name: string }[];
+  contacts: {
+    id: string;
+    name: string;
+    email: string;
+    company: string | null;
+  }[];
   canManage: boolean;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
@@ -95,6 +101,7 @@ export function InvitationsTab({
   invitations,
   roles,
   departments,
+  contacts,
   canManage,
   platform,
   locale,
@@ -165,6 +172,7 @@ export function InvitationsTab({
                   <TableHead>{t.tableEmail}</TableHead>
                   <TableHead>{t.tableRole}</TableHead>
                   <TableHead>{t.tableDepartment}</TableHead>
+                  <TableHead>{t.tableContact}</TableHead>
                   <TableHead>{t.tableSent}</TableHead>
                   <TableHead>{t.tableExpiration}</TableHead>
                   <TableHead>{t.tableStatus}</TableHead>
@@ -182,6 +190,9 @@ export function InvitationsTab({
                     <TableCell>{invitation.roleName}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {invitation.departmentName ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {invitation.contactName ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(invitation.createdAt, locale)}
@@ -248,6 +259,7 @@ export function InvitationsTab({
           onOpenChange={setInviteOpen}
           roles={roles}
           departments={departments}
+          contacts={contacts}
           platform={platform}
         />
       )}

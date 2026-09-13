@@ -28,6 +28,12 @@ export default async function DashboardLayout({
   const dict = await getDictionary();
   const locale = await getLocale();
 
+  // A user whose every role is the restricted Client role gets the scoped
+  // client portal shell (client-scoped nav items + hub dashboard).
+  const isClient =
+    userContext.roles.length > 0 &&
+    userContext.roles.every((role) => role.key === "client");
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
@@ -36,6 +42,7 @@ export default async function DashboardLayout({
         userFullName={userContext.profile.full_name ?? undefined}
         userEmail={userContext.user.email}
         locale={locale}
+        isClient={isClient}
         platform={dict.platform}
       />
       {/* Logical main container: the flex row flips automatically under

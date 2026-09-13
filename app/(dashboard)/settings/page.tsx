@@ -15,6 +15,7 @@ export interface InvitationRow {
   email: string;
   roleName: string;
   departmentName: string | null;
+  contactName: string | null;
   invitedByName: string | null;
   status: InvitationStatus;
   token: string;
@@ -31,6 +32,7 @@ interface InvitationJoin {
   expires_at: string;
   role?: { name?: string } | { name?: string }[] | null;
   department?: { name?: string } | { name?: string }[] | null;
+  contact?: { name?: string } | { name?: string }[] | null;
   invited_by_profile?:
     | { full_name?: string }
     | { full_name?: string }[]
@@ -79,29 +81,37 @@ export default async function SettingsPage() {
   const supabase = await createServerClient();
   const organization = userContext.organization;
 
-  const [rolesResult, departmentsResult, invitesResult] = await Promise.all([
-    supabase
-      .from("roles")
-      .select("id, name, is_system")
-      .eq("organization_id", organization.id)
-      .order("is_system", { ascending: true })
-      .order("name", { ascending: true }),
-    supabase
-      .from("departments")
-      .select("id, name")
-      .eq("organization_id", organization.id)
-      .order("name", { ascending: true }),
-    supabase
-      .from("organization_invitations")
-      .select(
-        `id, email, status, token, created_at, expires_at,
+  const [rolesResult, departmentsResult, invitesResult, contactsResult] =
+    await Promise.all([
+      supabase
+        .from("roles")
+        .select("id, name, key, is_system")
+        .eq("organization_id", organization.id)
+        .order("is_system", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("departments")
+        .select("id, name")
+        .eq("organization_id", organization.id)
+        .order("name", { ascending: true }),
+      supabase
+        .from("organization_invitations")
+        .select(
+          `id, email, status, token, created_at, expires_at,
          role:roles!fk_organization_invitations_role(name),
          department:departments!fk_organization_invitations_department(name),
+         contact:crm_contacts!fk_organization_invitations_contact(name),
          invited_by_profile:profiles!fk_organization_invitations_invited_by(full_name)`
-      )
-      .eq("organization_id", organization.id)
-      .order("created_at", { ascending: false }),
-  ]);
+        )
+        .eq("organization_id", organization.id)
+        .order("created_at", { ascending: false }),
+      // CRM contacts for optionally linking Client-role invites.
+      supabase
+        .from("crm_contacts")
+        .select("id, name, email, company")
+        .eq("organization_id", organization.id)
+        .order("name", { ascending: true }),
+    ]);
 
   const invitations: InvitationRow[] = (
     (invitesResult.data ?? []) as InvitationJoin[]
@@ -118,6 +128,7 @@ export default async function SettingsPage() {
         email: invitation.email,
         roleName: pickJoinedValue(invitation.role, "name") ?? "—",
         departmentName: pickJoinedValue(invitation.department, "name"),
+        contactName: pickJoinedValue(invitation.contact, "name"),
         invitedByName: pickJoinedValue(
           invitation.invited_by_profile,
           "full_name"
@@ -147,11 +158,18 @@ export default async function SettingsPage() {
         roles={(rolesResult.data ?? []).map((role) => ({
           id: role.id,
           name: role.name,
+          key: role.key,
           isSystem: role.is_system,
         }))}
         departments={(departmentsResult.data ?? []).map((department) => ({
           id: department.id,
           name: department.name,
+        }))}
+        contacts={(contactsResult.data ?? []).map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          email: contact.email,
+          company: contact.company ?? null,
         }))}
         invitations={invitations}
         canManage={canManage}

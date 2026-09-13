@@ -30,6 +30,8 @@ export interface SidebarProps {
   userFullName?: string;
   userEmail?: string;
   locale: Locale;
+  /** True when the user's only role is the restricted Client role. */
+  isClient?: boolean;
   /** Platform dictionary slice — drives every label in the shell. */
   platform: Dictionary["platform"];
 }
@@ -40,12 +42,46 @@ export default function Sidebar({
   userFullName,
   userEmail,
   locale,
+  isClient = false,
   platform,
 }: SidebarProps) {
   const pathname = usePathname();
   const t = platform.sidebar;
+  const cp = platform.clientPortal;
 
-  const navItems = [
+  // Restricted Client portal shell: only the scoped, client-facing pages
+  // are shown. Each item is still permission-gated (portal.client /
+  // tasks.view / chat.view / invoicing.view), so a Client role that was
+  // granted fewer keys sees proportionally fewer items.
+  const clientNavItems = [
+    {
+      label: cp.navOverview,
+      href: "/dashboard",
+      icon: LayoutDashboard,
+      permission: "portal.client",
+    },
+    {
+      label: cp.navTasks,
+      href: "/tasks",
+      icon: CheckSquare,
+      permission: "tasks.view",
+    },
+    {
+      label: cp.navChat,
+      href: "/chat",
+      icon: MessageSquare,
+      permission: "chat.view",
+    },
+    {
+      label: cp.navInvoicing,
+      href: "/invoicing",
+      icon: Receipt,
+      permission: "invoicing.view",
+    },
+  ] as const;
+
+  // Internal role shell: every workspace app, gated by its permission.
+  const staffNavItems = [
     {
       label: t.dashboard,
       href: "/dashboard",
@@ -113,6 +149,8 @@ export default function Sidebar({
       permission: "dashboard.view",
     },
   ] as const;
+
+  const navItems = isClient ? clientNavItems : staffNavItems;
 
   const visibleItems = navItems.filter((item) =>
     hasPermission(item.permission, permissions)

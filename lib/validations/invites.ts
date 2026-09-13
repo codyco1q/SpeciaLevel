@@ -17,6 +17,7 @@ export interface InviteValidationMessages {
   selectRole: string;
   selectValidRole: string;
   selectValidDepartment: string;
+  selectValidContact: string;
 }
 
 export const DEFAULT_INVITE_VALIDATION_MESSAGES: InviteValidationMessages = {
@@ -24,6 +25,7 @@ export const DEFAULT_INVITE_VALIDATION_MESSAGES: InviteValidationMessages = {
   selectRole: "Select a role.",
   selectValidRole: "Select a valid role.",
   selectValidDepartment: "Select a valid department.",
+  selectValidContact: "Select a valid client contact.",
 };
 
 export function createInvitationSchema(
@@ -46,6 +48,19 @@ export function createInvitationSchema(
           value === "none" ||
           z.string().uuid().safeParse(value).success,
         messages.selectValidDepartment
+      )
+      .optional(),
+    // Client-role invites may pre-link a CRM contact. "none" is the
+    // sentinel value used by the Radix Select for "no client contact".
+    contact_id: z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          value === "" ||
+          value === "none" ||
+          z.string().uuid().safeParse(value).success,
+        messages.selectValidContact
       )
       .optional(),
   });

@@ -11,8 +11,9 @@ export interface SettingsClientProps {
   organization: { id: string; name: string; slug: string; timezone: string };
   profile: { fullName: string | null; jobTitle: string | null };
   userEmail: string;
-  roles: { id: string; name: string; isSystem: boolean }[];
+  roles: { id: string; name: string; key: string; isSystem: boolean }[];
   departments: { id: string; name: string }[];
+  contacts: { id: string; name: string; email: string; company: string | null }[];
   invitations: InvitationRow[];
   canManage: boolean;
   /** Localized copy + formatters for the current render. */
@@ -26,6 +27,7 @@ export function SettingsClient({
   userEmail,
   roles,
   departments,
+  contacts,
   invitations,
   canManage,
   platform,
@@ -60,6 +62,7 @@ export function SettingsClient({
             invitations={invitations}
             roles={roles}
             departments={departments}
+            contacts={contacts}
             canManage={canManage}
             platform={platform}
             locale={locale}
