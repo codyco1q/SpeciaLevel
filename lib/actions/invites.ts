@@ -92,6 +92,7 @@ export async function createInvitation(data: {
   email: string;
   role_id: string;
   department_id?: string;
+  contact_id?: string;
 }): Promise<InviteActionState> {
   const auth = await requireInviteManage();
   if (!auth.ok) return auth.error;
@@ -113,6 +114,12 @@ export async function createInvitation(data: {
   const department_id =
     parsed.data.department_id && parsed.data.department_id !== "none"
       ? parsed.data.department_id
+      : undefined;
+  // Client-role invites may pre-link a CRM contact; "none" mirrors the
+  // department sentinel used by the Radix Select.
+  const contact_id =
+    parsed.data.contact_id && parsed.data.contact_id !== "none"
+      ? parsed.data.contact_id
       : undefined;
 
   const supabase = await createServerClient();
@@ -145,6 +152,23 @@ export async function createInvitation(data: {
       return {
         status: "error",
         error: err.departmentNotFound,
+      };
+    }
+  }
+
+  // The optional client contact must belong to the current organization.
+  if (contact_id) {
+    const { data: contact } = await supabase
+      .from("crm_contacts")
+      .select("id")
+      .eq("id", contact_id)
+      .eq("organization_id", auth.organizationId)
+      .maybeSingle();
+
+    if (!contact) {
+      return {
+        status: "error",
+        error: err.contactNotFound,
       };
     }
   }
@@ -189,6 +213,7 @@ export async function createInvitation(data: {
       email,
       role_id,
       department_id: department_id || null,
+      contact_id: contact_id || null,
       invited_by: auth.userId,
       token,
       status: "pending",
@@ -371,7 +396,7 @@ export async function acceptInvitation(
   const { data: invitation, error: fetchError } = await admin
     .from("organization_invitations")
     .select(
-      "id, email, organization_id, role_id, department_id, status, expires_at"
+      "id, email, organization_id, role_id, department_id, contact_id, status, expires_at"
     )
     .eq("token", token)
     .maybeSingle();
@@ -412,15 +437,18 @@ export async function acceptInvitation(
     };
   }
 
-  // 1. Link the signup-trigger-created profile to the inviting org and the
-  //    pre-assigned department (a deleted department nulls the FK first).
+  // 1. Link the signup-trigger-created profile to the inviting org, the
+  //    pre-assigned department, and the optional client contact (a deleted
+  //    department/contact nulls the FK first).
   const profileUpdate: {
     organization_id: string;
     department_id: string | null;
+    contact_id: string | null;
     full_name?: string;
   } = {
     organization_id: invitation.organization_id,
     department_id: invitation.department_id,
+    contact_id: invitation.contact_id,
   };
   if (fullName?.trim()) {
     profileUpdate.full_name = fullName.trim();

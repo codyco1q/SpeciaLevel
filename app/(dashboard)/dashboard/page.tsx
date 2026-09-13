@@ -13,9 +13,11 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/rbac";
 import { createServerClient } from "@/lib/supabase/server";
 import { getTimeTrackingData } from "@/lib/actions/time-tracking";
+import { getClientPortalData } from "@/lib/actions/client-portal";
 import { Badge } from "@/components/ui/badge";
 import { QuickClockButton } from "./quick-clock-button";
 import { ModulesGrid } from "@/components/modules-grid";
+import { ClientPortalHub } from "./client-portal-hub";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 
 export const dynamic = "force-dynamic";
@@ -136,6 +138,26 @@ export default async function DashboardPage() {
   const organizationId = organization.id;
   const { platform } = await getDictionary();
   const locale = await getLocale();
+
+  // Restricted Client role → render the personalized Client Hub instead of
+  // the internal operations dashboard. Counts are RLS-scoped in the DB
+  // (00013), so a client only ever sees their own deliverables + invoices.
+  const isClient =
+    roles.length > 0 && roles.every((role) => role.key === "client");
+
+  if (isClient) {
+    const portalData = await getClientPortalData();
+    return (
+      <ClientPortalHub
+        userFullName={profile.full_name}
+        organizationName={organization.name}
+        data={portalData}
+        t={platform.clientPortal}
+        platform={platform}
+        locale={locale}
+      />
+    );
+  }
 
   const supabase = await createServerClient();
 

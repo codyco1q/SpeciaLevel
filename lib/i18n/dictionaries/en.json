@@ -268,6 +268,35 @@
       "metricClockedInHint": "Currently working"
     }
     ,
+    "clientPortal": {
+      "navOverview": "Overview",
+      "navTasks": "Tasks & Deliverables",
+      "navChat": "Messages & Support",
+      "navInvoicing": "Invoices & Billing",
+      "welcomeTitle": "Welcome back to your SpeciaLevel project hub",
+      "welcomeSubtitle": "Track project deliverables, review your invoices, and message your project team — all in one place.",
+      "deliverablesTitle": "Project Deliverables",
+      "deliverablesHint": "Live progress on your project milestones.",
+      "activeTasks": "Active tasks",
+      "completedDeliverables": "Completed deliverables",
+      "progressLabel": "Progress",
+      "viewAllDeliverables": "View all",
+      "noActiveTasks": "No active deliverables",
+      "noActiveTasksHint": "New deliverables from your project team will appear here.",
+      "invoicesTitle": "Recent Invoices",
+      "invoicesHint": "Your outstanding balance and billing history.",
+      "outstandingBalance": "Outstanding balance",
+      "outstandingBalanceHint": "Unpaid invoices",
+      "paidToDate": "Paid to date",
+      "paidInvoicesHint": "Paid invoices",
+      "viewAllInvoices": "View all invoices",
+      "noInvoices": "No invoices yet",
+      "noInvoicesHint": "Invoices issued to you will appear here.",
+      "messageTeamTitle": "Project Messages",
+      "messageTeamHint": "Reach your project team and ask questions directly.",
+      "openMessages": "Open messages"
+    }
+    ,
     "time": {
       "title": "Time Tracking",
       "subtitle": "Clock in when you start work, clock out when you stop.",
@@ -649,6 +678,9 @@
       "selectRole": "Select a role",
       "departmentLabel": "Department (optional)",
       "noDepartment": "No department",
+      "clientContactLabel": "Client contact (optional)",
+      "noClientContact": "No client contact",
+      "tableContact": "Client contact",
       "sendInvitation": "Send invitation",
       "invitationSent": "Invitation sent — share the link from the list.",
       "emptyInvitations": "No invitations yet.",
@@ -699,8 +731,10 @@
         "selectRole": "Select a role.",
         "selectValidRole": "Select a valid role.",
         "selectValidDepartment": "Select a valid department.",
+        "selectValidContact": "Select a valid client contact.",
         "roleNotFound": "Role not found, or you don't have access to it.",
         "departmentNotFound": "Department not found, or you don't have access to it.",
+        "contactNotFound": "Client contact not found, or you don't have access to it.",
         "invitePending": "An invitation for this email is already pending.",
         "alreadyMember": "This person is already a member of your organization.",
         "inviteCreateFailed": "Could not create the invitation. Please try again.",
@@ -714,7 +748,8 @@
       "owner": "Owner",
       "admin": "Admin",
       "manager": "Manager",
-      "employee": "Employee"
+      "employee": "Employee",
+      "client": "Client"
     },
     "modules": {
       "title": "Modules & Apps",

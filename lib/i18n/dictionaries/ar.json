@@ -268,6 +268,35 @@
       "metricClockedInHint": "يعملون الآن"
     }
     ,
+    "clientPortal": {
+      "navOverview": "نظرة عامة",
+      "navTasks": "المهام والتسليمات",
+      "navChat": "الرسائل والدعم",
+      "navInvoicing": "الفوترة والفواتير",
+      "welcomeTitle": "مرحبًا بعودتك إلى مركز مشروعك في سبيس ليفل",
+      "welcomeSubtitle": "تتبّع تسليمات المشروع، وراجع فواتيرك، وتواصل مع فريق المشروع — كل ذلك في مكان واحد.",
+      "deliverablesTitle": "تسليمات المشروع",
+      "deliverablesHint": "تقدّم مباشر على مراحل مشروعك.",
+      "activeTasks": "مهام نشطة",
+      "completedDeliverables": "تسليمات مكتملة",
+      "progressLabel": "نسبة الإنجاز",
+      "viewAllDeliverables": "عرض الكل",
+      "noActiveTasks": "لا توجد تسليمات نشطة",
+      "noActiveTasksHint": "ستظهر هنا التسليمات الجديدة من فريق مشروعك.",
+      "invoicesTitle": "الفواتير الأخيرة",
+      "invoicesHint": "رصيدك المستحق وسجلّ الفوترة.",
+      "outstandingBalance": "الرصيد المستحق",
+      "outstandingBalanceHint": "فواتير غير مدفوعة",
+      "paidToDate": "المدفوع حتى الآن",
+      "paidInvoicesHint": "فواتير مدفوعة",
+      "viewAllInvoices": "عرض كل الفواتير",
+      "noInvoices": "لا توجد فواتير بعد",
+      "noInvoicesHint": "ستظهر هنا الفواتير الصادرة لك.",
+      "messageTeamTitle": "رسائل المشروع",
+      "messageTeamHint": "تواصل مباشرة مع فريق مشروعك واطرح أسئلتك.",
+      "openMessages": "فتح الرسائل"
+    }
+    ,
     "time": {
       "title": "تتبّع الوقت",
       "subtitle": "سجّل حضورك عند بدء العمل وسجّل خروجك عند الانتهاء.",
@@ -649,6 +678,9 @@
       "selectRole": "اختر دورًا",
       "departmentLabel": "القسم (اختياري)",
       "noDepartment": "بدون قسم",
+      "clientContactLabel": "جهة اتصال العميل (اختياري)",
+      "noClientContact": "بدون جهة اتصال",
+      "tableContact": "جهة اتصال العميل",
       "sendInvitation": "إرسال الدعوة",
       "invitationSent": "تم إرسال الدعوة — شارك الرابط من القائمة.",
       "emptyInvitations": "لا توجد دعوات بعد.",
@@ -699,8 +731,10 @@
         "selectRole": "اختر دورًا.",
         "selectValidRole": "اختر دورًا صحيحًا.",
         "selectValidDepartment": "اختر قسمًا صحيحًا.",
+        "selectValidContact": "اختر جهة اتصال عميل صحيحة.",
         "roleNotFound": "الدور غير موجود، أو لا تملك وصولًا إليه.",
         "departmentNotFound": "القسم غير موجود، أو لا تملك وصولًا إليه.",
+        "contactNotFound": "جهة اتصال العميل غير موجودة، أو لا تملك وصولًا إليها.",
         "invitePending": "توجد دعوة معلّقة لهذا البريد الإلكتروني بالفعل.",
         "alreadyMember": "هذا الشخص عضو في مؤسستك بالفعل.",
         "inviteCreateFailed": "تعذّر إنشاء الدعوة. حاول مرة أخرى.",
@@ -714,7 +748,8 @@
       "owner": "مالك",
       "admin": "مدير",
       "manager": "مشرف",
-      "employee": "موظف"
+      "employee": "موظف",
+      "client": "عميل"
     },
     "modules": {
       "title": "الوحدات والتطبيقات",

@@ -20,6 +20,8 @@ export interface Profile {
   avatar_url: string | null;
   job_title: string | null;
   department_id: string | null;
+  /** CRM contact this profile is linked to (client role portal scoping). */
+  contact_id: string | null;
   is_active: boolean;
   status: string;
   /** UI locale the user chose ('en' | 'ar'); read by getLocale() when no cookie is set. */
@@ -110,6 +112,10 @@ export interface Task {
   assigned_to: string | null;
   created_by: string;
   due_date: string | null;
+  /** CRM contact this deliverable is for (client portal scoping). */
+  contact_id: string | null;
+  /** When true, the linked client (or any client) can see this task. */
+  is_client_visible: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +127,15 @@ export interface ChatChannel {
   description: string | null;
   is_private: boolean;
   created_by: string;
+  created_at: string;
+}
+
+export interface ChatChannelMember {
+  id: string;
+  organization_id: string;
+  channel_id: string;
+  user_id: string;
+  added_by: string | null;
   created_at: string;
 }
 
@@ -142,6 +157,8 @@ export interface OrganizationInvitation {
   email: string;
   role_id: string;
   department_id: string | null;
+  /** CRM contact this invite is linked to (client role portal scoping). */
+  contact_id: string | null;
   invited_by: string | null;
   token: string;
   status: InvitationStatus;

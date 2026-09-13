@@ -35,8 +35,14 @@ import {
 interface InviteMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  roles: { id: string; name: string; isSystem: boolean }[];
+  roles: { id: string; name: string; key: string; isSystem: boolean }[];
   departments: { id: string; name: string }[];
+  contacts: {
+    id: string;
+    name: string;
+    email: string;
+    company: string | null;
+  }[];
   /** Localized copy for the current render. */
   platform: Dictionary["platform"];
 }
@@ -46,6 +52,7 @@ export function InviteMemberDialog({
   onOpenChange,
   roles,
   departments,
+  contacts,
   platform,
 }: InviteMemberDialogProps) {
   const t = platform.settings;
@@ -55,6 +62,7 @@ export function InviteMemberDialog({
         email: String(formData.get("email") ?? ""),
         role_id: String(formData.get("role_id") ?? ""),
         department_id: String(formData.get("department_id") ?? "") || undefined,
+        contact_id: String(formData.get("contact_id") ?? "") || undefined,
       }),
     initialInviteActionState
   );
@@ -63,24 +71,43 @@ export function InviteMemberDialog({
     register,
     handleSubmit,
     control,
+    watch,
     reset,
     formState: { errors },
   } = useForm<InvitationFormValues>({
     resolver: zodResolver(invitationSchema),
-    defaultValues: { email: "", role_id: "", department_id: "" },
+    defaultValues: {
+      email: "",
+      role_id: "",
+      department_id: "",
+      contact_id: "",
+    },
   });
+
+  const watchedRoleId = watch("role_id");
+  // The Client contact selector is only relevant for the system Client
+  // role (scoped portal access linked to a CRM contact).
+  const isClientRole =
+    roles.some(
+      (role) => role.id === watchedRoleId && role.key === "client"
+    );
 
   // Reset the form every time the dialog opens.
   useEffect(() => {
     if (open) {
-      reset({ email: "", role_id: "", department_id: "" });
+      reset({
+        email: "",
+        role_id: "",
+        department_id: "",
+        contact_id: "",
+      });
     }
   }, [open, reset]);
 
   // Close shortly after a successful save.
   useEffect(() => {
     if (state.status === "success") {
-      reset({ email: "", role_id: "", department_id: "" });
+      reset({ email: "", role_id: "", department_id: "", contact_id: "" });
       const timeout = setTimeout(() => onOpenChange(false), 500);
       return () => clearTimeout(timeout);
     }
@@ -90,12 +117,15 @@ export function InviteMemberDialog({
   const roleError = errors.role_id?.message ?? state.fieldErrors?.role_id?.[0];
   const departmentError =
     errors.department_id?.message ?? state.fieldErrors?.department_id?.[0];
+  const contactError =
+    errors.contact_id?.message ?? state.fieldErrors?.contact_id?.[0];
 
   async function onSubmit(values: InvitationFormValues) {
     const formData = new FormData();
     formData.set("email", values.email);
     formData.set("role_id", values.role_id);
     formData.set("department_id", values.department_id ?? "");
+    formData.set("contact_id", values.contact_id ?? "");
     formAction(formData);
   }
 
@@ -192,6 +222,42 @@ export function InviteMemberDialog({
                 </p>
               )}
             </div>
+
+            {isClientRole && (
+              <div className="space-y-2">
+                <Label htmlFor="invite-contact">{t.clientContactLabel}</Label>
+                <Controller
+                  control={control}
+                  name="contact_id"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "none" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger id="invite-contact" className="w-full">
+                        <SelectValue placeholder={t.noClientContact} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t.noClientContact}</SelectItem>
+                        {contacts.map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            {contact.name}
+                            {contact.company ? ` — ${contact.company}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {contactError && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {contactError}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {state.error && (
