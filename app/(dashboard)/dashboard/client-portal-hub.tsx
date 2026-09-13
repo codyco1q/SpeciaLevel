@@ -1,6 +1,8 @@
 import Link from "next/link";
 import {
   CheckCircle2,
+  Download,
+  FileText,
   MessageSquareText,
   Receipt,
   ArrowRight,
@@ -14,16 +16,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatFileSize } from "@/lib/utils/files";
 import {
   INVOICE_STATUS_BADGE_CLASSES,
   formatCurrency,
   formatInvoiceDate,
 } from "@/app/(dashboard)/invoicing/invoicing-meta";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
-import type {
-  ClientPortalData,
-  ClientPortalInvoiceRow,
-} from "@/lib/actions/client-portal";
+import type { ClientPortalData, ClientPortalInvoiceRow } from "@/lib/actions/client-portal";
 
 interface ClientPortalHubProps {
   userFullName: string | null;
@@ -96,6 +96,51 @@ function DeliverableCard({
                 />
               </div>
             </div>
+
+            {data.assets.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t.attachedAssetsTitle}
+                </p>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {t.attachedAssetsHint}
+                </p>
+                <ul className="space-y-1.5">
+                  {data.assets.map((asset) => (
+                    <li
+                      key={asset.id}
+                      className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{asset.fileName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(asset.fileSize)}
+                          {asset.taskTitle && (
+                            <>
+                              <span className="mx-1">·</span>
+                              {asset.taskTitle}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      {asset.downloadUrl && (
+                        <a
+                          href={asset.downloadUrl}
+                          download={asset.fileName}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={t.downloadAsset}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
       </CardContent>

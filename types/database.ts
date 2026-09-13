@@ -149,6 +149,24 @@ export interface ChatMessage {
   updated_at: string;
 }
 
+/** Metadata row for one stored object in the private `project_assets` bucket. */
+export interface FileAttachment {
+  id: string;
+  organization_id: string;
+  /** Exactly one parent (task XOR message) is set — see chk_attachment_parent. */
+  task_id: string | null;
+  message_id: string | null;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  /** Scoped path: {organization_id}/tasks/{task_id}/{file_id}-{filename} (or chat/...). */
+  storage_path: string;
+  /** When true, a Client-role user may download this attachment. */
+  is_client_visible: boolean;
+  uploaded_by: string;
+  created_at: string;
+}
+
 export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 
 export interface OrganizationInvitation {

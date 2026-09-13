@@ -1,7 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Hash, LoaderCircle, MessageSquare, Plus, Send } from "lucide-react";
+import {
+  Download,
+  FileText,
+  Hash,
+  LoaderCircle,
+  MessageSquare,
+  Paperclip,
+  Plus,
+  Send,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +24,13 @@ import {
   type ChatMessageRow,
   type ChatPerson,
 } from "@/lib/actions/chat";
+import {
+  createAttachmentRecord,
+  getMessageAttachments,
+  type AttachmentRow,
+} from "@/lib/actions/attachments";
+import { MAX_ATTACHMENT_BYTES } from "@/lib/validations/attachments";
+import { formatFileSize, newUuid, sanitizeFileName } from "@/lib/utils/files";
 import { cn } from "@/lib/utils";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { ChannelDialog } from "./channel-dialog";
@@ -42,9 +59,17 @@ interface ChatViewProps {
   canManage: boolean;
   /** The signed-in user, used for optimistic sends and "own message" styling. */
   currentUser: ChatPerson;
+  /** Caller's organization, used to scope attachment upload paths. */
+  organizationId: string;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
+}
+
+/** A file queued in the composer, pending upload once the message sends. */
+interface PendingFile {
+  id: string;
+  file: File;
 }
 
 /**
@@ -63,6 +88,7 @@ export function ChatView({
   activeChannelId: initialActiveChannelId,
   canManage,
   currentUser,
+  organizationId,
   platform,
   locale,
 }: ChatViewProps) {
@@ -77,8 +103,13 @@ export function ChatView({
   const [sendError, setSendError] = useState<string | null>(null);
   const [feedLoading, setFeedLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [attachmentMap, setAttachmentMap] = useState<
+    Record<string, AttachmentRow[]>
+  >({});
 
   const feedRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sender-name cache so realtime messages render names without refetching
   // profiles for senders we've already seen.
@@ -186,8 +217,9 @@ export function ChatView({
   async function handleSend() {
     if (!activeChannelId || sendPending) return;
 
-    const content = composer.trim();
-    if (!content) return;
+    const files = pendingFiles;
+    const content = composer.trim() || (files.length > 0 ? t.fileOnlyBody : "");
+    if (!content && files.length === 0) return;
 
     // Optimistic send: append a local copy immediately, then swap it for
     // the persisted row (realtime will also echo it — deduped by id).
@@ -202,6 +234,7 @@ export function ChatView({
     };
 
     setComposer("");
+    setPendingFiles([]);
     setSendError(null);
     setSendPending(true);
     setMessages((prev) => [...prev, optimistic]);
@@ -212,13 +245,69 @@ export function ChatView({
       setSendError(result.error ?? t.errors.sendFailed);
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setComposer(content);
+      setPendingFiles(files);
       setSendPending(false);
       return;
     }
 
+    const persisted = result.message;
     setMessages((prev) =>
-      prev.map((m) => (m.id === optimisticId ? result.message : m))
+      prev.map((m) => (m.id === optimisticId ? persisted : m))
     );
+
+    // Upload any queued files and link them to the persisted message. A
+    // failure here never unsends the message — it only surfaces an error.
+    if (files.length > 0) {
+      const supabase = createBrowserClient();
+      const uploads: AttachmentRow[] = [];
+      let uploadError: string | null = null;
+
+      for (const pending of files) {
+        const storagePath = `${organizationId}/chat/${activeChannelId}/${pending.id}-${sanitizeFileName(pending.file.name)}`;
+        const { error: objectError } = await supabase.storage
+          .from("project_assets")
+          .upload(storagePath, pending.file, {
+            cacheControl: "3600",
+            contentType: pending.file.type || "application/octet-stream",
+            upsert: false,
+          });
+
+        if (objectError) {
+          console.error("[chat] attachment upload failed:", objectError.message);
+          uploadError = platform.attachments.errors.uploadFailed;
+          break;
+        }
+
+        const record = await createAttachmentRecord({
+          id: pending.id,
+          messageId: persisted.id,
+          fileName: pending.file.name,
+          fileSize: pending.file.size,
+          fileType: pending.file.type || "application/octet-stream",
+          storagePath,
+          isClientVisible: true,
+        });
+
+        if (record.status === "error") {
+          // Object stored but metadata row failed — drop the orphan.
+          await supabase.storage.from("project_assets").remove([storagePath]);
+          uploadError = record.error;
+          break;
+        }
+        const saved = record.attachment;
+        if (saved) uploads.push(saved);
+      }
+
+      if (uploadError) {
+        setSendError(uploadError);
+      } else if (uploads.length > 0) {
+        setAttachmentMap((prev) => ({
+          ...prev,
+          [persisted.id]: [...(prev[persisted.id] ?? []), ...uploads],
+        }));
+      }
+    }
+
     setSendPending(false);
   }
 
@@ -226,6 +315,39 @@ export function ChatView({
     setChannelList((prev) => [...prev, channel]);
     setActiveChannelId(channel.id);
     setMessages([]);
+  }
+
+  /** Eagerly loads a message's attachments once (chat bubbles fetch on mount). */
+  const requestAttachments = useCallback(
+    async (messageId: string) => {
+      if (attachmentMap[messageId] !== undefined) return;
+      const result = await getMessageAttachments(messageId);
+      if (result.status === "success") {
+        setAttachmentMap((prev) =>
+          prev[messageId] === undefined
+            ? { ...prev, [messageId]: result.attachments }
+            : prev
+        );
+      }
+    },
+    [attachmentMap]
+  );
+
+  function handleFilesChosen(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    const accepted: PendingFile[] = [];
+    for (const file of files) {
+      if (file.size === 0 || file.size > MAX_ATTACHMENT_BYTES) {
+        setSendError(t.attachmentSizeError);
+        continue;
+      }
+      accepted.push({ id: newUuid(), file });
+    }
+    if (accepted.length > 0) {
+      setSendError(null);
+      setPendingFiles((prev) => [...prev, ...accepted]);
+    }
   }
 
   function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -351,6 +473,8 @@ export function ChatView({
                   key={message.id}
                   message={message}
                   isOwn={message.userId === currentUser.id}
+                  attachments={attachmentMap[message.id]}
+                  onRequestAttachments={requestAttachments}
                   platform={platform}
                   locale={locale}
                 />
@@ -361,19 +485,70 @@ export function ChatView({
 {/* Composer */}
         <div className="border-t border-border p-3">
           <form onSubmit={handleFormSubmit} className="grid gap-2">
-            <Textarea
-              value={composer}
-              onChange={(event) => setComposer(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              placeholder={
-                activeChannel
-                  ? t.messagePlaceholder.replace("{channel}", activeChannel.name)
-                  : t.selectChannelPlaceholder
-              }
-              rows={2}
-              maxLength={2000}
-              disabled={!activeChannel || sendPending}
-            />
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {pendingFiles.map((pending) => (
+                  <span
+                    key={pending.id}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs"
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="max-w-[160px] truncate">{pending.file.name}</span>
+                    <span className="text-muted-foreground">
+                      {formatFileSize(pending.file.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingFiles((prev) =>
+                          prev.filter((p) => p.id !== pending.id)
+                        )
+                      }
+                      disabled={sendPending}
+                      aria-label={platform.attachments.remove}
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:text-destructive disabled:pointer-events-none"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-1.5">
+              <Textarea
+                value={composer}
+                onChange={(event) => setComposer(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={
+                  activeChannel
+                    ? t.messagePlaceholder.replace("{channel}", activeChannel.name)
+                    : t.selectChannelPlaceholder
+                }
+                rows={2}
+                maxLength={2000}
+                disabled={!activeChannel || sendPending}
+                className="min-h-0 flex-1"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!activeChannel || sendPending}
+                aria-label={t.attachFileAria}
+                title={t.attachFile}
+                className="shrink-0"
+              >
+                <Paperclip className="h-4 w-4 rtl:rotate-180" />
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFilesChosen}
+              />
+            </div>
             {sendError && (
               <p role="alert" className="text-sm text-destructive">
                 {sendError}
@@ -386,7 +561,11 @@ export function ChatView({
               <Button
                 type="submit"
                 size="sm"
-                disabled={!activeChannel || !composer.trim() || sendPending}
+                disabled={
+                  !activeChannel ||
+                  (!composer.trim() && pendingFiles.length === 0) ||
+                  sendPending
+                }
               >
                 {sendPending ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -413,17 +592,33 @@ export function ChatView({
 interface MessageBubbleProps {
   message: ChatMessageRow;
   isOwn: boolean;
+  attachments?: AttachmentRow[];
+  onRequestAttachments?: (messageId: string) => void;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
 }
 
-/** Single chat message: avatar, sender name + time, and the content bubble. */
-function MessageBubble({ message, isOwn, platform, locale }: MessageBubbleProps) {
+/** Single chat message: avatar, sender name + time, content bubble, and attachment cards. */
+function MessageBubble({
+  message,
+  isOwn,
+  attachments,
+  onRequestAttachments,
+  platform,
+  locale,
+}: MessageBubbleProps) {
   const t = platform.chat;
   const senderName =
     message.user.fullName ?? message.user.email ?? t.teamMember;
   const initials = getInitials(senderName);
+
+  // Eagerly fetch attachments the first time this bubble mounts (not yet loaded).
+  useEffect(() => {
+    if (attachments === undefined && onRequestAttachments) {
+      onRequestAttachments(message.id);
+    }
+  }, [attachments, message.id, onRequestAttachments]);
 
   return (
     <div className={cn("flex items-start gap-3", isOwn && "flex-row-reverse")}>
@@ -455,6 +650,33 @@ function MessageBubble({ message, isOwn, platform, locale }: MessageBubbleProps)
         >
           {message.content}
         </p>
+
+        {attachments && attachments.length > 0 && (
+          <div className={cn("mt-1.5 flex flex-col gap-1.5", isOwn && "items-end")}>
+            {attachments.map((attachment) => (
+              <a
+                key={attachment.id}
+                href={attachment.downloadUrl ?? undefined}
+                download={attachment.fileName}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  "inline-flex max-w-[240px] items-center gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:bg-muted",
+                  isOwn ? "border-transparent bg-primary/10" : "border-border bg-card"
+                )}
+              >
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{attachment.fileName}</span>
+                  <span className="block text-[10px] text-muted-foreground">
+                    {formatFileSize(attachment.fileSize)}
+                  </span>
+                </span>
+                <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

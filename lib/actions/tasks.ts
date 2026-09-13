@@ -49,6 +49,8 @@ export interface TaskRow {
   updatedAt: string;
   createdBy: TaskPerson;
   assignedTo: TaskPerson | null;
+  /** Client portal visibility flag (00013) — seeds attachment defaults. */
+  isClientVisible: boolean;
 }
 
 export interface TaskFilter {
@@ -66,6 +68,7 @@ interface TaskJoinRow {
   due_date: string | null;
   created_at: string;
   updated_at: string;
+  is_client_visible: boolean;
   created_by: { id: string; full_name: string | null; email: string | null }[];
   assigned_to:
     | { id: string; full_name: string | null; email: string | null }[]
@@ -160,6 +163,7 @@ function toTaskRow(row: TaskJoinRow): TaskRow {
     dueDate: row.due_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    isClientVisible: row.is_client_visible,
     createdBy: {
       id: creator.id,
       fullName: creator.full_name ?? null,
@@ -207,6 +211,7 @@ export async function getTasks(
         due_date,
         created_at,
         updated_at,
+        is_client_visible,
         created_by:profiles!fk_tasks_created_by(id, full_name, email),
         assigned_to:profiles!fk_tasks_assigned_to(id, full_name, email)
       `

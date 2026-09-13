@@ -45,7 +45,10 @@ interface TasksViewProps {
   initialTasks: TaskRow[];
   members: TaskMemberOption[];
   canManage: boolean;
+  /** Internal member with `tasks.view` — may upload attachments. */
+  canUpload: boolean;
   currentUserId: string;
+  organizationId: string;
   /** ISO string of today (server-rendered) for overdue highlighting. */
   todayIso: string;
   /** Localized copy + formatters for the current render. */
@@ -161,7 +164,9 @@ export function TasksView({
   initialTasks,
   members,
   canManage,
+  canUpload,
   currentUserId,
+  organizationId,
   todayIso,
   platform,
   locale,
@@ -495,7 +500,9 @@ export function TasksView({
         }}
         task={detailTask}
         canManage={canManage}
+        canUpload={canUpload}
         currentUserId={currentUserId}
+        organizationId={organizationId}
         onStatusChange={(taskId, status) =>
           handleStatusChange(taskId, status)
         }
