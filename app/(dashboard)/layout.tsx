@@ -35,7 +35,7 @@ export default async function DashboardLayout({
     userContext.roles.every((role) => role.key === "client");
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible">
       <Sidebar
         permissions={userContext.permissions}
         organizationName={userContext.organization?.name}
@@ -48,7 +48,7 @@ export default async function DashboardLayout({
       {/* Logical main container: the flex row flips automatically under
           dir="rtl", so the sidebar lands on the right and the content on
           the left without any layout-specific overrides. */}
-      <main className="flex-1 overflow-y-auto bg-background">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-background print:h-auto print:overflow-visible print:bg-white">{children}</main>
     </div>
   );
 }
