@@ -139,6 +139,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     icon: Receipt,
     link: "/invoicing",
   },
+  {
+    key: "automations",
+    name: "Automations",
+    description: "Automate repetitive workflows and sequences.",
+    icon: Zap,
+    link: "/automations",
+  },
 ];
 
 /**
@@ -158,13 +165,6 @@ const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "Telecommunications",
     description: "Phone systems and calling features.",
     icon: Phone,
-    isFuture: true,
-  },
-  {
-    key: "automations",
-    name: "Automations",
-    description: "Automate repetitive workflows and sequences.",
-    icon: Zap,
     isFuture: true,
   },
   {

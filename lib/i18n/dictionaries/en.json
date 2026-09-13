@@ -35,22 +35,38 @@
       {
         "title": "AI Workflow Automation",
         "description": "Custom agentic workflows, document processing, and webhook routing that replace repetitive manual work with reliable, always-on automation.",
-        "deliverables": ["Agentic workflows", "Document AI", "Webhook routing"]
+        "deliverables": [
+          "Agentic workflows",
+          "Document AI",
+          "Webhook routing"
+        ]
       },
       {
         "title": "Systems & API Integration",
         "description": "Connect your CRM, ERP, accounting, and communication tools into one system that actually talks to itself.",
-        "deliverables": ["CRM & ERP", "Accounting", "Communications"]
+        "deliverables": [
+          "CRM & ERP",
+          "Accounting",
+          "Communications"
+        ]
       },
       {
         "title": "Bespoke Internal Portals",
         "description": "Role-based dashboards, employee portals, and client hubs built around how your business actually operates.",
-        "deliverables": ["Role-based dashboards", "Employee portals", "Client hubs"]
+        "deliverables": [
+          "Role-based dashboards",
+          "Employee portals",
+          "Client hubs"
+        ]
       },
       {
         "title": "Funnel & Lead Automation",
         "description": "Automated lead enrichment, CRM syncing, and follow-up engines that turn incoming interest into booked conversations.",
-        "deliverables": ["Lead enrichment", "CRM syncing", "Follow-up engines"]
+        "deliverables": [
+          "Lead enrichment",
+          "CRM syncing",
+          "Follow-up engines"
+        ]
       }
     ]
   },
@@ -101,7 +117,7 @@
       }
     ]
   },
-"process": {
+  "process": {
     "eyebrow": "How we work",
     "title": "From bottleneck to blueprint to build",
     "subtitle": "A proven four-step sequence that gets you from “where do we start?” to a shipped, scalable system — without the software project sprawl.",
@@ -240,6 +256,7 @@
       "chat": "Chat",
       "crm": "CRM",
       "invoicing": "Invoicing",
+      "automations": "Automations",
       "employees": "Employees",
       "departments": "Departments",
       "roles": "Roles & Permissions",
@@ -266,8 +283,7 @@
       "metricDepartmentsHint": "Active departments",
       "metricClockedIn": "Clocked In",
       "metricClockedInHint": "Currently working"
-    }
-    ,
+    },
     "clientPortal": {
       "navOverview": "Overview",
       "navTasks": "Tasks & Deliverables",
@@ -299,8 +315,7 @@
       "attachedAssetsHint": "Approved files from your project team.",
       "downloadAsset": "Download",
       "noAttachedAssets": "No downloadable assets yet."
-    }
-    ,
+    },
     "time": {
       "title": "Time Tracking",
       "subtitle": "Clock in when you start work, clock out when you stop.",
@@ -349,8 +364,7 @@
         "alreadyClockedIn": "You're already clocked in. Clock out before clocking in again.",
         "notClockedIn": "You're not clocked in. Clock in before clocking out."
       }
-    }
-    ,
+    },
     "tasks": {
       "title": "Tasks",
       "noPermissionBody": "You don't have permission to view tasks.",
@@ -417,8 +431,7 @@
         "notFound": "Task not found, or you don't have access to it.",
         "missingId": "Missing task ID."
       }
-    }
-    ,
+    },
     "chat": {
       "title": "Chat",
       "noPermissionBody": "You don't have permission to view chat.",
@@ -466,8 +479,7 @@
         "invalidMessage": "Invalid message.",
         "highlightFields": "Please fix the highlighted fields."
       }
-    }
-    ,
+    },
     "crm": {
       "title": "CRM",
       "subtitle": "Deals, pipeline, and inbound leads from your marketing site.",
@@ -560,8 +572,7 @@
         "leadNotFound": "This lead no longer exists.",
         "missingId": "Missing ID."
       }
-    }
-    ,
+    },
     "invoicing": {
       "title": "Invoicing & Billing",
       "subtitle": "Create, send, and track invoices for your clients.",
@@ -664,6 +675,112 @@
         "missingId": "Missing invoice ID."
       }
     },
+    "automations": {
+      "title": "Automations",
+      "subtitle": "Create rule-based workflows that run automatically when events happen.",
+      "noPermissionBody": "You don't have permission to view automations.",
+      "createAutomation": "Create automation",
+      "editAutomation": "Edit automation",
+      "saveChanges": "Save changes",
+      "triggerEvent": "Trigger event",
+      "actionType": "Action",
+      "active": "Active",
+      "inactive": "Inactive",
+      "noAutomationsYet": "No automations yet",
+      "noAutomationsHintManage": "Create your first automation to start automating busywork.",
+      "noAutomationsHintView": "Automations created for your organization will appear here.",
+      "actions": "Actions",
+      "triggerEvents": {
+        "leadCreated": "Lead created",
+        "dealStageChanged": "Deal stage changed",
+        "invoicePaid": "Invoice paid",
+        "taskCompleted": "Task completed"
+      },
+      "actionTypes": {
+        "webhook": "Webhook",
+        "chatMessage": "Chat message",
+        "createTask": "Create task"
+      },
+      "actionSummary": {
+        "webhook": "Send webhook to {host}",
+        "chatMessage": "Post to {channel} in chat",
+        "createTask": "Create task {title}"
+      },
+      "dialog": {
+        "title": "Create automation",
+        "description": "Choose what triggers this automation, then configure what it does.",
+        "step1Label": "Step 1",
+        "step1Title": "Select a trigger event",
+        "step1Description": "When should this automation run?",
+        "step2Label": "Step 2",
+        "step2Title": "Configure the action",
+        "step2Description": "What should happen when it runs?",
+        "nameLabel": "Automation name",
+        "namePlaceholder": "e.g. New lead alert",
+        "descriptionLabel": "Description",
+        "descriptionOptional": "(optional)",
+        "descriptionPlaceholder": "e.g. Notify the team when a new lead arrives.",
+        "triggerPlaceholder": "Select a trigger event",
+        "actionPlaceholder": "Select an action type",
+        "next": "Next",
+        "back": "Back",
+        "create": "Create automation",
+        "webhookUrlLabel": "Webhook URL",
+        "webhookUrlPlaceholder": "https://example.com/hooks/…",
+        "channelLabel": "Channel",
+        "channelPlaceholder": "Select a channel",
+        "messageLabel": "Message",
+        "messagePlaceholder": "e.g. A new lead just arrived!",
+        "taskTitleLabel": "Task title",
+        "taskTitlePlaceholder": "e.g. Follow up with the new lead",
+        "assigneeLabel": "Assignee",
+        "assigneeOptional": "(optional)"
+      },
+      "history": {
+        "title": "Execution history",
+        "description": "Recent runs of this automation.",
+        "noLogsYet": "No runs recorded yet.",
+        "tableStatus": "Status",
+        "tableTrigger": "Event",
+        "tableResult": "Result",
+        "tableError": "Error",
+        "tableTime": "Time",
+        "success": "Success",
+        "failed": "Failed",
+        "running": "Running",
+        "close": "Close",
+        "loading": "Loading…"
+      },
+      "errors": {
+        "signedIn": "You must be signed in to do this.",
+        "noPermissionView": "You don't have permission to view automations.",
+        "noPermissionManage": "You don't have permission to manage automations.",
+        "noOrg": "No organization found for your account.",
+        "nameRequired": "Automation name is required.",
+        "nameMax": "Automation name must be 100 characters or fewer.",
+        "descriptionMax": "Description must be 400 characters or fewer.",
+        "triggerRequired": "Select a trigger event.",
+        "actionRequired": "Select an action type.",
+        "webhookUrlRequired": "Webhook URL is required.",
+        "webhookUrlInvalid": "Enter a valid HTTPS URL.",
+        "channelRequired": "Select a channel.",
+        "messageRequired": "Message can't be empty.",
+        "messageMax": "Messages must be 500 characters or fewer.",
+        "taskTitleRequired": "Task title is required.",
+        "taskTitleMax": "Task titles must be 100 characters or fewer.",
+        "assigneeInvalid": "Select a valid team member.",
+        "invalidConfig": "Invalid configuration for this action.",
+        "highlightFields": "Please fix the highlighted fields.",
+        "createFailed": "Could not create the automation. Please try again.",
+        "deleteFailed": "Could not delete the automation. Please try again.",
+        "notFound": "Automation not found, or you don't have access to it.",
+        "invalidId": "Invalid automation ID.",
+        "logsFailed": "Could not load the execution history. Please try again.",
+        "deleteConfirmTitle": "Delete automation?",
+        "deleteConfirmBody": "Its execution history will be deleted too. This can't be undone."
+      },
+      "viewLogs": "View logs"
+    },
     "attachments": {
       "title": "Attachments & Deliverables",
       "upload": "Upload files",
@@ -707,8 +824,7 @@
         "missingParent": "Choose a task or a message for this file.",
         "tooManyParents": "A file can belong to only one task or message."
       }
-    }
-    ,
+    },
     "settings": {
       "title": "Settings",
       "subtitle": "Manage your organization, member invitations, and personal profile.",
@@ -802,8 +918,7 @@
         "inviteAlreadyAccepted": "This invitation has already been accepted.",
         "inviteRevokeFailed": "Could not revoke the invitation. Please try again."
       }
-    }
-    ,
+    },
     "roles": {
       "owner": "Owner",
       "admin": "Admin",
