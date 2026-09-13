@@ -17,6 +17,7 @@ import {
   Zap,
   Puzzle,
   Settings,
+  Sparkles,
   LogOut,
 } from "lucide-react";
 import { hasPermission } from "@/lib/auth/rbac";
@@ -131,6 +132,12 @@ export default function Sidebar({
       href: "/automations",
       icon: Zap,
       permission: "automations.view",
+    },
+    {
+      label: platform.ai.navLabel,
+      href: "/ai",
+      icon: Sparkles,
+      permission: "ai.view",
     },
     {
       label: t.analytics,
