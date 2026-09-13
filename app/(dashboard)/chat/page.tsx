@@ -55,6 +55,7 @@ export default async function ChatPage() {
       activeChannelId={activeChannelId}
       canManage={hasPermission("chat.manage", userContext.permissions)}
       currentUser={currentUser}
+      organizationId={userContext.organization.id}
       platform={platform}
       locale={locale}
     />

@@ -34,6 +34,7 @@ import {
   TASK_PRIORITY_BADGE_CLASSES,
   TASK_STATUSES,
 } from "./task-meta";
+import { AttachmentPanel } from "./attachment-panel";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface TaskDetailDialogProps {
@@ -41,7 +42,10 @@ interface TaskDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   task: TaskRow | null;
   canManage: boolean;
+  /** Internal member with `tasks.view` — may upload attachments. */
+  canUpload: boolean;
   currentUserId: string;
+  organizationId: string;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onEditRequest: (task: TaskRow) => void;
   onDeleted: () => void;
@@ -59,7 +63,9 @@ export function TaskDetailDialog({
   onOpenChange,
   task,
   canManage,
+  canUpload,
   currentUserId,
+  organizationId,
   onStatusChange,
   onEditRequest,
   onDeleted,
@@ -209,6 +215,18 @@ export function TaskDetailDialog({
           ) : (
             <p className="text-sm text-muted-foreground">{t.noDescription}</p>
           )}
+
+          <div className="border-t border-border/60 pt-4">
+            <AttachmentPanel
+              taskId={task.id}
+              organizationId={organizationId}
+              canUpload={canUpload}
+              canManage={canManage}
+              currentUserId={currentUserId}
+              taskClientVisible={task.isClientVisible}
+              platform={platform}
+            />
+          </div>
 
           {requestError && (
             <p
