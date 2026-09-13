@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   CheckSquare,
   MessageSquare,
+  TrendingUp,
+  Receipt,
   Puzzle,
   Settings,
   LogOut,
@@ -73,6 +75,18 @@ export default function Sidebar({
       href: "/chat",
       icon: MessageSquare,
       permission: "chat.view",
+    },
+    {
+      label: t.crm,
+      href: "/crm",
+      icon: TrendingUp,
+      permission: "crm.view",
+    },
+    {
+      label: t.invoicing,
+      href: "/invoicing",
+      icon: Receipt,
+      permission: "invoicing.view",
     },
     {
       label: t.employees,
