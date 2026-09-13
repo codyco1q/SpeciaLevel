@@ -13,6 +13,7 @@ import {
   MessageSquare,
   TrendingUp,
   Receipt,
+  Zap,
   Puzzle,
   Settings,
   LogOut,
@@ -123,6 +124,12 @@ export default function Sidebar({
       href: "/invoicing",
       icon: Receipt,
       permission: "invoicing.view",
+    },
+    {
+      label: t.automations,
+      href: "/automations",
+      icon: Zap,
+      permission: "automations.view",
     },
     {
       label: t.employees,
