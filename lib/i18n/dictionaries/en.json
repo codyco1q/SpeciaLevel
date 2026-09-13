@@ -256,6 +256,7 @@
       "chat": "Chat",
       "crm": "CRM",
       "invoicing": "Invoicing",
+      "analytics": "Analytics",
       "automations": "Automations",
       "employees": "Employees",
       "departments": "Departments",
@@ -780,6 +781,73 @@
         "deleteConfirmBody": "Its execution history will be deleted too. This can't be undone."
       },
       "viewLogs": "View logs"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "subtitle": "Business intelligence across revenue, pipeline, and team performance.",
+      "rangeLabel": "Date range",
+      "range7": "7 Days",
+      "range30": "30 Days",
+      "range90": "90 Days",
+      "export": "Export CSV",
+      "loading": "Loading…",
+      "vsPrevious": "vs previous {days} days",
+      "noData": "No data for this period yet.",
+      "noPermissionBody": "You don't have permission to view analytics.",
+      "kpis": {
+        "totalRevenue": "Total Revenue",
+        "totalRevenueHint": "Invoiced this period",
+        "pipelineValue": "Pipeline Value",
+        "pipelineValueHint": "Open deals",
+        "conversionRate": "Conversion Rate",
+        "conversionRateHint": "Leads → won deals",
+        "tasksCompleted": "Completed Tasks",
+        "tasksCompletedHint": "This period"
+      },
+      "revenue": {
+        "title": "Revenue & Invoicing",
+        "totalInvoiced": "Total invoiced",
+        "collected": "Collected",
+        "outstanding": "Outstanding",
+        "paidInvoices": "Paid invoices"
+      },
+      "crm": {
+        "title": "CRM Velocity",
+        "newLeads": "New leads",
+        "won": "Deals won",
+        "lost": "Deals lost",
+        "open": "Open deals"
+      },
+      "operations": {
+        "title": "Team Operations",
+        "overdue": "Tasks overdue",
+        "hours": "Hours tracked",
+        "avgCompletion": "Avg. completion (h)"
+      },
+      "charts": {
+        "revenueTrend": "Invoicing & Revenue Trend",
+        "revenueTrendLegend": "Revenue billed",
+        "pipelineFunnel": "Deal Pipeline by Stage",
+        "deals": "deals"
+      },
+      "team": {
+        "title": "Team Productivity",
+        "tasks": "Tasks completed",
+        "hours": "Hours logged"
+      },
+      "stages": {
+        "lead": "Lead",
+        "contacted": "Contacted",
+        "proposal": "Proposal",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "errors": {
+        "signedIn": "You must be signed in to do this.",
+        "noOrg": "No organization found for your account.",
+        "noPermissionView": "You don't have permission to view analytics.",
+        "loadFailed": "Could not load analytics. Please try again."
+      }
     },
     "attachments": {
       "title": "Attachments & Deliverables",

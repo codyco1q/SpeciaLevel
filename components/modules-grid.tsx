@@ -146,6 +146,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     icon: Zap,
     link: "/automations",
   },
+  {
+    key: "analytics",
+    name: "Analytics",
+    description: "Business insights, reports, and KPIs.",
+    icon: BarChart3,
+    link: "/analytics",
+  },
 ];
 
 /**
@@ -172,13 +179,6 @@ const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "AI",
     description: "AI-powered agents and business intelligence.",
     icon: Brain,
-    isFuture: true,
-  },
-  {
-    key: "analytics",
-    name: "Analytics",
-    description: "Business insights, reports, and KPIs.",
-    icon: BarChart3,
     isFuture: true,
   },
 ];

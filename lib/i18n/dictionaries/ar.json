@@ -256,6 +256,7 @@
       "chat": "المحادثة",
       "crm": "إدارة العملاء",
       "invoicing": "الفوترة",
+      "analytics": "التحليلات",
       "automations": "الأتمتة",
       "employees": "الموظفون",
       "departments": "الأقسام",
@@ -780,6 +781,73 @@
         "deleteConfirmBody": "سيُحذف سجل التنفيذ أيضًا. لا يمكن التراجع عن هذا الإجراء."
       },
       "viewLogs": "عرض السجل"
+    },
+    "analytics": {
+      "title": "التحليلات",
+      "subtitle": "ذكاء الأعمال عبر الإيرادات وخط أنابيب المبيعات وأداء الفريق.",
+      "rangeLabel": "الفترة الزمنية",
+      "range7": "٧ أيام",
+      "range30": "٣٠ يومًا",
+      "range90": "٩٠ يومًا",
+      "export": "تصدير CSV",
+      "loading": "جارٍ التحميل…",
+      "vsPrevious": "مقابل {days} أيام سابقة",
+      "noData": "لا توجد بيانات لهذه الفترة بعد.",
+      "noPermissionBody": "ليس لديك صلاحية لعرض التحليلات.",
+      "kpis": {
+        "totalRevenue": "إجمالي الإيرادات",
+        "totalRevenueHint": "المفوترة هذه الفترة",
+        "pipelineValue": "قيمة خط الأنابيب",
+        "pipelineValueHint": "صفقات مفتوحة",
+        "conversionRate": "معدل التحويل",
+        "conversionRateHint": "العملاء المحتملون ← صفقات رابحة",
+        "tasksCompleted": "المهام المكتملة",
+        "tasksCompletedHint": "هذه الفترة"
+      },
+      "revenue": {
+        "title": "الإيرادات والفواتير",
+        "totalInvoiced": "إجمالي المفوتر",
+        "collected": "المحصَّل",
+        "outstanding": "المستحق",
+        "paidInvoices": "الفواتير المدفوعة"
+      },
+      "crm": {
+        "title": "سرعة إدارة العملاء",
+        "newLeads": "عملاء محتملون جدد",
+        "won": "صفقات رابحة",
+        "lost": "صفقات خاسرة",
+        "open": "صفقات مفتوحة"
+      },
+      "operations": {
+        "title": "عمليات الفريق",
+        "overdue": "مهام متأخرة",
+        "hours": "ساعات العمل المسجَّلة",
+        "avgCompletion": "متوسط الإنجاز (ساعة)"
+      },
+      "charts": {
+        "revenueTrend": "اتجاه الفوترة والإيرادات",
+        "revenueTrendLegend": "الإيرادات المفوترة",
+        "pipelineFunnel": "خط أنابيب الصفقات حسب المرحلة",
+        "deals": "صفقة"
+      },
+      "team": {
+        "title": "إنتاجية الفريق",
+        "tasks": "مهام مكتملة",
+        "hours": "ساعات مسجَّلة"
+      },
+      "stages": {
+        "lead": "عميل محتمل",
+        "contacted": "تم التواصل",
+        "proposal": "عرض",
+        "won": "رابحة",
+        "lost": "خاسرة"
+      },
+      "errors": {
+        "signedIn": "يجب تسجيل الدخول للقيام بذلك.",
+        "noOrg": "لا توجد منظمة مرتبطة بحسابك.",
+        "noPermissionView": "ليس لديك صلاحية لعرض التحليلات.",
+        "loadFailed": "تعذَّر تحميل التحليلات. حاول مرة أخرى."
+      }
     },
     "attachments": {
       "title": "المرفقات والتسليمات",

@@ -8,6 +8,7 @@ import {
   Clock,
   Users,
   Building2,
+  BarChart3,
   ShieldCheck,
   CheckSquare,
   MessageSquare,
@@ -130,6 +131,12 @@ export default function Sidebar({
       href: "/automations",
       icon: Zap,
       permission: "automations.view",
+    },
+    {
+      label: t.analytics,
+      href: "/analytics",
+      icon: BarChart3,
+      permission: "analytics.view",
     },
     {
       label: t.employees,
