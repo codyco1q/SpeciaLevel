@@ -159,3 +159,90 @@ export interface UserContext {
   roles: Role[];
   permissions: string[];
 }
+
+// ============================================================
+// CRM module (00011_crm_module.sql)
+// ============================================================
+
+export type CrmStage = "lead" | "contacted" | "proposal" | "won" | "lost";
+
+export interface CrmContact {
+  id: string;
+  organization_id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** NUMERIC columns arrive from PostgREST as strings by default. */
+export interface CrmDeal {
+  id: string;
+  organization_id: string;
+  contact_id: string | null;
+  title: string;
+  value: string | number;
+  currency: string;
+  stage: CrmStage;
+  notes: string | null;
+  assigned_to: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MarketingLeadStatus = "new" | "contacted" | "converted" | "archived";
+
+export interface MarketingLead {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  bottleneck: string | null;
+  package_of_interest: string | null;
+  status: MarketingLeadStatus;
+  created_at: string;
+}
+
+// ============================================================
+// Invoicing module (00012_invoicing_module.sql)
+// ============================================================
+
+export type InvoiceStatus =
+  | "draft"
+  | "sent"
+  | "paid"
+  | "overdue"
+  | "cancelled";
+
+/** NUMERIC columns arrive from PostgREST as strings by default. */
+export interface Invoice {
+  id: string;
+  organization_id: string;
+  invoice_number: string;
+  contact_id: string | null;
+  deal_id: string | null;
+  status: InvoiceStatus;
+  currency: string;
+  subtotal: string | number;
+  tax_rate: string | number;
+  tax_amount: string | number;
+  total: string | number;
+  due_date: string | null;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceItem {
+  id: string;
+  invoice_id: string;
+  description: string;
+  quantity: string | number;
+  unit_price: string | number;
+  amount: string | number;
+  created_at: string;
+}

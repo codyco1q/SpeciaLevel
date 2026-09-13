@@ -11,6 +11,7 @@ import {
   Phone,
   Zap,
   Brain,
+  Receipt,
   MessageSquare,
   CheckSquare,
   BarChart3,
@@ -36,6 +37,7 @@ type ModulesKey =
   | "tasks"
   | "chat"
   | "crm"
+  | "invoicing"
   | "marketing"
   | "telecommunications"
   | "automations"
@@ -123,6 +125,20 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     icon: MessageSquare,
     link: "/chat",
   },
+  {
+    key: "crm",
+    name: "CRM",
+    description: "Manage customer relationships and pipelines.",
+    icon: Contact,
+    link: "/crm",
+  },
+  {
+    key: "invoicing",
+    name: "Invoicing & Billing",
+    description: "Create invoices and manage billing.",
+    icon: Receipt,
+    link: "/invoicing",
+  },
 ];
 
 /**
@@ -130,13 +146,6 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
  * modular and ready for expansion without implying they are usable.
  */
 const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
-  {
-    key: "crm",
-    name: "CRM",
-    description: "Manage customer relationships and pipelines.",
-    icon: Contact,
-    isFuture: true,
-  },
   {
     key: "marketing",
     name: "Marketing",
