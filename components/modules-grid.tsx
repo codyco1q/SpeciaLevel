@@ -147,6 +147,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     link: "/automations",
   },
   {
+    key: "ai",
+    name: "AI & Agents",
+    description: "AI prompt playground, quick tools, and reusable templates.",
+    icon: Brain,
+    link: "/ai",
+  },
+  {
     key: "analytics",
     name: "Analytics",
     description: "Business insights, reports, and KPIs.",
@@ -172,13 +179,6 @@ const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "Telecommunications",
     description: "Phone systems and calling features.",
     icon: Phone,
-    isFuture: true,
-  },
-  {
-    key: "ai",
-    name: "AI",
-    description: "AI-powered agents and business intelligence.",
-    icon: Brain,
     isFuture: true,
   },
 ];
