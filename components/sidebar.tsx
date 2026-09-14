@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   CheckSquare,
   MessageSquare,
+  Megaphone,
   TrendingUp,
   Receipt,
   Zap,
@@ -126,6 +127,12 @@ export default function Sidebar({
       href: "/invoicing",
       icon: Receipt,
       permission: "invoicing.view",
+    },
+    {
+      label: t.marketing,
+      href: "/marketing",
+      icon: Megaphone,
+      permission: "marketing.view",
     },
     {
       label: t.automations,

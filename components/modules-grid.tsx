@@ -140,6 +140,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     link: "/invoicing",
   },
   {
+    key: "marketing",
+    name: "Marketing",
+    description: "Campaigns, social planning, and content workflows.",
+    icon: Megaphone,
+    link: "/marketing",
+  },
+  {
     key: "automations",
     name: "Automations",
     description: "Automate repetitive workflows and sequences.",
@@ -167,13 +174,6 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
  * modular and ready for expansion without implying they are usable.
  */
 const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
-  {
-    key: "marketing",
-    name: "Marketing",
-    description: "Campaigns, social planning, and content workflows.",
-    icon: Megaphone,
-    isFuture: true,
-  },
   {
     key: "telecommunications",
     name: "Telecommunications",
