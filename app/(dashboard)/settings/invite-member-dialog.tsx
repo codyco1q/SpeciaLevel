@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useActionState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useWatch, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, UserPlus } from "lucide-react";
 
@@ -71,7 +71,6 @@ export function InviteMemberDialog({
     register,
     handleSubmit,
     control,
-    watch,
     reset,
     formState: { errors },
   } = useForm<InvitationFormValues>({
@@ -84,7 +83,7 @@ export function InviteMemberDialog({
     },
   });
 
-  const watchedRoleId = watch("role_id");
+  const watchedRoleId = useWatch({ control, name: "role_id" });
   // The Client contact selector is only relevant for the system Client
   // role (scoped portal access linked to a CRM contact).
   const isClientRole =
