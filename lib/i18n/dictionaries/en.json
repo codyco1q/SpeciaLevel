@@ -259,6 +259,7 @@
       "analytics": "Analytics",
       "automations": "Automations",
       "marketing": "Marketing",
+      "telecommunications": "Telecommunications",
       "employees": "Employees",
       "departments": "Departments",
       "roles": "Roles & Permissions",
@@ -948,6 +949,142 @@
         "invalidId": "Invalid campaign ID.",
         "loadFailed": "Could not load marketing data. Please try again.",
         "deleteConfirmBody": "The campaign and its assets will be deleted. This can't be undone."
+      }
+    },
+    "telecom": {
+      "title": "Telecommunications",
+      "subtitle": "Track calls, SMS, and telemarketing activity across your team.",
+      "noPermissionBody": "You don't have permission to view telecommunications.",
+      "logCall": "Log call",
+      "sendSms": "Send SMS",
+      "allDirections": "All directions",
+      "metrics": {
+        "totalCalls": "Total Calls",
+        "totalCallsHint": "All call records",
+        "minutesLogged": "Minutes Logged",
+        "minutesLoggedHint": "Logged call duration",
+        "missedCalls": "Missed Calls",
+        "missedCallsHint": "{rate}% of all calls",
+        "totalSms": "Total SMS",
+        "totalSmsHint": "Messages sent and received"
+      },
+      "directions": {
+        "inbound": "Inbound",
+        "outbound": "Outbound"
+      },
+      "callStatuses": {
+        "completed": "Completed",
+        "missed": "Missed",
+        "busy": "Busy",
+        "failed": "Failed",
+        "voicemail": "Voicemail"
+      },
+      "smsStatuses": {
+        "sent": "Sent",
+        "delivered": "Delivered",
+        "failed": "Failed",
+        "received": "Received"
+      },
+      "tabs": {
+        "calls": "Call Logs",
+        "sms": "SMS History",
+        "dialer": "Quick Dialer"
+      },
+      "callsTable": {
+        "direction": "Direction",
+        "contact": "Contact",
+        "number": "Number",
+        "duration": "Duration",
+        "status": "Outcome",
+        "agent": "Agent",
+        "recording": "Recording"
+      },
+      "smsTable": {
+        "direction": "Direction",
+        "contact": "Contact",
+        "number": "Number",
+        "body": "Message",
+        "status": "Status",
+        "sentAt": "Sent at"
+      },
+      "dialer": {
+        "title": "Place a call",
+        "hint": "Dial a number and log the call to history.",
+        "toLabel": "Number to dial",
+        "toPlaceholder": "+1 (555) 000-0000",
+        "fromLabel": "Your number",
+        "fromPlaceholder": "+1 (555) 000-0000",
+        "directionLabel": "Direction",
+        "statusLabel": "Outcome",
+        "durationLabel": "Duration (seconds)",
+        "summaryLabel": "Notes / summary",
+        "summaryPlaceholder": "Call outcome, follow-ups, next steps…",
+        "submit": "Place call & log",
+        "stubHint": "Outbound routing is stubbed — the call is logged immediately."
+      },
+      "logCallDialog": {
+        "title": "Log call",
+        "description": "Record a call in the call history.",
+        "contactLabel": "Contact",
+        "contactOptional": "(optional)",
+        "contactPlaceholder": "No contact linked",
+        "noContacts": "No contacts yet",
+        "directionLabel": "Direction",
+        "statusLabel": "Outcome",
+        "fromNumberLabel": "From number",
+        "fromNumberPlaceholder": "+1 (555) 000-0000",
+        "toNumberLabel": "To number",
+        "toNumberPlaceholder": "+1 (555) 000-0000",
+        "durationLabel": "Duration (seconds)",
+        "recordingUrlLabel": "Recording URL",
+        "recordingUrlPlaceholder": "https://…/recording.mp3",
+        "summaryLabel": "Notes / summary",
+        "summaryPlaceholder": "Call outcome, follow-ups, next steps…",
+        "submit": "Log call"
+      },
+      "sendSmsDialog": {
+        "title": "Send SMS",
+        "description": "Compose a text message and log it to SMS history.",
+        "contactLabel": "Contact",
+        "contactOptional": "(optional)",
+        "contactPlaceholder": "No contact linked",
+        "noContacts": "No contacts yet",
+        "directionLabel": "Direction",
+        "fromNumberLabel": "From number",
+        "fromNumberPlaceholder": "+1 (555) 000-0000",
+        "toNumberLabel": "To number",
+        "toNumberPlaceholder": "+1 (555) 000-0000",
+        "bodyLabel": "Message",
+        "bodyPlaceholder": "Type your message…",
+        "bodyCount": "{count} / 1600",
+        "submit": "Send"
+      },
+      "empty": {
+        "noCalls": "No calls logged yet",
+        "noCallsHint": "Calls placed or received by your team will appear here.",
+        "noSms": "No messages yet",
+        "noSmsHint": "SMS sent and received by your team will appear here."
+      },
+      "errors": {
+        "signedIn": "You must be signed in to do this.",
+        "noPermissionView": "You don't have permission to view telecommunications.",
+        "noPermissionManage": "You don't have permission to manage calls and SMS.",
+        "noOrg": "No organization found for your account.",
+        "directionRequired": "Select a direction.",
+        "statusRequired": "Select an outcome.",
+        "fromNumberRequired": "Enter the from number.",
+        "toNumberRequired": "Enter the to number.",
+        "numberMax": "Number must be 25 characters or fewer.",
+        "durationInvalid": "Enter a valid duration in seconds.",
+        "recordingUrlInvalid": "Recording URL must be 500 characters or fewer.",
+        "summaryMax": "Summary must be 1000 characters or fewer.",
+        "bodyRequired": "Message body is required.",
+        "bodyMax": "Message must be 1600 characters or fewer.",
+        "invalidId": "Invalid record ID.",
+        "highlightFields": "Please fix the highlighted fields.",
+        "createFailed": "Could not log the call. Please try again.",
+        "sendFailed": "Could not send the SMS. Please try again.",
+        "loadFailed": "Could not load telecom data. Please try again."
       }
     },
     "attachments": {

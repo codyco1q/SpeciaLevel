@@ -259,6 +259,7 @@
       "analytics": "التحليلات",
       "automations": "الأتمتة",
       "marketing": "التسويق",
+      "telecommunications": "الاتصالات",
       "employees": "الموظفون",
       "departments": "الأقسام",
       "roles": "الأدوار والصلاحيات",
@@ -948,6 +949,142 @@
         "invalidId": "معرّف حملة غير صالح.",
         "loadFailed": "تعذّر تحميل بيانات التسويق. حاول مرة أخرى.",
         "deleteConfirmBody": "سيتم حذف الحملة وأصولها. لا يمكن التراجع عن هذا الإجراء."
+      }
+    },
+    "telecom": {
+      "title": "الاتصالات",
+      "subtitle": "تابع المكالمات والرسائل النصية وأنشطة التسويق الهاتفي لفريقك.",
+      "noPermissionBody": "ليس لديك صلاحية لعرض الاتصالات.",
+      "logCall": "تسجيل مكالمة",
+      "sendSms": "إرسال رسالة نصية",
+      "allDirections": "كل الاتجاهات",
+      "metrics": {
+        "totalCalls": "إجمالي المكالمات",
+        "totalCallsHint": "كل سجلات المكالمات",
+        "minutesLogged": "الدقائق المسجلة",
+        "minutesLoggedHint": "مدة المكالمات المسجلة",
+        "missedCalls": "المكالمات الفائتة",
+        "missedCallsHint": "{rate}٪ من إجمالي المكالمات",
+        "totalSms": "إجمالي الرسائل النصية",
+        "totalSmsHint": "الرسائل المرسلة والمستلمة"
+      },
+      "directions": {
+        "inbound": "وارد",
+        "outbound": "صادر"
+      },
+      "callStatuses": {
+        "completed": "مكتملة",
+        "missed": "فائتة",
+        "busy": "مشغول",
+        "failed": "فشلت",
+        "voicemail": "بريد صوتي"
+      },
+      "smsStatuses": {
+        "sent": "أُرسلت",
+        "delivered": "تم التوصيل",
+        "failed": "فشلت",
+        "received": "مستلمة"
+      },
+      "tabs": {
+        "calls": "سجل المكالمات",
+        "sms": "سجل الرسائل النصية",
+        "dialer": "الطلب السريع"
+      },
+      "callsTable": {
+        "direction": "الاتجاه",
+        "contact": "جهة الاتصال",
+        "number": "الرقم",
+        "duration": "المدة",
+        "status": "النتيجة",
+        "agent": "الموظف",
+        "recording": "التسجيل"
+      },
+      "smsTable": {
+        "direction": "الاتجاه",
+        "contact": "جهة الاتصال",
+        "number": "الرقم",
+        "body": "الرسالة",
+        "status": "الحالة",
+        "sentAt": "أُرسلت في"
+      },
+      "dialer": {
+        "title": "إجراء مكالمة",
+        "hint": "اطلب رقمًا وسجّل المكالمة في السجل.",
+        "toLabel": "الرقم المطلوب",
+        "toPlaceholder": "+1 (555) 000-0000",
+        "fromLabel": "رقمك",
+        "fromPlaceholder": "+1 (555) 000-0000",
+        "directionLabel": "الاتجاه",
+        "statusLabel": "النتيجة",
+        "durationLabel": "المدة (بالثواني)",
+        "summaryLabel": "ملاحظات / ملخص",
+        "summaryPlaceholder": "نتيجة المكالمة، والمتابعات، والخطوات التالية…",
+        "submit": "أجرِ المكالمة وسجّلها",
+        "stubHint": "يتم تسجيل المكالمة فورًا — التوجيه الصادر غير مفعّل بعد."
+      },
+      "logCallDialog": {
+        "title": "تسجيل مكالمة",
+        "description": "سجّل مكالمة في سجل المكالمات.",
+        "contactLabel": "جهة الاتصال",
+        "contactOptional": "(اختياري)",
+        "contactPlaceholder": "لا توجد جهة اتصال مرتبطة",
+        "noContacts": "لا توجد جهات اتصال بعد",
+        "directionLabel": "الاتجاه",
+        "statusLabel": "النتيجة",
+        "fromNumberLabel": "رقم المتصل",
+        "fromNumberPlaceholder": "+1 (555) 000-0000",
+        "toNumberLabel": "الرقم المتصل به",
+        "toNumberPlaceholder": "+1 (555) 000-0000",
+        "durationLabel": "المدة (بالثواني)",
+        "recordingUrlLabel": "رابط التسجيل",
+        "recordingUrlPlaceholder": "https://…/recording.mp3",
+        "summaryLabel": "ملاحظات / ملخص",
+        "summaryPlaceholder": "نتيجة المكالمة، والمتابعات، والخطوات التالية…",
+        "submit": "تسجيل المكالمة"
+      },
+      "sendSmsDialog": {
+        "title": "إرسال رسالة نصية",
+        "description": "اكتب رسالة نصية وسجّلها في سجل الرسائل.",
+        "contactLabel": "جهة الاتصال",
+        "contactOptional": "(اختياري)",
+        "contactPlaceholder": "لا توجد جهة اتصال مرتبطة",
+        "noContacts": "لا توجد جهات اتصال بعد",
+        "directionLabel": "الاتجاه",
+        "fromNumberLabel": "رقم المرسل",
+        "fromNumberPlaceholder": "+1 (555) 000-0000",
+        "toNumberLabel": "الرقم المستلم",
+        "toNumberPlaceholder": "+1 (555) 000-0000",
+        "bodyLabel": "الرسالة",
+        "bodyPlaceholder": "اكتب رسالتك…",
+        "bodyCount": "{count} / 1600",
+        "submit": "إرسال"
+      },
+      "empty": {
+        "noCalls": "لا توجد مكالمات مسجلة بعد",
+        "noCallsHint": "ستظهر هنا المكالمات التي أجراها فريقك أو استقبلها.",
+        "noSms": "لا توجد رسائل بعد",
+        "noSmsHint": "ستظهر هنا الرسائل النصية المرسلة والمستلمة من فريقك."
+      },
+      "errors": {
+        "signedIn": "يجب تسجيل الدخول للقيام بهذا الإجراء.",
+        "noPermissionView": "ليس لديك صلاحية لعرض الاتصالات.",
+        "noPermissionManage": "ليس لديك صلاحية لإدارة المكالمات والرسائل النصية.",
+        "noOrg": "لم يتم العثور على مؤسسة لحسابك.",
+        "directionRequired": "اختر اتجاهًا.",
+        "statusRequired": "اختر نتيجة.",
+        "fromNumberRequired": "أدخل رقم المتصل.",
+        "toNumberRequired": "أدخل الرقم المتصل به.",
+        "numberMax": "يجب ألا يتجاوز الرقم ٢٥ حرفًا.",
+        "durationInvalid": "أدخل مدة صالحة بالثواني.",
+        "recordingUrlInvalid": "يجب ألا يتجاوز رابط التسجيل ٥٠٠ حرف.",
+        "summaryMax": "يجب ألا يتجاوز الملخص ١٠٠٠ حرف.",
+        "bodyRequired": "نص الرسالة مطلوب.",
+        "bodyMax": "يجب ألا تتجاوز الرسالة ١٦٠٠ حرف.",
+        "invalidId": "معرّف سجل غير صالح.",
+        "highlightFields": "يرجى تصحيح الحقول المحددة.",
+        "createFailed": "تعذّر تسجيل المكالمة. حاول مرة أخرى.",
+        "sendFailed": "تعذّر إرسال الرسالة النصية. حاول مرة أخرى.",
+        "loadFailed": "تعذّر تحميل بيانات الاتصالات. حاول مرة أخرى."
       }
     },
     "attachments": {
