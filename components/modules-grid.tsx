@@ -147,6 +147,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     link: "/marketing",
   },
   {
+    key: "telecommunications",
+    name: "Telecommunications",
+    description: "Phone systems and calling features.",
+    icon: Phone,
+    link: "/telecom",
+  },
+  {
     key: "automations",
     name: "Automations",
     description: "Automate repetitive workflows and sequences.",
@@ -173,15 +180,7 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
  * Future platform modules. Shown as "Coming Soon" so the product feels
  * modular and ready for expansion without implying they are usable.
  */
-const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [
-  {
-    key: "telecommunications",
-    name: "Telecommunications",
-    description: "Phone systems and calling features.",
-    icon: Phone,
-    isFuture: true,
-  },
-];
+const FUTURE_MODULE_DEFINITIONS: ModuleDefinition[] = [];
 
 /** In compact mode the dashboard shows a taste of future modules. */
 const FUTURE_VISIBLE_IN_COMPACT = 4;

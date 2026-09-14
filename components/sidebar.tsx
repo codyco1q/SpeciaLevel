@@ -13,6 +13,7 @@ import {
   CheckSquare,
   MessageSquare,
   Megaphone,
+  PhoneCall,
   TrendingUp,
   Receipt,
   Zap,
@@ -133,6 +134,12 @@ export default function Sidebar({
       href: "/marketing",
       icon: Megaphone,
       permission: "marketing.view",
+    },
+    {
+      label: t.telecommunications,
+      href: "/telecom",
+      icon: PhoneCall,
+      permission: "telecom.view",
     },
     {
       label: t.automations,
