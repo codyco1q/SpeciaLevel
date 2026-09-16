@@ -42,6 +42,8 @@ import {
   formatLeadDate,
 } from "./crm-meta";
 import { DealDialog, type CrmMemberOption } from "./deal-dialog";
+import { ContactsTab } from "./contacts-tab";
+import type { ContactSummaryRow } from "@/lib/actions/crm-contacts";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface DealCardProps {
@@ -127,6 +129,7 @@ interface CrmViewProps {
   initialDeals: DealRow[];
   initialLeads: MarketingLeadRow[];
   members: CrmMemberOption[];
+  initialContacts: ContactSummaryRow[];
   canManage: boolean;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
@@ -146,6 +149,7 @@ export function CrmView({
   initialDeals,
   initialLeads,
   members,
+  initialContacts,
   canManage,
   platform,
   locale,
@@ -155,7 +159,7 @@ export function CrmView({
   const common = platform.common;
   const [deals, setDeals] = useState<DealRow[]>(initialDeals);
   const [leads, setLeads] = useState<MarketingLeadRow[]>(initialLeads);
-  const [tab, setTab] = useState<"pipeline" | "leads">("pipeline");
+  const [tab, setTab] = useState<"pipeline" | "leads" | "contacts">("pipeline");
   const [createOpen, setCreateOpen] = useState(false);
   const [convertingLead, setConvertingLead] =
     useState<MarketingLeadRow | null>(null);
@@ -217,11 +221,12 @@ export function CrmView({
 
       <Tabs
         value={tab}
-        onValueChange={(value) => setTab(value as "pipeline" | "leads")}
+        onValueChange={(value) => setTab(value as "pipeline" | "leads" | "contacts")}
         className="w-full"
       >
         <TabsList>
           <TabsTrigger value="pipeline">{t.tabs.pipeline}</TabsTrigger>
+          <TabsTrigger value="contacts">{t.tabs.contacts}</TabsTrigger>
           {canManage && (
             <TabsTrigger value="leads">{t.tabs.inboundLeads}</TabsTrigger>
           )}
@@ -357,6 +362,16 @@ export function CrmView({
             )}
           </TabsContent>
         )}
+
+        {/* ── Contacts directory ─────────────────────────────── */}
+        <TabsContent value="contacts" className="mt-4">
+          <ContactsTab
+            initialContacts={initialContacts}
+            canManage={canManage}
+            platform={platform}
+            locale={locale}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Dialogs */}

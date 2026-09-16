@@ -208,8 +208,26 @@ export interface CrmContact {
   email: string;
   company: string | null;
   phone: string | null;
+  /** Job title, e.g. "Operations Director" (00020 contacts enhancement). */
+  title: string | null;
+  /** Free-form internal context attached to the contact. */
+  notes: string | null;
+  address: string | null;
+  tags: string[];
+  /** Profile that added this contact (00020 backfills existing rows). */
+  created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Internal per-contact note (00020 contacts enhancement). */
+export interface CrmContactNote {
+  id: string;
+  organization_id: string;
+  contact_id: string;
+  content: string;
+  author_id: string;
+  created_at: string;
 }
 
 /** NUMERIC columns arrive from PostgREST as strings by default. */

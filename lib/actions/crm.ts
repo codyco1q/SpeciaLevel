@@ -265,6 +265,7 @@ export async function getMarketingLeads(): Promise<MarketingLeadRow[] | null> {
  */
 async function resolveContactId(
   organizationId: string,
+  userId: string,
   contact: CrmDealInput["contact"]
 ): Promise<{ id: string | null; error?: string }> {
   if (!contact?.name || !contact.email) return { id: null };
@@ -288,6 +289,8 @@ async function resolveContactId(
       email: contact.email,
       company: contact.company || null,
       phone: contact.phone || null,
+      // required by the 00020 insert policy (created_by = auth.uid()).
+      created_by: userId,
     })
     .select("id")
     .single();
@@ -323,6 +326,7 @@ export async function createDeal(
 
   const contact = await resolveContactId(
     auth.organizationId,
+    auth.userId,
     parsed.data.contact
   );
   if (contact.error) {
@@ -462,7 +466,11 @@ export async function convertLeadToDeal(
         phone: "",
       };
 
-  const contact = await resolveContactId(auth.organizationId, contactInfo);
+  const contact = await resolveContactId(
+    auth.organizationId,
+    auth.userId,
+    contactInfo
+  );
   if (contact.error) {
     return { status: "error", error: err.convertFailed };
   }
