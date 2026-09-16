@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getDeals, getMarketingLeads } from "@/lib/actions/crm";
+import { getContacts } from "@/lib/actions/crm-contacts";
 import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { CrmView } from "./crm-view";
@@ -52,6 +53,7 @@ export default async function CrmPage() {
   }));
 
   const initialDeals = await getDeals();
+  const initialContacts = await getContacts();
 
   // Inbound leads are RLS-restricted to `crm.manage` holders — only fetch
   // them for managers (the tab is hidden for view-only members anyway).
@@ -67,6 +69,7 @@ export default async function CrmPage() {
         platform={platform}
         locale={locale}
         packageLabels={dict.contact.form.packageOptions}
+        initialContacts={initialContacts ?? []}
       />
     </div>
   );
