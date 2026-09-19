@@ -243,16 +243,18 @@ export function InvoiceDetailDocument({
         <div className="mt-8 overflow-hidden rounded-lg border border-border print:rounded-none">
           <Table>
             <TableHeader className="bg-muted/50 [&_tr]:border-b">
-              <TableHead>{t.detail.description}</TableHead>
-              <TableHead className="w-24 text-end">
-                {t.detail.quantity}
-              </TableHead>
-              <TableHead className="w-32 text-end">
-                {t.detail.unitPrice}
-              </TableHead>
-              <TableHead className="w-32 text-end">
-                {t.detail.amount}
-              </TableHead>
+              <TableRow>
+                <TableHead>{t.detail.description}</TableHead>
+                <TableHead className="w-24 text-end">
+                  {t.detail.quantity}
+                </TableHead>
+                <TableHead className="w-32 text-end">
+                  {t.detail.unitPrice}
+                </TableHead>
+                <TableHead className="w-32 text-end">
+                  {t.detail.amount}
+                </TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody className="[&>tr]:border-b">
               {invoice.items.map((item) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
+import { startTransition, useActionState, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -61,7 +61,9 @@ export function ContactForm({
     formData.set("company", values.company);
     formData.set("bottleneck", values.bottleneck);
     formData.set("packageOfInterest", values.packageOfInterest);
-    formAction(formData);
+    startTransition(() => {
+      formAction(formData);
+    });
   }
 
   const pending = isPending || isSubmitting;
