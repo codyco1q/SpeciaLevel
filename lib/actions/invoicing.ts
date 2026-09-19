@@ -339,6 +339,16 @@ export async function createInvoice(
 
   const supabase = await createServerClient();
 
+  // The dialog sends camelCase field names; the DB function reads the
+  // line items with snake_case keys (`unit_price`). Without this mapping
+  // `unit_price` arrives as NULL and the invoice_items insert fails its
+  // NOT NULL constraint, so every UI-driven invoice creation would error.
+  const rpcItems = parsed.data.items.map((item) => ({
+    description: item.description,
+    quantity: item.quantity,
+    unit_price: item.unitPrice,
+  }));
+
   const { error } = await supabase.rpc("create_invoice", {
     p_contact_id: parsed.data.contactId || null,
     p_deal_id: null,
@@ -346,7 +356,7 @@ export async function createInvoice(
     p_currency: parsed.data.currency,
     p_tax_rate: parsed.data.taxRate,
     p_notes: parsed.data.notes || null,
-    p_items: parsed.data.items,
+    p_items: rpcItems,
   });
 
   if (error) {
