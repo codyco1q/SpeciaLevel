@@ -10,6 +10,7 @@ import {
   Paperclip,
   Plus,
   Send,
+  Settings,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ import { formatFileSize, newUuid, sanitizeFileName } from "@/lib/utils/files";
 import { cn } from "@/lib/utils";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { ChannelDialog } from "./channel-dialog";
+import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import {
   formatMessageDateTitle,
   formatMessageTime,
@@ -59,6 +61,8 @@ interface ChatViewProps {
   canManage: boolean;
   /** The signed-in user, used for optimistic sends and "own message" styling. */
   currentUser: ChatPerson;
+  /** Active members in the workspace for channel member management. */
+  orgMembers: ChatPerson[];
   /** Caller's organization, used to scope attachment upload paths. */
   organizationId: string;
   /** Localized copy + formatters for the current render. */
@@ -88,6 +92,7 @@ export function ChatView({
   activeChannelId: initialActiveChannelId,
   canManage,
   currentUser,
+  orgMembers,
   organizationId,
   platform,
   locale,
@@ -103,6 +108,7 @@ export function ChatView({
   const [sendError, setSendError] = useState<string | null>(null);
   const [feedLoading, setFeedLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [attachmentMap, setAttachmentMap] = useState<
     Record<string, AttachmentRow[]>
@@ -317,6 +323,28 @@ export function ChatView({
     setMessages([]);
   }
 
+  function handleChannelUpdated(updated: ChatChannelRow) {
+    setChannelList((prev) =>
+      prev.map((c) => (c.id === updated.id ? updated : c))
+    );
+  }
+
+  function handleChannelDeleted(deletedId: string) {
+    setChannelList((prev) => {
+      const filtered = prev.filter((c) => c.id !== deletedId);
+      if (activeChannelId === deletedId) {
+        const nextId = filtered[0]?.id ?? null;
+        setActiveChannelId(nextId);
+        if (nextId) {
+          void getMessages(nextId).then((res) => setMessages(res ?? []));
+        } else {
+          setMessages([]);
+        }
+      }
+      return filtered;
+    });
+  }
+
   /** Eagerly loads a message's attachments once (chat bubbles fetch on mount). */
   const requestAttachments = useCallback(
     async (messageId: string) => {
@@ -434,18 +462,43 @@ export function ChatView({
 
       {/* Main feed */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <h1 className="text-sm font-semibold">
-              {activeChannel ? activeChannel.name : t.title}
-            </h1>
-            {activeChannel?.description && (
-              <p className="truncate text-xs text-muted-foreground">
-                {activeChannel.description}
-              </p>
-            )}
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-semibold truncate">
+                  {activeChannel ? activeChannel.name : t.title}
+                </h1>
+                {activeChannel?.isPrivate && (
+                  <Badge
+                    variant="outline"
+                    className="px-1.5 py-0 text-[10px]"
+                  >
+                    {t.private}
+                  </Badge>
+                )}
+              </div>
+              {activeChannel?.description && (
+                <p className="truncate text-xs text-muted-foreground">
+                  {activeChannel.description}
+                </p>
+              )}
+            </div>
           </div>
+          {activeChannel &&
+            (canManage || activeChannel.createdBy === currentUser.id) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => setSettingsOpen(true)}
+                title={t.settings?.channelSettings ?? "Channel Settings"}
+                aria-label={t.settings?.channelSettings ?? "Channel Settings"}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
         </div>
 
         <div
@@ -583,6 +636,18 @@ export function ChatView({
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={handleChannelCreated}
+        platform={platform}
+      />
+
+      <ChannelSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        channel={activeChannel}
+        canManage={canManage}
+        currentUserId={currentUser.id}
+        orgMembers={orgMembers}
+        onUpdated={handleChannelUpdated}
+        onDeleted={handleChannelDeleted}
         platform={platform}
       />
     </div>

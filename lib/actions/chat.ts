@@ -8,8 +8,11 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
   createChannelInputSchema,
+  createUpdateChannelInputSchema,
   createMessageContentSchema,
+  updateChannelMembersSchema,
   type CreateChannelState,
+  type UpdateChannelState,
 } from "@/lib/validations/chat";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 
@@ -20,7 +23,8 @@ import { getDictionary } from "@/lib/i18n/get-dictionary";
  *  - `organization_id` and `user_id` are NEVER read from the payload —
  *    they come exclusively from `getCurrentUserContext()`, so a caller can
  *    only touch rows inside their own organization, as themselves.
- *  - Viewing requires `chat.view`; creating channels requires `chat.manage`.
+ *  - Viewing requires `chat.view`; managing channels requires `chat.manage`
+ *    or being the channel creator.
  *  - Outgoing messages verify the target channel belongs to the caller's
  *    organization in the same statement (RLS backstops this, but we never
  *    rely on frontend-only checks).
@@ -39,6 +43,9 @@ export interface ChatChannelRow {
   name: string;
   description: string | null;
   isPrivate: boolean;
+  isArchived: boolean;
+  isSystem: boolean;
+  createdBy: string | null;
   createdAt: string;
 }
 
@@ -47,6 +54,15 @@ export interface ChatMessageRow {
   channelId: string;
   userId: string;
   content: string;
+  createdAt: string;
+  user: ChatPerson;
+}
+
+export interface ChannelMemberInfo {
+  id: string;
+  userId: string;
+  channelId: string;
+  role: "admin" | "member";
   createdAt: string;
   user: ChatPerson;
 }
@@ -70,11 +86,31 @@ interface ChannelSelectRow {
   name: string;
   description: string | null;
   is_private: boolean;
+  is_archived?: boolean | null;
+  is_system?: boolean | null;
+  created_by?: string | null;
   created_at: string;
 }
 
+interface ChannelMemberSelectRow {
+  id: string;
+  user_id: string;
+  channel_id: string;
+  role: string;
+  created_at: string;
+  user:
+    | { id: string; full_name: string | null; email: string | null }
+    | { id: string; full_name: string | null; email: string | null }[]
+    | null;
+}
+
 type ChatAuthResult =
-  | { ok: true; organizationId: string; userId: string }
+  | {
+      ok: true;
+      organizationId: string;
+      userId: string;
+      permissions: string[];
+    }
   | { ok: false; error: string };
 
 /**
@@ -110,12 +146,13 @@ async function requireChatPermission(
     ok: true,
     organizationId,
     userId: userContext.user.id,
+    permissions: userContext.permissions,
   };
 }
 
-function parseFieldErrors(
+function parseFieldErrors<T extends Record<string, unknown>>(
   issues: z.ZodIssue[]
-): CreateChannelState["fieldErrors"] {
+): Partial<Record<keyof T, string[] | undefined>> {
   const fieldErrors: Record<string, string[]> = {};
   for (const issue of issues) {
     const key = issue.path[0];
@@ -123,7 +160,7 @@ function parseFieldErrors(
       (fieldErrors[key] ??= []).push(issue.message);
     }
   }
-  return fieldErrors;
+  return fieldErrors as Partial<Record<keyof T, string[] | undefined>>;
 }
 
 function toChannelRow(row: ChannelSelectRow): ChatChannelRow {
@@ -131,7 +168,10 @@ function toChannelRow(row: ChannelSelectRow): ChatChannelRow {
     id: row.id,
     name: row.name,
     description: row.description ?? null,
-    isPrivate: row.is_private,
+    isPrivate: row.is_private ?? false,
+    isArchived: row.is_archived ?? false,
+    isSystem: row.is_system ?? false,
+    createdBy: row.created_by ?? null,
     createdAt: row.created_at,
   };
 }
@@ -176,8 +216,9 @@ export async function getChannels(): Promise<ChatChannelRow[] | null> {
 
   const { data, error } = await supabase
     .from("chat_channels")
-    .select("id, name, description, is_private, created_at")
+    .select("id, name, description, is_private, is_archived, is_system, created_by, created_at")
     .eq("organization_id", organizationId)
+    .eq("is_archived", false)
     .order("created_at", { ascending: true });
 
   if (error || !data) {
@@ -363,7 +404,7 @@ export async function createChannel(
       is_private: isPrivate ?? false,
       created_by: auth.userId,
     })
-    .select("id, name, description, is_private, created_at")
+    .select("id, name, description, is_private, is_archived, is_system, created_by, created_at")
     .single();
 
   if (error) {
@@ -383,9 +424,375 @@ export async function createChannel(
     };
   }
 
+  // If private, automatically add creator to channel members
+  if (isPrivate) {
+    await supabase.from("chat_channel_members").upsert(
+      {
+        organization_id: auth.organizationId,
+        channel_id: inserted.id,
+        user_id: auth.userId,
+        role: "admin",
+        added_by: auth.userId,
+      },
+      { onConflict: "channel_id,user_id" }
+    );
+  }
+
   revalidatePath("/chat");
   return {
     status: "success",
     channel: toChannelRow(inserted as unknown as ChannelSelectRow),
   };
+}
+
+export type UpdateChannelResult =
+  | { status: "success"; channel: ChatChannelRow }
+  | {
+      status: "error";
+      error: string;
+      fieldErrors?: UpdateChannelState["fieldErrors"];
+    };
+
+/**
+ * Updates an existing channel's name, description, or privacy.
+ * Requires `chat.manage` or being the creator of the channel.
+ */
+export async function updateChannel(
+  channelId: string,
+  data: unknown
+): Promise<UpdateChannelResult> {
+  const auth = await requireChatPermission("chat.view");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
+
+  if (!channelId) {
+    return { status: "error", error: err.missingChannel };
+  }
+
+  const supabase = await createServerClient();
+
+  // Verify channel exists in current org
+  const { data: existing, error: fetchError } = await supabase
+    .from("chat_channels")
+    .select("id, name, description, is_private, is_archived, is_system, created_by")
+    .eq("id", channelId)
+    .eq("organization_id", auth.organizationId)
+    .maybeSingle();
+
+  if (fetchError || !existing) {
+    return { status: "error", error: err.channelNotFound };
+  }
+
+  // Caller must have chat.manage OR be creator
+  const canManage = hasPermission("chat.manage", auth.permissions);
+  const isCreator = existing.created_by === auth.userId;
+  if (!canManage && !isCreator) {
+    return { status: "error", error: err.noPermissionManage };
+  }
+
+  const parsed = createUpdateChannelInputSchema(err).safeParse(data);
+  if (!parsed.success) {
+    return {
+      status: "error",
+      error: err.highlightFields,
+      fieldErrors: parseFieldErrors(parsed.error.issues),
+    };
+  }
+
+  const { name, description, isPrivate, isArchived } = parsed.data;
+
+  // Protect system channels from being made private
+  if (existing.is_system && isPrivate === true) {
+    return {
+      status: "error",
+      error: dict.platform.chat.settings?.systemChannelNotice ?? "System channels cannot be made private.",
+    };
+  }
+
+  const updatePayload: Record<string, unknown> = {};
+  if (name !== undefined) updatePayload.name = name;
+  if (description !== undefined) updatePayload.description = description || null;
+  if (isPrivate !== undefined && !existing.is_system) updatePayload.is_private = isPrivate;
+  if (isArchived !== undefined) updatePayload.is_archived = isArchived;
+
+  const { data: updated, error: updateErr } = await supabase
+    .from("chat_channels")
+    .update(updatePayload)
+    .eq("id", channelId)
+    .eq("organization_id", auth.organizationId)
+    .select("id, name, description, is_private, is_archived, is_system, created_by, created_at")
+    .single();
+
+  if (updateErr) {
+    console.error("[chat] update channel failed:", updateErr.message);
+    if (updateErr.code === "23505") {
+      return { status: "error", error: err.channelExists };
+    }
+    return { status: "error", error: err.createFailed };
+  }
+
+  // If changing to private, ensure creator/caller is a member
+  if (isPrivate === true) {
+    await supabase.from("chat_channel_members").upsert(
+      {
+        organization_id: auth.organizationId,
+        channel_id: channelId,
+        user_id: auth.userId,
+        role: "admin",
+        added_by: auth.userId,
+      },
+      { onConflict: "channel_id,user_id" }
+    );
+  }
+
+  revalidatePath("/chat");
+  return {
+    status: "success",
+    channel: toChannelRow(updated as unknown as ChannelSelectRow),
+  };
+}
+
+export type DeleteChannelResult =
+  | { status: "success" }
+  | { status: "error"; error: string };
+
+/**
+ * Deletes a channel and cascades its messages and attachments.
+ * Requires `chat.manage` or being the creator.
+ * Rejects if channel is system default (`is_system = true` or `#general`).
+ */
+export async function deleteChannel(
+  channelId: string
+): Promise<DeleteChannelResult> {
+  const auth = await requireChatPermission("chat.view");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
+
+  if (!channelId) {
+    return { status: "error", error: err.missingChannel };
+  }
+
+  const supabase = await createServerClient();
+
+  const { data: channel, error: fetchError } = await supabase
+    .from("chat_channels")
+    .select("id, name, is_system, created_by")
+    .eq("id", channelId)
+    .eq("organization_id", auth.organizationId)
+    .maybeSingle();
+
+  if (fetchError || !channel) {
+    return { status: "error", error: err.channelNotFound };
+  }
+
+  if (
+    channel.is_system ||
+    channel.name === "general" ||
+    channel.name === "client-project"
+  ) {
+    return {
+      status: "error",
+      error:
+        dict.platform.chat.settings?.systemChannelCannotDelete ??
+        "System channels cannot be deleted.",
+    };
+  }
+
+  const canManage = hasPermission("chat.manage", auth.permissions);
+  const isCreator = channel.created_by === auth.userId;
+  if (!canManage && !isCreator) {
+    return { status: "error", error: err.noPermissionManage };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("chat_channels")
+    .delete()
+    .eq("id", channelId)
+    .eq("organization_id", auth.organizationId);
+
+  if (deleteError) {
+    console.error("[chat] delete channel failed:", deleteError.message);
+    return { status: "error", error: err.createFailed };
+  }
+
+  revalidatePath("/chat");
+  return { status: "success" };
+}
+
+export type GetChannelMembersResult =
+  | { status: "success"; members: ChannelMemberInfo[] }
+  | { status: "error"; error: string };
+
+/**
+ * Retrieves members of a specific channel.
+ */
+export async function getChannelMembers(
+  channelId: string
+): Promise<GetChannelMembersResult> {
+  const auth = await requireChatPermission("chat.view");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
+
+  if (!channelId) {
+    return { status: "error", error: err.missingChannel };
+  }
+
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase
+    .from("chat_channel_members")
+    .select(`
+      id,
+      user_id,
+      channel_id,
+      role,
+      created_at,
+      user:profiles!fk_chat_channel_members_user(id, full_name, email)
+    `)
+    .eq("organization_id", auth.organizationId)
+    .eq("channel_id", channelId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[chat] fetch channel members failed:", error.message);
+    return { status: "error", error: err.channelNotFound };
+  }
+
+  const members: ChannelMemberInfo[] = (
+    (data ?? []) as unknown as ChannelMemberSelectRow[]
+  ).map((row) => {
+    const userObj = Array.isArray(row.user) ? row.user[0] : row.user;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      channelId: row.channel_id,
+      role: (row.role === "admin" ? "admin" : "member") as "admin" | "member",
+      createdAt: row.created_at,
+      user: userObj
+        ? {
+            id: userObj.id,
+            fullName: userObj.full_name ?? null,
+            email: userObj.email ?? null,
+          }
+        : { id: row.user_id, fullName: null, email: null },
+    };
+  });
+
+  return { status: "success", members };
+}
+
+
+
+export type UpdateChannelMembersResult =
+  | { status: "success" }
+  | { status: "error"; error: string };
+
+/**
+ * Synchronizes the list of members for a private channel.
+ * Requires `chat.manage` or being channel creator.
+ */
+export async function updateChannelMembers(
+  channelId: string,
+  memberUserIds: string[]
+): Promise<UpdateChannelMembersResult> {
+  const auth = await requireChatPermission("chat.view");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const dict = await getDictionary();
+  const err = dict.platform.chat.errors;
+
+  const parsed = updateChannelMembersSchema.safeParse({
+    channelId,
+    memberUserIds,
+  });
+  if (!parsed.success) {
+    return { status: "error", error: err.highlightFields };
+  }
+
+  const supabase = await createServerClient();
+
+  // Verify channel exists in current org
+  const { data: channel, error: fetchError } = await supabase
+    .from("chat_channels")
+    .select("id, is_system, created_by")
+    .eq("id", channelId)
+    .eq("organization_id", auth.organizationId)
+    .maybeSingle();
+
+  if (fetchError || !channel) {
+    return { status: "error", error: err.channelNotFound };
+  }
+
+  const canManage = hasPermission("chat.manage", auth.permissions);
+  const isCreator = channel.created_by === auth.userId;
+  if (!canManage && !isCreator) {
+    return { status: "error", error: err.noPermissionManage };
+  }
+
+  // Fetch current members
+  const { data: currentRows, error: memberFetchErr } = await supabase
+    .from("chat_channel_members")
+    .select("user_id")
+    .eq("channel_id", channelId)
+    .eq("organization_id", auth.organizationId);
+
+  if (memberFetchErr) {
+    console.error("[chat] member fetch failed:", memberFetchErr.message);
+    return { status: "error", error: err.createFailed };
+  }
+
+  const currentIds = new Set((currentRows ?? []).map((r) => r.user_id));
+  const targetIds = new Set(memberUserIds);
+
+  // Always ensure channel creator stays in
+  if (channel.created_by) {
+    targetIds.add(channel.created_by);
+  }
+
+  const toRemove = Array.from(currentIds).filter((id) => !targetIds.has(id));
+  const toAdd = Array.from(targetIds).filter((id) => !currentIds.has(id));
+
+  if (toRemove.length > 0) {
+    const { error: removeErr } = await supabase
+      .from("chat_channel_members")
+      .delete()
+      .eq("channel_id", channelId)
+      .eq("organization_id", auth.organizationId)
+      .in("user_id", toRemove);
+
+    if (removeErr) {
+      console.error("[chat] remove members failed:", removeErr.message);
+      return { status: "error", error: err.createFailed };
+    }
+  }
+
+  if (toAdd.length > 0) {
+    const rowsToInsert = toAdd.map((userId) => ({
+      organization_id: auth.organizationId,
+      channel_id: channelId,
+      user_id: userId,
+      role: (userId === channel.created_by ? "admin" : "member") as
+        | "admin"
+        | "member",
+      added_by: auth.userId,
+    }));
+
+    const { error: insertErr } = await supabase
+      .from("chat_channel_members")
+      .insert(rowsToInsert);
+
+    if (insertErr) {
+      console.error("[chat] add members failed:", insertErr.message);
+      return { status: "error", error: err.createFailed };
+    }
+  }
+
+  revalidatePath("/chat");
+  return { status: "success" };
 }

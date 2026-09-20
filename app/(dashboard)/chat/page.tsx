@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
+import { createServerClient } from "@/lib/supabase/server";
 import {
   getChannels,
   getMessages,
@@ -48,6 +49,19 @@ export default async function ChatPage() {
     email: userContext.user.email,
   };
 
+  const supabase = await createServerClient();
+  const { data: profileRows } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("organization_id", userContext.organization.id)
+    .order("full_name", { ascending: true });
+
+  const orgMembers: ChatPerson[] = (profileRows ?? []).map((p) => ({
+    id: p.id,
+    fullName: p.full_name,
+    email: p.email,
+  }));
+
   return (
     <ChatView
       channels={channels ?? []}
@@ -55,6 +69,7 @@ export default async function ChatPage() {
       activeChannelId={activeChannelId}
       canManage={hasPermission("chat.manage", userContext.permissions)}
       currentUser={currentUser}
+      orgMembers={orgMembers}
       organizationId={userContext.organization.id}
       platform={platform}
       locale={locale}
