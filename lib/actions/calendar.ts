@@ -5,8 +5,17 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
   calendarEventSchemaWithRange,
+  bookingProfileInputSchema,
+  publicAppointmentInputSchema,
+  DEFAULT_WEEKLY_AVAILABILITY,
   type CalendarActionState,
   type CalendarEventInput,
+  type BookingProfileRow,
+  type BookingProfileInput,
+  type AppointmentRow,
+  type PublicBookingProfile,
+  type PublicAppointmentInput,
+  type DayOfWeek,
 } from "@/lib/validations/calendar";
 import { z } from "zod";
 
@@ -378,3 +387,442 @@ export async function deleteEvent(
   revalidatePath("/dashboard");
   return { status: "success" };
 }
+
+// ============================================================
+// Appointment Scheduler Server Actions
+// ============================================================
+
+function toBookingProfileRow(row: any): BookingProfileRow {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    userId: row.user_id,
+    slug: row.slug,
+    title: row.title,
+    description: row.description ?? null,
+    durationMinutes: Number(row.duration_minutes ?? 30),
+    bufferBeforeMinutes: Number(row.buffer_before_minutes ?? 0),
+    bufferAfterMinutes: Number(row.buffer_after_minutes ?? 10),
+    isActive: Boolean(row.is_active),
+    weeklyAvailability: row.weekly_availability ?? DEFAULT_WEEKLY_AVAILABILITY,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toAppointmentRow(row: any): AppointmentRow {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    bookingProfileId: row.booking_profile_id,
+    hostUserId: row.host_user_id,
+    clientName: row.client_name,
+    clientEmail: row.client_email,
+    clientPhone: row.client_phone ?? null,
+    notes: row.notes ?? null,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    status: row.status,
+    contactId: row.contact_id ?? null,
+    dealId: row.deal_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    host: row.host
+      ? {
+          id: row.host.id,
+          fullName: row.host.full_name ?? null,
+          email: row.host.email ?? null,
+          avatarUrl: row.host.avatar_url ?? null,
+        }
+      : undefined,
+    contact: row.contact
+      ? {
+          id: row.contact.id,
+          name: row.contact.name,
+          email: row.contact.email,
+          phone: row.contact.phone ?? null,
+          company: row.contact.company ?? null,
+        }
+      : null,
+    deal: row.deal
+      ? {
+          id: row.deal.id,
+          title: row.deal.title,
+          value: Number(row.deal.value ?? 0),
+          currency: row.deal.currency ?? "USD",
+          stage: row.deal.stage,
+        }
+      : null,
+  };
+}
+
+export async function getMyBookingProfile(): Promise<BookingProfileRow | null> {
+  const userContext = await getCurrentUserContext();
+  if (!userContext || !userContext.organization) return null;
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("calendar_booking_profiles")
+    .select("*")
+    .eq("organization_id", userContext.organization.id)
+    .eq("user_id", userContext.user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[calendar] getMyBookingProfile error:", error.message);
+    return null;
+  }
+
+  if (data) {
+    return toBookingProfileRow(data);
+  }
+
+  const emailPrefix =
+    userContext.user.email?.split("@")[0]?.toLowerCase().replace(/[^a-z0-9]/g, "-") ||
+    "member";
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  const baseSlug = `${emailPrefix}-${randomSuffix}`;
+
+  const { data: created, error: createError } = await supabase
+    .from("calendar_booking_profiles")
+    .insert({
+      organization_id: userContext.organization.id,
+      user_id: userContext.user.id,
+      slug: baseSlug,
+      title: "30 Min Consultation",
+      description:
+        "Quick 30-minute introductory meeting to discuss project requirements.",
+      duration_minutes: 30,
+      buffer_before_minutes: 0,
+      buffer_after_minutes: 10,
+      is_active: true,
+      weekly_availability: DEFAULT_WEEKLY_AVAILABILITY,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error(
+      "[calendar] create default booking profile error:",
+      createError.message
+    );
+    return null;
+  }
+
+  return toBookingProfileRow(created);
+}
+
+export async function updateMyBookingProfile(
+  payload: BookingProfileInput
+): Promise<
+  | { status: "success"; data: BookingProfileRow }
+  | { status: "error"; error: string; fieldErrors?: Record<string, string[]> }
+> {
+  const userContext = await getCurrentUserContext();
+  if (!userContext || !userContext.organization) {
+    return { status: "error", error: "Unauthorized" };
+  }
+
+  const parsed = bookingProfileInputSchema.safeParse(payload);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0]);
+      (fieldErrors[key] ??= []).push(issue.message);
+    }
+    return { status: "error", error: "Validation failed", fieldErrors };
+  }
+
+  const supabase = await createServerClient();
+  const orgId = userContext.organization.id;
+  const userId = userContext.user.id;
+
+  const { data: existingSlug } = await supabase
+    .from("calendar_booking_profiles")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("slug", parsed.data.slug)
+    .neq("user_id", userId)
+    .maybeSingle();
+
+  if (existingSlug) {
+    return {
+      status: "error",
+      error: "This booking link slug is already in use by another team member.",
+      fieldErrors: { slug: ["This slug is already in use."] },
+    };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("calendar_booking_profiles")
+    .upsert(
+      {
+        organization_id: orgId,
+        user_id: userId,
+        slug: parsed.data.slug,
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        duration_minutes: parsed.data.durationMinutes,
+        buffer_before_minutes: parsed.data.bufferBeforeMinutes,
+        buffer_after_minutes: parsed.data.bufferAfterMinutes,
+        is_active: parsed.data.isActive,
+        weekly_availability: parsed.data.weeklyAvailability,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,user_id" }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[calendar] updateMyBookingProfile error:", error.message);
+    return { status: "error", error: error.message };
+  }
+
+  revalidatePath("/calendar");
+  revalidatePath(`/book/${parsed.data.slug}`);
+  return { status: "success", data: toBookingProfileRow(updated) };
+}
+
+export async function getAppointments(
+  startDate?: string,
+  endDate?: string
+): Promise<AppointmentRow[]> {
+  const userContext = await getCurrentUserContext();
+  if (!userContext || !userContext.organization) return [];
+  if (!userContext.permissions.includes("calendar.view")) return [];
+
+  const supabase = await createServerClient();
+  let query = supabase
+    .from("calendar_appointments")
+    .select(
+      `
+      id,
+      organization_id,
+      booking_profile_id,
+      host_user_id,
+      client_name,
+      client_email,
+      client_phone,
+      notes,
+      start_time,
+      end_time,
+      status,
+      contact_id,
+      deal_id,
+      created_at,
+      updated_at,
+      host:profiles!calendar_appointments_host_user_id_fkey(id, full_name, email, avatar_url),
+      contact:crm_contacts(id, name, email, phone, company),
+      deal:crm_deals(id, title, value, currency, stage)
+    `
+    )
+    .eq("organization_id", userContext.organization.id)
+    .order("start_time", { ascending: true });
+
+  if (startDate) {
+    query = query.gte("start_time", startDate);
+  }
+  if (endDate) {
+    query = query.lte("start_time", endDate);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[calendar] getAppointments error:", error.message);
+    return [];
+  }
+
+  return (data ?? []).map(toAppointmentRow);
+}
+
+export async function cancelAppointment(
+  appointmentId: string,
+  reason?: string
+): Promise<{ status: "success" } | { status: "error"; error: string }> {
+  const userContext = await getCurrentUserContext();
+  if (!userContext || !userContext.organization) {
+    return { status: "error", error: "Unauthorized" };
+  }
+  if (!userContext.permissions.includes("calendar.manage")) {
+    return { status: "error", error: "Permission denied." };
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("calendar_appointments")
+    .update({
+      status: "cancelled",
+      notes: reason ? `Cancelled: ${reason}` : undefined,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", appointmentId)
+    .eq("organization_id", userContext.organization.id);
+
+  if (error) {
+    console.error("[calendar] cancelAppointment error:", error.message);
+    return { status: "error", error: error.message };
+  }
+
+  revalidatePath("/calendar");
+  return { status: "success" };
+}
+
+export async function getPublicBookingProfileBySlug(
+  slug: string,
+  orgSlug?: string
+): Promise<PublicBookingProfile | null> {
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc("get_public_booking_profile", {
+    p_profile_slug: slug,
+    p_org_slug: orgSlug || null,
+  });
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    slug: data.slug,
+    title: data.title,
+    description: data.description ?? null,
+    durationMinutes: Number(data.duration_minutes ?? 30),
+    bufferBeforeMinutes: Number(data.buffer_before_minutes ?? 0),
+    bufferAfterMinutes: Number(data.buffer_after_minutes ?? 10),
+    weeklyAvailability: data.weekly_availability ?? DEFAULT_WEEKLY_AVAILABILITY,
+    hostName: data.host_name ?? "Host",
+    hostAvatar: data.host_avatar ?? null,
+    hostEmail: data.host_email ?? "",
+    orgName: data.org_name ?? "Organization",
+    orgSlug: data.org_slug ?? "",
+    existingAppointments: data.existing_appointments ?? [],
+  };
+}
+
+export interface TimeSlotOption {
+  time: string; // "09:00", "09:30"
+  startIso: string;
+  endIso: string;
+  available: boolean;
+}
+
+export async function getPublicBookingSlots(
+  profileSlug: string,
+  dateStr: string, // YYYY-MM-DD
+  orgSlug?: string
+): Promise<{ profile: PublicBookingProfile | null; slots: TimeSlotOption[]; error?: string }> {
+  const profile = await getPublicBookingProfileBySlug(profileSlug, orgSlug);
+  if (!profile) {
+    return { profile: null, slots: [], error: "Booking profile not found" };
+  }
+
+  const [yearStr, monthStr, dayStr] = dateStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10) - 1;
+  const day = parseInt(dayStr, 10);
+
+  const targetDate = new Date(year, month, day);
+  const daysMap: DayOfWeek[] = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+  const dayName = daysMap[targetDate.getDay()];
+  const dayWindows = profile.weeklyAvailability[dayName] || [];
+
+  const slots: TimeSlotOption[] = [];
+  const duration = profile.durationMinutes;
+  const bufferAfter = profile.bufferAfterMinutes;
+  const existingAppts = profile.existingAppointments || [];
+
+  const now = new Date();
+
+  for (const window of dayWindows) {
+    const [startH, startM] = window.start.split(":").map(Number);
+    const [endH, endM] = window.end.split(":").map(Number);
+
+    let currentMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    while (currentMinutes + duration <= endMinutes) {
+      const slotHour = Math.floor(currentMinutes / 60);
+      const slotMin = currentMinutes % 60;
+      const timeLabel = `${String(slotHour).padStart(2, "0")}:${String(slotMin).padStart(2, "0")}`;
+
+      const slotStart = new Date(year, month, day, slotHour, slotMin, 0, 0);
+      const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
+
+      // Check if in the past (allow 10 minute leeway)
+      const isPast = slotStart.getTime() < now.getTime() + 10 * 60 * 1000;
+
+      // Check overlap with existing confirmed appointments
+      const hasOverlap = existingAppts.some((appt) => {
+        const apptStart = new Date(appt.start_time).getTime();
+        const apptEnd = new Date(appt.end_time).getTime();
+        return slotStart.getTime() < apptEnd && slotEnd.getTime() > apptStart;
+      });
+
+      slots.push({
+        time: timeLabel,
+        startIso: slotStart.toISOString(),
+        endIso: slotEnd.toISOString(),
+        available: !isPast && !hasOverlap,
+      });
+
+      currentMinutes += duration + bufferAfter;
+    }
+  }
+
+  return { profile, slots };
+}
+
+export async function bookPublicAppointment(
+  input: PublicAppointmentInput
+): Promise<
+  | { status: "success"; data: any }
+  | { status: "error"; error: string; fieldErrors?: Record<string, string[]> }
+> {
+  const parsed = publicAppointmentInputSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0]);
+      (fieldErrors[key] ??= []).push(issue.message);
+    }
+    return { status: "error", error: "Validation failed", fieldErrors };
+  }
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc("book_public_appointment", {
+    p_booking_profile_id: parsed.data.bookingProfileId,
+    p_client_name: parsed.data.clientName,
+    p_client_email: parsed.data.clientEmail,
+    p_client_phone: parsed.data.clientPhone || null,
+    p_notes: parsed.data.notes || null,
+    p_start_time: parsed.data.startTime,
+  });
+
+  if (error) {
+    console.error("[calendar] bookPublicAppointment error:", error.message);
+    return { status: "error", error: error.message };
+  }
+
+  if (!data?.success) {
+    return {
+      status: "error",
+      error:
+        data?.error ||
+        "Could not book appointment. Slot might no longer be available.",
+    };
+  }
+
+  revalidatePath("/calendar");
+  return { status: "success", data };
+}
+
+

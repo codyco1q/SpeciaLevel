@@ -56,6 +56,7 @@ export async function proxy(request: NextRequest) {
     pathname === "/" ||
     pathname.startsWith("/pay/") ||
     pathname.startsWith("/f/") ||
+    pathname.startsWith("/book/") ||
     pathname.startsWith("/api/public/");
 
   // Allow the root page, auth pages, and public routes to load; redirect all other routes to /login.
