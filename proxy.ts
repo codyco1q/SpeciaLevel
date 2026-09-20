@@ -53,21 +53,21 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/login") || pathname.startsWith("/signup");
   const isPublicRoute =
     isAuthRoute ||
-    pathname === "/" ||
     pathname.startsWith("/pay/") ||
     pathname.startsWith("/f/") ||
     pathname.startsWith("/book/") ||
+    pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/public/");
 
-  // Allow the root page, auth pages, and public routes to load; redirect all other routes to /login.
+  // Allow auth pages and public routes to load; redirect all other unauthenticated routes to /login.
   if (!user && !isPublicRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If the user is already authenticated and visiting an auth page, send them to the dashboard.
-  if (user && isAuthRoute) {
+  // If the user is already authenticated and visiting an auth page or root gateway, send them to the dashboard.
+  if (user && (isAuthRoute || pathname === "/")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     return NextResponse.redirect(redirectUrl);

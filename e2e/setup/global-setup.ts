@@ -18,6 +18,8 @@ import {
   SEED_INVOICE_TOTAL,
   SEED_NOTE_CONTENT,
   SEED_SECOND_CONTACT_NAME,
+  SEED_FORM_SLUG,
+  SEED_FORM_TITLE,
 } from "./constants";
 
 /**
@@ -231,6 +233,12 @@ async function purgeFixtures(
   supabase: SupabaseClient,
   organizationId: string
 ): Promise<void> {
+  await supabase
+    .from("inbound_forms")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("slug", SEED_FORM_SLUG);
+
   const { data: invoices } = await supabase
     .from("invoices")
     .select("id")
@@ -263,6 +271,29 @@ async function seedFixtures(
   organizationId: string,
   userId: string
 ): Promise<void> {
+  const { error: formError } = await supabase.from("inbound_forms").insert({
+    organization_id: organizationId,
+    title: SEED_FORM_TITLE,
+    slug: SEED_FORM_SLUG,
+    is_published: true,
+    fields: [
+      { id: "name", label: "Full Name", type: "text", required: true, placeholder: "Sarah Jenkins" },
+      { id: "email", label: "Work Email", type: "email", required: true, placeholder: "sarah@apex.test" },
+      { id: "company", label: "Company Name", type: "text", required: false, placeholder: "Apex Global Logistics" },
+      { id: "bottleneck", label: "Current Bottleneck", type: "textarea", required: true, placeholder: "Cross-departmental data sync..." },
+    ],
+    settings: {
+      submit_button_text: "Book my consultation",
+      submitButtonText: "Book my consultation",
+      success_message: "Thanks — we'll review your project and get back to you within one business day with next steps.",
+      successMessage: "Thanks — we'll review your project and get back to you within one business day with next steps.",
+    },
+    created_by: userId,
+  });
+  if (formError) {
+    throw new Error(`[e2e] Could not seed the inbound form: ${formError.message}`);
+  }
+
   const { data: primary, error: primaryError } = await supabase
     .from("crm_contacts")
     .insert({

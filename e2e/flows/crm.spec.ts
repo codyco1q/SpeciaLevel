@@ -132,7 +132,9 @@ test.describe("CRM contacts & 360° profile", () => {
 
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
-      await expect(dialog.getByText(SEED_DEAL_TITLE)).toBeVisible();
+      await expect(
+        dialog.getByRole("heading", { name: SEED_DEAL_TITLE })
+      ).toBeVisible();
 
       // View linked contact from deal detail
       const viewContactBtn = dialog.getByRole("link", { name: "View contact profile" });

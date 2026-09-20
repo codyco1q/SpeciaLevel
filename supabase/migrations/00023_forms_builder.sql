@@ -25,7 +25,7 @@ create table if not exists public.inbound_forms (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint uq_inbound_forms_slug unique (slug),
-  constraint chk_inbound_forms_slug_format check (slug ~ '^[a-z0-9-_]+$')
+  constraint chk_inbound_forms_slug_format check (slug ~ '^[a-z0-9_-]+$')
 );
 
 create index if not exists idx_inbound_forms_organization_id

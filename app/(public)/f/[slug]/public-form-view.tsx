@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Monogram } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LocaleSwitcher } from "@/components/marketing/locale-switcher";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Monogram } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LocaleSwitcher } from "@/components/marketing/locale-switcher";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { cn } from "@/lib/utils";
 import type { PublicInvoiceData } from "@/lib/actions/invoicing";
 import {
