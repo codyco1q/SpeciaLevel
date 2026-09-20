@@ -30,6 +30,8 @@ import {
 import {
   convertLeadToDeal,
   createDeal,
+  updateDeal,
+  type DealRow,
   type MarketingLeadRow,
 } from "@/lib/actions/crm";
 import { CRM_CURRENCIES, CRM_STAGES } from "./crm-meta";
@@ -45,7 +47,9 @@ interface DealDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Non-null opens the dialog in "convert inbound lead" mode. */
-  lead: MarketingLeadRow | null;
+  lead?: MarketingLeadRow | null;
+  /** Non-null opens the dialog in "edit deal" mode. */
+  deal?: DealRow | null;
   /** Active organization members available for assignment. */
   members: CrmMemberOption[];
   onSaved: () => void;
@@ -54,22 +58,22 @@ interface DealDialogProps {
 }
 
 /**
- * Create / convert deal dialog backed by react-hook-form + the shared Zod
- * schema. In convert mode the contact fields are prefilled from the lead
- * and the payload goes to `convertLeadToDeal` (which marks the lead
- * `converted` server-side); otherwise it goes to `createDeal`.
+ * Create / convert / edit deal dialog backed by react-hook-form + the shared
+ * Zod schema.
  */
 export function DealDialog({
   open,
   onOpenChange,
-  lead,
+  lead = null,
+  deal = null,
   members,
   onSaved,
   platform,
 }: DealDialogProps) {
   const t = platform.crm;
   const common = platform.common;
-  const isConvert = lead !== null;
+  const isConvert = lead !== null && lead !== undefined;
+  const isEdit = deal !== null && deal !== undefined;
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -94,24 +98,41 @@ export function DealDialog({
   });
 
   // Re-seed the form every time the dialog opens so it always reflects a
-  // pristine create form or the lead being converted.
+  // pristine create form, the lead being converted, or the deal being edited.
   useEffect(() => {
     if (!open) return;
-    reset({
-      title: "",
-      value: 0,
-      currency: "USD",
-      stage: "lead",
-      notes: "",
-      assignedTo: "",
-      contact: {
-        name: lead?.name ?? "",
-        email: lead?.email ?? "",
-        company: lead?.company ?? "",
-        phone: "",
-      },
-    });
-  }, [open, lead, reset]);
+    if (deal) {
+      reset({
+        title: deal.title,
+        value: deal.value,
+        currency: (deal.currency as "USD" | "EUR" | "GBP" | "AED" | "SAR") || "USD",
+        stage: deal.stage,
+        notes: deal.notes ?? "",
+        assignedTo: deal.assignee?.id ?? "",
+        contact: {
+          name: deal.contact?.name ?? "",
+          email: deal.contact?.email ?? "",
+          company: deal.contact?.company ?? "",
+          phone: deal.contact?.phone ?? "",
+        },
+      });
+    } else {
+      reset({
+        title: "",
+        value: 0,
+        currency: "USD",
+        stage: "lead",
+        notes: "",
+        assignedTo: "",
+        contact: {
+          name: lead?.name ?? "",
+          email: lead?.email ?? "",
+          company: lead?.company ?? "",
+          phone: "",
+        },
+      });
+    }
+  }, [open, lead, deal, reset]);
 
   // Clear any leftover server error the moment the dialog closes.
   const handleOpenChange = (next: boolean) => {
@@ -122,9 +143,11 @@ export function DealDialog({
   const onSubmit = handleSubmit((values) => {
     setServerError(null);
     startTransition(() => {
-      const action = isConvert
-        ? convertLeadToDeal(lead.id, values)
-        : createDeal(values);
+      const action = isEdit
+        ? updateDeal(deal.id, values)
+        : isConvert
+          ? convertLeadToDeal(lead.id, values)
+          : createDeal(values);
       void action.then((result) => {
         if (result.status === "error") {
           setServerError(result.error ?? t.errors.createFailed);
@@ -153,12 +176,18 @@ export function DealDialog({
         <form onSubmit={onSubmit} noValidate className="space-y-4">
           <DialogHeader>
             <DialogTitle>
-              {isConvert ? t.dealDialog.convertTitle : t.dealDialog.createTitle}
+              {isEdit
+                ? t.dealDialog.editTitle
+                : isConvert
+                  ? t.dealDialog.convertTitle
+                  : t.dealDialog.createTitle}
             </DialogTitle>
             <DialogDescription>
-              {isConvert
-                ? t.dealDialog.convertDescription
-                : t.dealDialog.createDescription}
+              {isEdit
+                ? t.dealDialog.editDescription
+                : isConvert
+                  ? t.dealDialog.convertDescription
+                  : t.dealDialog.createDescription}
             </DialogDescription>
           </DialogHeader>
 
@@ -391,7 +420,11 @@ export function DealDialog({
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              {isConvert ? t.dealDialog.convert : t.dealDialog.create}
+              {isEdit
+                ? t.dealDialog.edit
+                : isConvert
+                  ? t.dealDialog.convert
+                  : t.dealDialog.create}
             </Button>
           </DialogFooter>
         </form>

@@ -527,6 +527,8 @@
       "dealDialog": {
         "createTitle": "New deal",
         "createDescription": "Add a deal to your pipeline. Contact details are optional.",
+        "editTitle": "Edit deal",
+        "editDescription": "Update deal information, stage, or assignment.",
         "convertTitle": "Convert lead to deal",
         "convertDescription": "Turn this website inquiry into a deal in your pipeline.",
         "titleLabel": "Title",
@@ -549,7 +551,27 @@
         "contactPhoneLabel": "Phone",
         "contactPhonePlaceholder": "+1 555 000 1234",
         "create": "Create deal",
+        "edit": "Save changes",
         "convert": "Convert to deal"
+      },
+      "dealDetail": {
+        "title": "Deal details",
+        "stage": "Stage",
+        "value": "Value",
+        "assignee": "Assigned to",
+        "unassigned": "Unassigned",
+        "contact": "Linked contact",
+        "noContact": "No linked contact",
+        "viewContact": "View contact profile",
+        "created": "Created",
+        "updated": "Last updated",
+        "notes": "Notes & details",
+        "noNotes": "No notes provided.",
+        "editDeal": "Edit deal",
+        "deleteDeal": "Delete deal",
+        "deleteConfirmTitle": "Delete deal?",
+        "deleteConfirmDescription": "This permanently removes this deal from your pipeline.",
+        "deleteConfirm": "Delete deal"
       },
       "errors": {
         "signedIn": "You must be signed in to do this.",

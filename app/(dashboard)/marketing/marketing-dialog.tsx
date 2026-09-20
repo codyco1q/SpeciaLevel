@@ -74,7 +74,7 @@ export function MarketingDialog({
 }: MarketingDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] sm:max-w-3xl md:max-w-4xl overflow-hidden flex flex-col p-6">
         <MarketingCampaignForm
           key={
             open
@@ -232,7 +232,8 @@ function MarketingCampaignForm({
         <DialogDescription>{t.dialog.description}</DialogDescription>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <div className="max-h-[85vh] overflow-y-auto px-1 space-y-5 flex-1 pe-2">
         {/* Name + status */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
@@ -467,20 +468,26 @@ function MarketingCampaignForm({
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div className="min-w-0 flex-1">
               <span className="mb-1.5 block text-xs text-muted-foreground">
                 {t.dialog.utmPreviewLabel}
               </span>
               <p
                 dir="ltr"
-                className="truncate rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-muted-foreground"
+                className="truncate rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-muted-foreground break-all"
                 title={utmUrl}
               >
                 {utmUrl}
               </p>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={handleCopyUtm}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={handleCopyUtm}
+            >
               {isCopied ? (
                 <Check className="size-4 text-emerald-500" />
               ) : (
@@ -490,6 +497,7 @@ function MarketingCampaignForm({
             </Button>
           </div>
         </div>
+      </div>
 
         {serverError && (
           <p
@@ -500,7 +508,7 @@ function MarketingCampaignForm({
           </p>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="mt-4 pt-3 border-t">
           <Button
             type="button"
             variant="outline"

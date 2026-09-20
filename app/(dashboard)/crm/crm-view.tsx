@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
   ChevronLeft,
@@ -42,6 +43,7 @@ import {
   formatLeadDate,
 } from "./crm-meta";
 import { DealDialog, type CrmMemberOption } from "./deal-dialog";
+import { DealDetailDialog } from "./deal-detail-dialog";
 import { ContactsTab } from "./contacts-tab";
 import type { ContactSummaryRow } from "@/lib/actions/crm-contacts";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
@@ -49,20 +51,32 @@ import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 interface DealCardProps {
   deal: DealRow;
   onMove: (dealId: string, stage: CrmStage) => void;
+  onSelect: (deal: DealRow) => void;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
 }
 
 /** Single pipeline card: identity, value, and chevron stage moves. */
-function DealCard({ deal, onMove, platform, locale }: DealCardProps) {
+function DealCard({ deal, onMove, onSelect, platform, locale }: DealCardProps) {
   const t = platform.crm;
   const stageIndex = CRM_STAGES.indexOf(deal.stage);
   const hasPrev = stageIndex > 0;
   const hasNext = stageIndex < CRM_STAGES.length - 1;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm transition-colors hover:border-foreground/20">
+    <div
+      onClick={() => onSelect(deal)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(deal);
+        }
+      }}
+      className="cursor-pointer rounded-lg border border-border bg-card p-3 shadow-sm transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <p className="text-sm font-semibold leading-snug">{deal.title}</p>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -95,7 +109,10 @@ function DealCard({ deal, onMove, platform, locale }: DealCardProps) {
           size="sm"
           className="size-7 p-0"
           disabled={!hasPrev}
-          onClick={() => onMove(deal.id, CRM_STAGES[stageIndex - 1])}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(deal.id, CRM_STAGES[stageIndex - 1]);
+          }}
           aria-label={t.movePrevious}
         >
           <ChevronLeft className="size-4 rtl:rotate-180" />
@@ -115,7 +132,10 @@ function DealCard({ deal, onMove, platform, locale }: DealCardProps) {
           size="sm"
           className="size-7 p-0"
           disabled={!hasNext}
-          onClick={() => onMove(deal.id, CRM_STAGES[stageIndex + 1])}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(deal.id, CRM_STAGES[stageIndex + 1]);
+          }}
           aria-label={t.moveNext}
         >
           <ChevronRight className="size-4 rtl:rotate-180" />
@@ -136,6 +156,7 @@ interface CrmViewProps {
   locale: Locale;
   /** Localized package-of-interest labels from the contact form dict. */
   packageLabels: Record<string, string>;
+  initialTab?: string;
 }
 
 /**
@@ -154,21 +175,63 @@ export function CrmView({
   platform,
   locale,
   packageLabels,
+  initialTab,
 }: CrmViewProps) {
   const t = platform.crm;
   const common = platform.common;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get("tab");
+
+  const resolvedInitialTab =
+    urlTab === "contacts" || initialTab === "contacts"
+      ? "contacts"
+      : (urlTab === "leads" || initialTab === "leads") && canManage
+        ? "leads"
+        : "pipeline";
+
   const [deals, setDeals] = useState<DealRow[]>(initialDeals);
   const [leads, setLeads] = useState<MarketingLeadRow[]>(initialLeads);
-  const [tab, setTab] = useState<"pipeline" | "leads" | "contacts">("pipeline");
+  const [tab, setTab] = useState<string>(resolvedInitialTab);
   const [createOpen, setCreateOpen] = useState(false);
   const [convertingLead, setConvertingLead] =
     useState<MarketingLeadRow | null>(null);
+  const [selectedDeal, setSelectedDeal] = useState<DealRow | null>(null);
+  const [editingDeal, setEditingDeal] = useState<DealRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (urlTab === "contacts") {
+      setTab("contacts");
+    } else if (urlTab === "leads" && canManage) {
+      setTab("leads");
+    } else if (urlTab === "pipeline") {
+      setTab("pipeline");
+    }
+  }, [urlTab, canManage]);
+
+  const handleTabChange = (nextTab: string) => {
+    setTab(nextTab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextTab === "pipeline") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nextTab);
+    }
+    const query = params.toString();
+    router.replace(query ? `/crm?${query}` : "/crm", { scroll: false });
+  };
 
   /** Refetch deals (and leads when permitted). */
   async function refreshAll() {
     const rows = await getDeals();
-    if (rows) setDeals(rows);
+    if (rows) {
+      setDeals(rows);
+      if (selectedDeal) {
+        const refreshed = rows.find((d) => d.id === selectedDeal.id);
+        if (refreshed) setSelectedDeal(refreshed);
+      }
+    }
     if (canManage) {
       const leadRows = await getMarketingLeads();
       if (leadRows) setLeads(leadRows);
@@ -182,12 +245,27 @@ export function CrmView({
       setActionError(result.error ?? t.errors.updateFailed);
       return;
     }
+    setDeals((current) =>
+      current.map((deal) => (deal.id === dealId ? { ...deal, stage } : deal))
+    );
+    setSelectedDeal((prev) =>
+      prev && prev.id === dealId ? { ...prev, stage } : prev
+    );
     await refreshAll();
   }
 
   function handleDealSaved() {
     setCreateOpen(false);
     setConvertingLead(null);
+    setEditingDeal(null);
+    void refreshAll();
+  }
+
+  function handleDealDeleted() {
+    if (selectedDeal) {
+      setDeals((prev) => prev.filter((d) => d.id !== selectedDeal.id));
+    }
+    setSelectedDeal(null);
     void refreshAll();
   }
 
@@ -221,7 +299,7 @@ export function CrmView({
 
       <Tabs
         value={tab}
-        onValueChange={(value) => setTab(value as "pipeline" | "leads" | "contacts")}
+        onValueChange={handleTabChange}
         className="w-full"
       >
         <TabsList>
@@ -270,6 +348,7 @@ export function CrmView({
                           key={deal.id}
                           deal={deal}
                           onMove={handleStageMove}
+                          onSelect={setSelectedDeal}
                           platform={platform}
                           locale={locale}
                         />
@@ -374,16 +453,36 @@ export function CrmView({
         </TabsContent>
       </Tabs>
 
+      {/* Deal Detail Dialog */}
+      <DealDetailDialog
+        deal={selectedDeal}
+        open={selectedDeal !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDeal(null);
+        }}
+        canManage={canManage}
+        members={members}
+        platform={platform}
+        locale={locale}
+        onStageChange={handleStageMove}
+        onEdit={(deal) => {
+          setEditingDeal(deal);
+        }}
+        onDeleted={handleDealDeleted}
+      />
+
       {/* Dialogs */}
       <DealDialog
-        open={createOpen || convertingLead !== null}
+        open={createOpen || convertingLead !== null || editingDeal !== null}
         onOpenChange={(open) => {
           if (!open) {
             setCreateOpen(false);
             setConvertingLead(null);
+            setEditingDeal(null);
           }
         }}
         lead={convertingLead}
+        deal={editingDeal}
         members={members}
         onSaved={handleDealSaved}
         platform={platform}

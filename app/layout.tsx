@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Cairo, Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { TopLoader } from "@/components/top-loader";
 import { getLocale } from "@/lib/i18n/get-dictionary";
 
 const geistSans = Geist({
@@ -61,6 +63,9 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <Suspense fallback={null}>
+            <TopLoader />
+          </Suspense>
           {children}
         </ThemeProvider>
       </body>

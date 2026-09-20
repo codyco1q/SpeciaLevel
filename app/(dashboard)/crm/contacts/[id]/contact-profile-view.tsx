@@ -84,7 +84,7 @@ export function ContactProfileView({
       <div className="p-8">
         <div className="mb-6 flex">
           <Button type="button" asChild variant="ghost" size="sm">
-            <Link href="/crm">
+            <Link href="/crm?tab=contacts">
               <ChevronLeft className="size-4 rtl:rotate-180" />
               {t.profile.back}
             </Link>
@@ -113,7 +113,7 @@ export function ContactProfileView({
         </Link>
         <ChevronRight className="size-3.5 text-muted-foreground/40" />
         <Link
-          href="/crm"
+          href="/crm?tab=contacts"
           className="text-muted-foreground transition-colors hover:text-foreground"
         >
           {t.profile.contactsCrumb}
