@@ -51,9 +51,14 @@ export async function proxy(request: NextRequest) {
   // Public routes that don't require auth.
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
+  const isPublicRoute =
+    isAuthRoute ||
+    pathname === "/" ||
+    pathname.startsWith("/pay/") ||
+    pathname.startsWith("/api/public/");
 
-  // Allow the root page and auth pages to load; redirect all other routes to /login.
-  if (!user && !isAuthRoute && pathname !== "/") {
+  // Allow the root page, auth pages, and public routes to load; redirect all other routes to /login.
+  if (!user && !isPublicRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);

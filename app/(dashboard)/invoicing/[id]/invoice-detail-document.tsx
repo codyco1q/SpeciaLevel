@@ -4,8 +4,10 @@ import { useState, useTransition } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  Edit,
   LoaderCircle,
   Printer,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,11 +33,15 @@ import {
   formatCurrency,
   formatInvoiceDate,
 } from "../invoicing-meta";
+import { EditInvoiceDialog } from "../edit-invoice-dialog";
+import { ShareInvoiceDialog } from "../share-invoice-dialog";
+import type { InvoiceContactOption } from "../create-invoice-dialog";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface InvoiceDetailDocumentProps {
   invoice: InvoiceRow | null;
   canManage: boolean;
+  contacts?: InvoiceContactOption[];
   organizationName: string;
   platform: Dictionary["platform"];
   locale: Locale;
@@ -54,6 +60,7 @@ interface InvoiceDetailDocumentProps {
 export function InvoiceDetailDocument({
   invoice,
   canManage,
+  contacts = [],
   organizationName,
   platform,
   locale,
@@ -62,6 +69,8 @@ export function InvoiceDetailDocument({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   /* ── Not found / no access ────────────────────────────────────── */
   if (!invoice) {
@@ -91,6 +100,7 @@ export function InvoiceDetailDocument({
   const { status } = invoice;
   const canMarkPaid =
     canManage && status !== "paid" && status !== "cancelled";
+  const canEdit = canManage && status !== "paid";
 
   /* ── Mark-paid handler ────────────────────────────────────────── */
   const handleMarkPaid = () => {
@@ -119,7 +129,27 @@ export function InvoiceDetailDocument({
           </Link>
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditOpen(true)}
+            >
+              <Edit className="size-4" />
+              {t.detail.edit ?? "Edit invoice"}
+            </Button>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShareOpen(true)}
+          >
+            <Share2 className="size-4" />
+            {t.share?.shareButton ?? "Share Payment Link"}
+          </Button>
+
           {canMarkPaid && (
             <Button
               type="button"
@@ -327,6 +357,29 @@ export function InvoiceDetailDocument({
           </div>
         )}
       </div>
+
+      {/* Edit Invoice Dialog */}
+      {canEdit && (
+        <EditInvoiceDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          invoice={invoice}
+          contacts={contacts}
+          onSaved={() => router.refresh()}
+          platform={platform}
+          locale={locale}
+        />
+      )}
+
+      {/* Share Payment Link Dialog */}
+      <ShareInvoiceDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        invoice={invoice}
+        platform={platform}
+        locale={locale}
+        onTokenRegenerated={() => router.refresh()}
+      />
     </div>
   );
 }

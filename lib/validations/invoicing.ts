@@ -39,6 +39,7 @@ export interface InvoicingValidationMessages {
   itemDescriptionMax: string;
   itemQuantityInvalid: string;
   itemUnitPriceInvalid: string;
+  cannotEditPaid?: string;
 }
 
 export const DEFAULT_INVOICING_VALIDATION_MESSAGES: InvoicingValidationMessages =
@@ -54,6 +55,7 @@ export const DEFAULT_INVOICING_VALIDATION_MESSAGES: InvoicingValidationMessages 
       "Line item descriptions must be 500 characters or fewer.",
     itemQuantityInvalid: "Enter a valid quantity (0 or more).",
     itemUnitPriceInvalid: "Enter a valid unit price (0 or more).",
+    cannotEditPaid: "Paid invoices cannot be edited.",
   };
 
 export function createInvoiceInputSchema(
