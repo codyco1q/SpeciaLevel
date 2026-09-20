@@ -800,6 +800,7 @@
         "taxAmount": "Tax",
         "total": "Total",
         "notes": "Notes",
+        "edit": "Edit invoice",
         "markPaid": "Mark as paid",
         "print": "Print / Save as PDF",
         "back": "Back to invoices",
@@ -808,6 +809,42 @@
         "confirmDelete": "Confirm delete",
         "notFound": "Invoice not found",
         "notFoundHint": "This invoice doesn't exist, or you don't have access to it."
+      },
+      "editDialog": {
+        "title": "Edit invoice",
+        "description": "Update invoice line items, dates, and details. Totals recalculate automatically.",
+        "save": "Save changes",
+        "cannotEditPaid": "Paid invoices cannot be edited."
+      },
+      "share": {
+        "shareButton": "Share Payment Link",
+        "dialogTitle": "Share Payment Link",
+        "dialogDescription": "Anyone with this link can view the invoice and payment instructions without signing in.",
+        "publicLink": "Public payment link",
+        "linkCopied": "Payment link copied to clipboard.",
+        "copyLink": "Copy Link",
+        "copied": "Copied!",
+        "regenerateToken": "Regenerate Link",
+        "regenerateTokenHint": "Regenerating will invalidate previous links.",
+        "regenerateSuccess": "New payment link generated.",
+        "openPublicView": "Preview Public View"
+      },
+      "publicPayment": {
+        "brandSubtitle": "Official Invoice",
+        "payNow": "Pay Now",
+        "payNowModalTitle": "Payment Instructions",
+        "payNowModalSubtitle": "Direct Bank Transfer details for {invoiceNumber}",
+        "bankName": "Bank Name",
+        "bankValue": "SpeciaLevel Corporate Banking",
+        "iban": "IBAN / Account Number",
+        "ibanValue": "SA0380000000608010167519",
+        "swift": "SWIFT / BIC",
+        "swiftValue": "SPECUS33XXX",
+        "reference": "Payment Reference",
+        "onlinePaymentsComingSoon": "Online credit card and Apple Pay processing is coming soon. Please complete your transfer using the bank details above.",
+        "alreadyPaidNotice": "This invoice has been marked as paid. No further action is required.",
+        "invoiceExpired": "This invoice link is no longer active.",
+        "print": "Print / Save as PDF"
       },
       "errors": {
         "signedIn": "You must be signed in to do this.",

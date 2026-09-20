@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getInvoiceById } from "@/lib/actions/invoicing";
+import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { InvoiceDetailDocument } from "./invoice-detail-document";
+import type { InvoiceContactOption } from "../create-invoice-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +19,8 @@ export const dynamic = "force-dynamic";
  *    org-scoped server-side AND protected by RLS — internal users see
  *    any invoice in their org, while Client-role users only get the
  *    invoice whose contact_id matches their linked CRM contact.
- *  - `invoicing.manage` additionally unlocks the mark-paid action in
- *    the actions bar (internal roles only; Client never holds it).
+ *  - `invoicing.manage` additionally unlocks the mark-paid and edit actions
+ *    in the actions bar (internal roles only; Client never holds it).
  */
 export default async function InvoiceDetailPage({
   params,
@@ -57,10 +59,28 @@ export default async function InvoiceDetailPage({
     userContext.permissions
   );
 
+  let contacts: InvoiceContactOption[] = [];
+  if (canManage && userContext.organization?.id) {
+    const supabase = await createServerClient();
+    const { data: contactsData } = await supabase
+      .from("crm_contacts")
+      .select("id, name, email, company")
+      .eq("organization_id", userContext.organization.id)
+      .order("name", { ascending: true });
+
+    contacts = (contactsData ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      company: c.company,
+    }));
+  }
+
   return (
     <InvoiceDetailDocument
       invoice={invoice}
       canManage={canManage}
+      contacts={contacts}
       organizationName={userContext.organization.name}
       platform={platform}
       locale={locale}

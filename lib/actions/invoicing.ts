@@ -56,6 +56,27 @@ export interface InvoiceRow {
   dueDate: string | null;
   notes: string | null;
   createdAt: string;
+  shareToken: string;
+  isShareable: boolean;
+  contact: InvoiceContact | null;
+  items: InvoiceItemRow[];
+}
+
+export interface PublicInvoiceData {
+  id: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  currency: string;
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+  dueDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  shareToken: string;
+  isShareable: boolean;
+  organizationName: string;
   contact: InvoiceContact | null;
   items: InvoiceItemRow[];
 }
@@ -139,6 +160,8 @@ interface InvoiceJoinRow {
   due_date: string | null;
   notes: string | null;
   created_at: string;
+  share_token?: string | null;
+  is_shareable?: boolean | null;
   contact: InvoiceContact | null;
   items: {
     id: string;
@@ -163,6 +186,8 @@ function toInvoiceRow(row: InvoiceJoinRow): InvoiceRow {
     dueDate: row.due_date,
     notes: row.notes,
     createdAt: row.created_at,
+    shareToken: row.share_token ?? "",
+    isShareable: row.is_shareable ?? true,
     contact: contact
       ? {
           id: contact.id,
@@ -252,6 +277,8 @@ export async function getInvoices(): Promise<InvoicingList | null> {
         due_date,
         notes,
         created_at,
+        share_token,
+        is_shareable,
         contact:crm_contacts(id, name, email, company, phone),
         items:invoice_items(id, description, quantity, unit_price, amount)
       `
@@ -297,6 +324,8 @@ export async function getInvoiceById(id: string): Promise<InvoiceRow | null> {
         due_date,
         notes,
         created_at,
+        share_token,
+        is_shareable,
         contact:crm_contacts(id, name, email, company, phone),
         items:invoice_items(id, description, quantity, unit_price, amount)
       `
@@ -446,4 +475,125 @@ export async function deleteInvoice(id: string): Promise<InvoicingActionState> {
 
   revalidatePath("/invoicing");
   return { status: "success" };
+}
+
+/**
+ * Updates an invoice and replaces its line items atomically. Requires
+ * `invoicing.manage`. Gated from editing paid invoices.
+ */
+export async function updateInvoice(
+  invoiceId: string,
+  data: InvoiceInput
+): Promise<InvoicingActionState> {
+  const auth = await requireInvoicingPermission("invoicing.manage");
+  if (!auth.ok) return auth.error;
+
+  const dict = await getDictionary();
+  const err = dict.platform.invoicing.errors;
+
+  if (!invoiceId) {
+    return { status: "error", error: err.missingId };
+  }
+
+  const parsed = createInvoiceInputSchema(err).safeParse(data);
+  if (!parsed.success) {
+    return {
+      status: "error",
+      error: err.highlightFields,
+      fieldErrors: parseFieldErrors(parsed.error.issues),
+    };
+  }
+
+  const supabase = await createServerClient();
+
+  const rpcItems = parsed.data.items.map((item) => ({
+    description: item.description,
+    quantity: item.quantity,
+    unit_price: item.unitPrice,
+  }));
+
+  const { error } = await supabase.rpc("update_invoice", {
+    p_invoice_id: invoiceId,
+    p_contact_id: parsed.data.contactId || null,
+    p_due_date: parsed.data.dueDate || null,
+    p_tax_rate: parsed.data.taxRate,
+    p_notes: parsed.data.notes || null,
+    p_items: rpcItems,
+  });
+
+  if (error) {
+    console.error("[invoicing] invoice update failed:", error.message);
+    return { status: "error", error: err.updateFailed };
+  }
+
+  revalidatePath("/invoicing");
+  revalidatePath(`/invoicing/${invoiceId}`);
+  return { status: "success" };
+}
+
+/**
+ * Regenerates the share token for an invoice, invalidating previous links.
+ * Requires `invoicing.manage`.
+ */
+export async function regenerateShareToken(
+  invoiceId: string
+): Promise<
+  | { status: "success"; shareToken: string }
+  | { status: "error"; error: string }
+> {
+  const auth = await requireInvoicingPermission("invoicing.manage");
+  if (!auth.ok) {
+    return { status: "error", error: auth.error.error ?? "Unauthorized" };
+  }
+
+  const dict = await getDictionary();
+  const err = dict.platform.invoicing.errors;
+
+  if (!invoiceId) {
+    return { status: "error", error: err.missingId };
+  }
+
+  const supabase = await createServerClient();
+  const newShareToken = crypto.randomUUID();
+
+  const { data, error } = await supabase
+    .from("invoices")
+    .update({ share_token: newShareToken, updated_at: new Date().toISOString() })
+    .eq("id", invoiceId)
+    .eq("organization_id", auth.organizationId)
+    .select("share_token")
+    .single();
+
+  if (error || !data) {
+    console.error("[invoicing] regenerate share token failed:", error?.message);
+    return { status: "error", error: err.updateFailed };
+  }
+
+  revalidatePath(`/invoicing/${invoiceId}`);
+  return { status: "success", shareToken: data.share_token };
+}
+
+/**
+ * Public invoice lookup by share token. Unauthenticated; returns sanitized
+ * invoice payload via SECURITY DEFINER function.
+ */
+export async function getPublicInvoiceByToken(
+  shareToken: string
+): Promise<PublicInvoiceData | null> {
+  if (!shareToken) return null;
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc("get_public_invoice_by_token", {
+    p_share_token: shareToken,
+  });
+
+  if (error || !data) {
+    console.error(
+      "[invoicing] public invoice fetch failed:",
+      error?.message ?? "no data"
+    );
+    return null;
+  }
+
+  return data as unknown as PublicInvoiceData;
 }
