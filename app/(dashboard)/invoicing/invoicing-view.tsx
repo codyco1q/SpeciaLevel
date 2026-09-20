@@ -5,11 +5,22 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock,
+  Eye,
+  MoreHorizontal,
+  Pencil,
   Plus,
+  Share2,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -36,6 +47,8 @@ import {
   CreateInvoiceDialog,
   type InvoiceContactOption,
 } from "./create-invoice-dialog";
+import { EditInvoiceDialog } from "./edit-invoice-dialog";
+import { ShareInvoiceDialog } from "./share-invoice-dialog";
 import { InvoiceDetailDialog } from "./invoice-detail-dialog";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
@@ -100,6 +113,8 @@ export function InvoicingView({
   const [summary, setSummary] = useState<InvoicingSummary>(initialSummary);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailInvoice, setDetailInvoice] = useState<InvoiceRow | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null);
+  const [sharingInvoice, setSharingInvoice] = useState<InvoiceRow | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -290,6 +305,36 @@ export function InvoicingView({
                         >
                           {t.viewDetails}
                         </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => setSharingInvoice(invoice)}
+                          disabled={isPending}
+                          title={t.share?.shareButton ?? "Share Payment Link"}
+                          aria-label={t.share?.shareButton ?? "Share Payment Link"}
+                        >
+                          <Share2 className="size-4" />
+                        </Button>
+                        {canManage && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-foreground"
+                            onClick={() => setEditingInvoice(invoice)}
+                            disabled={isPending || invoice.status === "paid"}
+                            title={
+                              invoice.status === "paid"
+                                ? (t.editDialog?.cannotEditPaid ?? "Paid invoices cannot be edited.")
+                                : (t.detail.edit ?? "Edit invoice")
+                            }
+                            aria-label={t.detail.edit ?? "Edit invoice"}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        )}
                         {canMarkPaidRow(invoice) && (
                           <Button
                             type="button"
@@ -301,31 +346,58 @@ export function InvoicingView({
                             {t.markPaid}
                           </Button>
                         )}
-                        {canManage && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className={
-                              confirmDeleteId === invoice.id
-                                ? "text-destructive"
-                                : "text-muted-foreground hover:text-destructive"
-                            }
-                            onClick={() => handleRowDeleteClick(invoice.id)}
-                            disabled={isPending}
-                            aria-label={
-                              confirmDeleteId === invoice.id
-                                ? t.detail.confirmDelete
-                                : common.delete
-                            }
-                          >
-                            {confirmDeleteId === invoice.id ? (
-                              t.detail.confirmDelete
-                            ) : (
-                              <Trash2 className="size-4" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-muted-foreground hover:text-foreground"
+                              aria-label={common.actions}
+                              disabled={isPending}
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onSelect={() => handleView(invoice.id)}>
+                              <Eye className="size-4" />
+                              {t.viewDetails}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setSharingInvoice(invoice)}>
+                              <Share2 className="size-4" />
+                              {t.share?.shareButton ?? "Share Payment Link"}
+                            </DropdownMenuItem>
+                            {canManage && (
+                              <DropdownMenuItem
+                                onSelect={() => setEditingInvoice(invoice)}
+                                disabled={invoice.status === "paid"}
+                              >
+                                <Pencil className="size-4" />
+                                {t.detail.edit ?? "Edit invoice"}
+                              </DropdownMenuItem>
                             )}
-                          </Button>
-                        )}
+                            {canMarkPaidRow(invoice) && (
+                              <DropdownMenuItem onSelect={() => handleMarkPaid(invoice)}>
+                                <CheckCircle2 className="size-4" />
+                                {t.markPaid}
+                              </DropdownMenuItem>
+                            )}
+                            {canManage && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() => handleRowDeleteClick(invoice.id)}
+                                >
+                                  <Trash2 className="size-4" />
+                                  {confirmDeleteId === invoice.id
+                                    ? t.detail.confirmDelete
+                                    : common.delete}
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -357,10 +429,65 @@ export function InvoicingView({
         onDelete={() => {
           if (detailInvoice) handleDelete(detailInvoice.id);
         }}
+        onEdit={(invoice) => {
+          setDetailInvoice(null);
+          setEditingInvoice(invoice);
+        }}
+        onShare={(invoice) => {
+          setDetailInvoice(null);
+          setSharingInvoice(invoice);
+        }}
         busy={isPending}
         platform={platform}
         locale={locale}
       />
+      {editingInvoice && (
+        <EditInvoiceDialog
+          open={editingInvoice !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditingInvoice(null);
+          }}
+          invoice={editingInvoice}
+          contacts={contacts}
+          onSaved={async () => {
+            setEditingInvoice(null);
+            setActionError(null);
+            startTransition(async () => {
+              await refreshAll();
+            });
+          }}
+          platform={platform}
+          locale={locale}
+        />
+      )}
+      {sharingInvoice && (
+        <ShareInvoiceDialog
+          open={sharingInvoice !== null}
+          onOpenChange={(open) => {
+            if (!open) setSharingInvoice(null);
+          }}
+          invoice={sharingInvoice}
+          platform={platform}
+          locale={locale}
+          onTokenRegenerated={(newToken) => {
+            setInvoices((prev) =>
+              prev.map((inv) =>
+                inv.id === sharingInvoice.id
+                  ? { ...inv, shareToken: newToken }
+                  : inv
+              )
+            );
+            setSharingInvoice((prev) =>
+              prev ? { ...prev, shareToken: newToken } : null
+            );
+            if (detailInvoice?.id === sharingInvoice.id) {
+              setDetailInvoice((prev) =>
+                prev ? { ...prev, shareToken: newToken } : null
+              );
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

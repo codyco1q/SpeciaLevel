@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { ExternalLink, LoaderCircle, Pencil, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Monogram } from "@/components/brand";
 import type { InvoiceRow } from "@/lib/actions/invoicing";
@@ -38,6 +37,8 @@ interface InvoiceDetailDialogProps {
   canManage: boolean;
   onMarkPaid: () => void;
   onDelete: () => void;
+  onEdit?: (invoice: InvoiceRow) => void;
+  onShare?: (invoice: InvoiceRow) => void;
   /** True while a mark-paid / delete server call is in flight. */
   busy: boolean;
   platform: Dictionary["platform"];
@@ -47,7 +48,7 @@ interface InvoiceDetailDialogProps {
 /**
  * Branded invoice preview: SpeciaLevel header, client block, line items,
  * and totals — rendered as a clean document inside the dialog for
- * printing/sharing. Mark-paid and delete live here and in the table.
+ * printing/sharing. Mark-paid, edit, share, and delete live here and in the table.
  */
 export function InvoiceDetailDialog({
   invoice,
@@ -55,6 +56,8 @@ export function InvoiceDetailDialog({
   canManage,
   onMarkPaid,
   onDelete,
+  onEdit,
+  onShare,
   busy,
   platform,
   locale,
@@ -218,54 +221,89 @@ export function InvoiceDetailDialog({
           )}
         </div>
 
-        <DialogFooter className="px-6 pb-6 pt-2">
-          <Button
-            type="button"
-            asChild
-            variant="ghost"
-            size="sm"
-            className="me-auto"
-            disabled={busy}
-          >
-            <Link href={`/invoicing/${invoice.id}`}>
-              <ExternalLink className="size-4" />
-              {t.detail.openPage}
-            </Link>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setConfirmDelete(false);
-              onOpenChange(false);
-            }}
-            disabled={busy}
-          >
-            {t.detail.close}
-          </Button>
-          {canManage && canMarkPaid && (
-            <Button type="button" onClick={onMarkPaid} disabled={busy}>
-              {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              {t.detail.markPaid}
-            </Button>
-          )}
-          {canManage && (
+        <DialogFooter className="flex flex-wrap items-center justify-between gap-2 px-6 pb-6 pt-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant="destructive"
-              onClick={() => {
-                if (confirmDelete) {
-                  setConfirmDelete(false);
-                  onDelete();
-                } else {
-                  setConfirmDelete(true);
+              asChild
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+            >
+              <Link href={`/invoicing/${invoice.id}`}>
+                <ExternalLink className="size-4" />
+                {t.detail.openPage}
+              </Link>
+            </Button>
+            {onShare && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onShare(invoice)}
+                disabled={busy}
+              >
+                <Share2 className="size-4" />
+                {t.share?.shareButton ?? "Share link"}
+              </Button>
+            )}
+            {canManage && onEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(invoice)}
+                disabled={busy || status === "paid"}
+                title={
+                  status === "paid"
+                    ? (t.editDialog?.cannotEditPaid ?? "Paid invoices cannot be edited.")
+                    : undefined
                 }
+              >
+                <Pencil className="size-4" />
+                {t.detail.edit ?? "Edit invoice"}
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 ms-auto">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setConfirmDelete(false);
+                onOpenChange(false);
               }}
               disabled={busy}
             >
-              {confirmDelete ? t.detail.confirmDelete : common.delete}
+              {t.detail.close}
             </Button>
-          )}
+            {canManage && canMarkPaid && (
+              <Button type="button" size="sm" onClick={onMarkPaid} disabled={busy}>
+                {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                {t.detail.markPaid}
+              </Button>
+            )}
+            {canManage && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  if (confirmDelete) {
+                    setConfirmDelete(false);
+                    onDelete();
+                  } else {
+                    setConfirmDelete(true);
+                  }
+                }}
+                disabled={busy}
+              >
+                {confirmDelete ? t.detail.confirmDelete : common.delete}
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
