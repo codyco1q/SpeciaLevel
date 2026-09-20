@@ -527,6 +527,8 @@
       "dealDialog": {
         "createTitle": "صفقة جديدة",
         "createDescription": "أضف صفقة إلى قنوات البيع. بيانات جهة الاتصال اختيارية.",
+        "editTitle": "تعديل الصفقة",
+        "editDescription": "تحديث معلومات الصفقة أو المرحلة أو التعيين.",
         "convertTitle": "تحويل العميل المحتمل إلى صفقة",
         "convertDescription": "حوّل هذا الاستفسار من الموقع إلى صفقة في قنوات البيع.",
         "titleLabel": "العنوان",
@@ -549,7 +551,27 @@
         "contactPhoneLabel": "الهاتف",
         "contactPhonePlaceholder": "+1 555 000 1234",
         "create": "إنشاء صفقة",
+        "edit": "حفظ التغييرات",
         "convert": "تحويل إلى صفقة"
+      },
+      "dealDetail": {
+        "title": "تفاصيل الصفقة",
+        "stage": "المرحلة",
+        "value": "القيمة",
+        "assignee": "المسؤول",
+        "unassigned": "غير معيّن",
+        "contact": "جهة الاتصال المرتبطة",
+        "noContact": "لا توجد جهة اتصال مرتبطة",
+        "viewContact": "عرض ملف جهة الاتصال",
+        "created": "تاريخ الإنشاء",
+        "updated": "آخر تحديث",
+        "notes": "الملاحظات والتفاصيل",
+        "noNotes": "لا توجد ملاحظات.",
+        "editDeal": "تعديل الصفقة",
+        "deleteDeal": "حذف الصفقة",
+        "deleteConfirmTitle": "حذف الصفقة؟",
+        "deleteConfirmDescription": "سيؤدي هذا إلى حذف هذه الصفقة نهائيًا من قنوات البيع.",
+        "deleteConfirm": "حذف الصفقة"
       },
       "errors": {
         "signedIn": "يجب تسجيل الدخول للقيام بهذا الإجراء.",

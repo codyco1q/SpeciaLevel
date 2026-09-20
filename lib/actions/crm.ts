@@ -505,3 +505,110 @@ export async function convertLeadToDeal(
   revalidatePath("/crm");
   return { status: "success" };
 }
+
+/**
+ * Updates an existing deal's fields (title, value, currency, stage, notes,
+ * assignedTo, and optional contact link). Requires `crm.manage`.
+ */
+export async function updateDeal(
+  dealId: string,
+  data: CrmDealInput
+): Promise<CrmActionState> {
+  const auth = await requireCrmPermission("crm.manage");
+  if (!auth.ok) return auth.error;
+
+  const dict = await getDictionary();
+  const err = dict.platform.crm.errors;
+
+  if (!dealId) {
+    return { status: "error", error: err.missingId };
+  }
+
+  const parsed = createCrmDealInputSchema(err).safeParse(data);
+  if (!parsed.success) {
+    return {
+      status: "error",
+      error: err.highlightFields,
+      fieldErrors: parseFieldErrors(parsed.error.issues),
+    };
+  }
+
+  let contactId: string | null = null;
+  if (
+    parsed.data.contact &&
+    (Boolean(parsed.data.contact.name) || Boolean(parsed.data.contact.email))
+  ) {
+    const contact = await resolveContactId(
+      auth.organizationId,
+      auth.userId,
+      parsed.data.contact
+    );
+    if (contact.error) {
+      return { status: "error", error: err.updateFailed };
+    }
+    contactId = contact.id;
+  }
+
+  const supabase = await createServerClient();
+  const updatePayload: Record<string, unknown> = {
+    title: parsed.data.title,
+    value: parsed.data.value,
+    currency: parsed.data.currency,
+    stage: parsed.data.stage,
+    notes: parsed.data.notes || null,
+    assigned_to: parsed.data.assignedTo || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (contactId !== null) {
+    updatePayload.contact_id = contactId;
+  }
+
+  const { data: updated, error } = await supabase
+    .from("crm_deals")
+    .update(updatePayload)
+    .eq("id", dealId)
+    .eq("organization_id", auth.organizationId)
+    .select("id");
+
+  if (error) {
+    console.error("[crm] deal update failed:", error.message);
+    return { status: "error", error: err.updateFailed };
+  }
+  if (!updated || updated.length === 0) {
+    return { status: "error", error: err.notFound };
+  }
+
+  revalidatePath("/crm");
+  return { status: "success" };
+}
+
+/**
+ * Deletes a pipeline deal. Requires `crm.manage`.
+ */
+export async function deleteDeal(dealId: string): Promise<CrmActionState> {
+  const auth = await requireCrmPermission("crm.manage");
+  if (!auth.ok) return auth.error;
+
+  const dict = await getDictionary();
+  const err = dict.platform.crm.errors;
+
+  if (!dealId) {
+    return { status: "error", error: err.missingId };
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("crm_deals")
+    .delete()
+    .eq("id", dealId)
+    .eq("organization_id", auth.organizationId);
+
+  if (error) {
+    console.error("[crm] deal delete failed:", error.message);
+    return { status: "error", error: err.updateFailed };
+  }
+
+  revalidatePath("/crm");
+  return { status: "success" };
+}

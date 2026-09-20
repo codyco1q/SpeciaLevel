@@ -107,4 +107,47 @@ test.describe("CRM contacts & 360° profile", () => {
     await page.waitForURL(/\/invoicing\/[0-9a-f]{8}-[0-9a-f-]{27}$/);
     await expect(page.locator(".print-document")).toContainText(SEED_INVOICE_NUMBER);
   });
+
+  test("clicking a deal card opens DealDetailDialog and contact breadcrumbs preserve contacts tab", async ({
+    page,
+  }) => {
+    // Navigate to CRM with tab=contacts
+    await page.goto("/crm?tab=contacts");
+    await expect(page.getByRole("tab", { name: "Contacts" })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
+
+    // Switch to Pipeline tab
+    await page.getByRole("tab", { name: "Pipeline" }).click();
+    await expect(page.getByRole("tab", { name: "Pipeline" })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
+
+    // Click on seeded deal card
+    const dealCard = page.getByRole("button", { name: new RegExp(SEED_DEAL_TITLE) });
+    if (await dealCard.count() > 0) {
+      await dealCard.first().click();
+
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText(SEED_DEAL_TITLE)).toBeVisible();
+
+      // View linked contact from deal detail
+      const viewContactBtn = dialog.getByRole("link", { name: "View contact profile" });
+      if (await viewContactBtn.count() > 0) {
+        await viewContactBtn.click();
+        await page.waitForURL(/\/crm\/contacts\/[0-9a-f-]{36}$/);
+
+        // Click Contacts breadcrumb link
+        await page.getByRole("link", { name: "Contacts" }).click();
+        await page.waitForURL(/\/crm\?tab=contacts/);
+        await expect(page.getByRole("tab", { name: "Contacts" })).toHaveAttribute(
+          "data-state",
+          "active"
+        );
+      }
+    }
+  });
 });

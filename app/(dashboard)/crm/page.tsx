@@ -11,7 +11,13 @@ import type { CrmMemberOption } from "./deal-dialog";
 
 export const dynamic = "force-dynamic";
 
-export default async function CrmPage() {
+export default async function CrmPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const resolvedParams = searchParams ? await searchParams : undefined;
+  const initialTab = resolvedParams?.tab;
   const userContext = await getCurrentUserContext();
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
@@ -70,6 +76,7 @@ export default async function CrmPage() {
         locale={locale}
         packageLabels={dict.contact.form.packageOptions}
         initialContacts={initialContacts ?? []}
+        initialTab={initialTab}
       />
     </div>
   );
