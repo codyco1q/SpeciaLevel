@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Megaphone,
   PhoneCall,
+  FormInput,
   TrendingUp,
   Receipt,
   Zap,
@@ -140,6 +141,12 @@ export default function Sidebar({
       href: "/telecom",
       icon: PhoneCall,
       permission: "telecom.view",
+    },
+    {
+      label: t.forms,
+      href: "/forms",
+      icon: FormInput,
+      permission: "forms.view",
     },
     {
       label: t.automations,

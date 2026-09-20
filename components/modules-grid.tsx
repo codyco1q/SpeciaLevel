@@ -9,6 +9,7 @@ import {
   Contact,
   Megaphone,
   Phone,
+  FormInput,
   Zap,
   Brain,
   Receipt,
@@ -40,6 +41,7 @@ type ModulesKey =
   | "invoicing"
   | "marketing"
   | "telecommunications"
+  | "forms"
   | "automations"
   | "ai"
   | "analytics";
@@ -152,6 +154,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Phone systems and calling features.",
     icon: Phone,
     link: "/telecom",
+  },
+  {
+    key: "forms",
+    name: "Lead Forms",
+    description: "Build custom lead capture forms and embed them anywhere.",
+    icon: FormInput,
+    link: "/forms",
   },
   {
     key: "automations",
