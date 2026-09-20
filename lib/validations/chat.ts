@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Shared Zod schemas for the chat module (create channel + message content).
+ * Shared Zod schemas for the chat module (create channel + message content + channel management).
  * Used client-side (react-hook-form resolver) and re-validated
  * server-side in lib/actions/chat.ts.
  *
@@ -68,6 +68,22 @@ export function createChannelInputSchema(
   });
 }
 
+export function createUpdateChannelInputSchema(
+  messages: ChatValidationMessages = DEFAULT_CHAT_VALIDATION_MESSAGES
+) {
+  return z.object({
+    name: createChannelNameSchema(messages).optional(),
+    description: z
+      .string()
+      .trim()
+      .max(200, messages.descriptionMax)
+      .optional()
+      .or(z.literal("")),
+    isPrivate: z.boolean().optional(),
+    isArchived: z.boolean().optional(),
+  });
+}
+
 export function createMessageContentSchema(
   messages: ChatValidationMessages = DEFAULT_CHAT_VALIDATION_MESSAGES
 ) {
@@ -80,9 +96,17 @@ export function createMessageContentSchema(
 
 export const channelNameSchema = createChannelNameSchema();
 export const channelInputSchema = createChannelInputSchema();
+export const updateChannelInputSchema = createUpdateChannelInputSchema();
 export const messageContentSchema = createMessageContentSchema();
 
+export const updateChannelMembersSchema = z.object({
+  channelId: z.string().uuid(),
+  memberUserIds: z.array(z.string().uuid()),
+});
+
 export type ChannelFormValues = z.infer<typeof channelInputSchema>;
+export type UpdateChannelFormValues = z.infer<typeof updateChannelInputSchema>;
+export type UpdateChannelMembersInput = z.infer<typeof updateChannelMembersSchema>;
 
 /** State returned by the createChannel server action. */
 export interface CreateChannelState {
@@ -94,3 +118,10 @@ export interface CreateChannelState {
 export const initialCreateChannelState: CreateChannelState = {
   status: "idle",
 };
+
+/** State returned by the updateChannel server action. */
+export interface UpdateChannelState {
+  status: "idle" | "success" | "error";
+  error?: string | null;
+  fieldErrors?: Partial<Record<keyof UpdateChannelFormValues, string[] | undefined>>;
+}
