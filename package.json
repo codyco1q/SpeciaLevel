@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test",
+    "test:e2e": "LD_LIBRARY_PATH=${HOME}/.local/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH} playwright test",
     "test:e2e:ui": "playwright test --ui",
     "supabase:migrate": "supabase db push"
   },

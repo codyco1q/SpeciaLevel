@@ -4,7 +4,7 @@ import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { PublicInvoiceView } from "./public-invoice-view";
 import { Monogram } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LocaleSwitcher } from "@/components/marketing/locale-switcher";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -7,6 +7,7 @@ import {
   SEED_CONTACT_EMAIL,
   SEED_CONTACT_NAME,
   SEED_DEAL_TITLE,
+  SEED_FORM_SLUG,
   SEED_INVOICE_NUMBER,
   SEED_NOTE_CONTENT,
   SEED_SECOND_CONTACT_NAME,
@@ -16,7 +17,7 @@ import {
  * SpeciaLevel Core Platform E2E Loop
  *
  * Covers the 4 critical platform user paths:
- *   1. Public Marketing & Lead Capture (Form submission + EN/AR RTL toggle)
+ *   1. Inbound Lead Capture & Arabic RTL switch (Public form submission + EN/AR RTL toggle + gateway redirect)
  *   2. Invoicing & Printable View (Creation + live math + /invoicing/[id] print doc)
  *   3. Contacts 360° Profile (Directory + search + 360° tabs: Notes, Deals, Invoices)
  *   4. AI Agent Playground (Execution roundtrip + error resilience)
@@ -29,53 +30,52 @@ test.describe("Core Platform Loop", () => {
     ]);
   });
 
-  // 1. Public Marketing & Lead Capture
-  test("1. Public marketing consultation form & Arabic RTL switch", async ({
+  // 1. Inbound Lead Capture & RTL switch
+  test("1. Public inbound consultation form & Arabic RTL switch", async ({
     page,
   }) => {
+    // Verify root gateway redirects authenticated users to dashboard
     await page.goto("/");
+    await page.waitForURL("**/dashboard", { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/dashboard/);
+
+    // Navigate to the public inbound form
+    await page.goto(`/f/${SEED_FORM_SLUG}`);
 
     await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
     await expect(
       page.getByRole("button", { name: "Book my consultation" })
     ).toBeVisible();
 
-    const contact = page.locator("#contact");
-    await contact.scrollIntoViewIfNeeded();
-
     const uniqueEmail = `e2e.consultation.${Date.now().toString(36)}@example.com`;
 
-    await contact.locator("#name").fill("Sarah Jenkins");
-    await contact.locator("#email").fill(uniqueEmail);
-    await contact.locator("#company").fill("Apex Global Logistics");
-    await contact
+    await page.locator("#name").fill("Sarah Jenkins");
+    await page.locator("#email").fill(uniqueEmail);
+    await page.locator("#company").fill("Apex Global Logistics");
+    await page
       .locator("#bottleneck")
       .fill("Cross-departmental data sync is manual and takes 15 hours weekly.");
 
-    await contact.locator("#package-label").locator("..").locator("button").click();
-    await page.getByRole("option", { name: /Custom Systems Implementation/i }).click();
+    await page.getByRole("button", { name: "Book my consultation" }).click();
 
-    await contact.getByRole("button", { name: "Book my consultation" }).click();
-
-    await expect(
-      page.getByRole("heading", { name: "Request received" })
-    ).toBeVisible({ timeout: 20_000 });
     await expect(
       page.getByText(
         "Thanks — we'll review your project and get back to you within one business day with next steps."
       )
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
 
     const supabase = serviceRoleClient();
-    const { data: lead } = await supabase
-      .from("marketing_leads")
-      .select("name, email, company, bottleneck, package_of_interest")
-      .eq("email", uniqueEmail)
+    const { data: submission } = await supabase
+      .from("inbound_form_submissions")
+      .select("data")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    expect(lead).not.toBeNull();
-    expect(lead?.name).toBe("Sarah Jenkins");
-    expect(lead?.company).toBe("Apex Global Logistics");
+    expect(submission).not.toBeNull();
+    const subData = submission?.data as Record<string, unknown>;
+    expect(subData?.name).toBe("Sarah Jenkins");
+    expect(subData?.company).toBe("Apex Global Logistics");
 
     const toArabic = page.locator('button[aria-label="العربية"]:visible');
     await toArabic.click();
@@ -84,7 +84,6 @@ test.describe("Core Platform Loop", () => {
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl", {
       timeout: 20_000,
     });
-    await expect(page.locator("h1")).toContainText("حان وقت التغيير");
 
     const toEnglish = page.locator('button[aria-label="English"]:visible');
     await toEnglish.click();

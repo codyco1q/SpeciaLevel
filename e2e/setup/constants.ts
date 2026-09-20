@@ -71,3 +71,8 @@ export const NEW_INVOICE = {
   expectedTax: "$330",
   expectedTotal: "$3,630",
 } as const;
+
+/** Seeded inbound public lead form fixture. */
+export const SEED_FORM_SLUG = "e2e-lead-capture";
+export const SEED_FORM_TITLE = "Consultation Request";
+

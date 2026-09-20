@@ -419,11 +419,15 @@ export async function getPublicFormBySlug(
     isPublished: raw.is_published,
     fields: raw.fields ?? [],
     settings: {
-      submitButtonText: raw.settings?.submit_button_text ?? "Submit",
+      submitButtonText:
+        raw.settings?.submit_button_text ??
+        raw.settings?.submitButtonText ??
+        "Submit",
       successMessage:
         raw.settings?.success_message ??
+        raw.settings?.successMessage ??
         "Thank you! Your submission has been received.",
-      redirectUrl: raw.settings?.redirect_url,
+      redirectUrl: raw.settings?.redirect_url ?? raw.settings?.redirectUrl,
     },
     organizationName: raw.organization_name,
   };

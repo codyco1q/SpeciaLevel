@@ -10,8 +10,6 @@ import nextTypescript from "eslint-config-next/typescript";
  * lints source code (and finishes fast instead of scanning `.next`).
  */
 const eslintConfig = [
-  ...nextVitals,
-  ...nextTypescript,
   {
     ignores: [
       ".next/**",
@@ -23,6 +21,8 @@ const eslintConfig = [
       "test-results/**",
     ],
   },
+  ...nextVitals,
+  ...nextTypescript,
 ];
 
 export default eslintConfig;
