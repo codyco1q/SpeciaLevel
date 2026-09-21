@@ -16,6 +16,7 @@ import {
   PhoneCall,
   FormInput,
   TrendingUp,
+  Contact,
   Receipt,
   Zap,
   Puzzle,
@@ -122,6 +123,12 @@ export default function Sidebar({
       label: t.crm,
       href: "/crm",
       icon: TrendingUp,
+      permission: "crm.view",
+    },
+    {
+      label: t.contacts,
+      href: "/contacts",
+      icon: Contact,
       permission: "crm.view",
     },
     {

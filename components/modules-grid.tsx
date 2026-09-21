@@ -12,6 +12,7 @@ import {
   FormInput,
   Zap,
   Brain,
+  TrendingUp,
   Receipt,
   MessageSquare,
   CheckSquare,
@@ -38,6 +39,7 @@ type ModulesKey =
   | "tasks"
   | "chat"
   | "crm"
+  | "contacts"
   | "invoicing"
   | "marketing"
   | "telecommunications"
@@ -131,8 +133,15 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     key: "crm",
     name: "CRM",
     description: "Manage customer relationships and pipelines.",
-    icon: Contact,
+    icon: TrendingUp,
     link: "/crm",
+  },
+  {
+    key: "contacts",
+    name: "Contacts",
+    description: "Directory for customer, partner, and lead records.",
+    icon: Contact,
+    link: "/contacts",
   },
   {
     key: "invoicing",
