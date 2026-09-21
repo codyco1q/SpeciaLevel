@@ -200,6 +200,9 @@ export function CrmView({
   const [editingDeal, setEditingDeal] = useState<DealRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const urlDealId = searchParams.get("dealId");
+  const urlNew = searchParams.get("new");
+
   useEffect(() => {
     if (urlTab === "contacts") {
       setTab("contacts");
@@ -209,6 +212,21 @@ export function CrmView({
       setTab("pipeline");
     }
   }, [urlTab, canManage]);
+
+  useEffect(() => {
+    if (urlDealId && deals.length > 0) {
+      const match = deals.find((d) => d.id === urlDealId);
+      if (match) {
+        setSelectedDeal(match);
+      }
+    }
+  }, [urlDealId, deals]);
+
+  useEffect(() => {
+    if (urlNew === "true" || urlNew === "1") {
+      setCreateOpen(true);
+    }
+  }, [urlNew]);
 
   const handleTabChange = (nextTab: string) => {
     setTab(nextTab);

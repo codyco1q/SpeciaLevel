@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/sidebar";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { CommandPalette } from "@/components/command-palette";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 
@@ -48,7 +50,24 @@ export default async function DashboardLayout({
       {/* Logical main container: the flex row flips automatically under
           dir="rtl", so the sidebar lands on the right and the content on
           the left without any layout-specific overrides. */}
-      <main className="flex-1 overflow-y-auto bg-background print:h-auto print:overflow-visible print:bg-white">{children}</main>
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+        <DashboardHeader
+          platform={dict.platform}
+          locale={locale}
+          permissions={userContext.permissions}
+          userFullName={userContext.profile.full_name ?? undefined}
+          userEmail={userContext.user.email}
+          organizationName={userContext.organization?.name}
+        />
+        <main className="flex-1 overflow-y-auto bg-background print:h-auto print:overflow-visible print:bg-white">
+          {children}
+        </main>
+      </div>
+      <CommandPalette
+        platform={dict.platform}
+        locale={locale}
+        permissions={userContext.permissions}
+      />
     </div>
   );
 }
