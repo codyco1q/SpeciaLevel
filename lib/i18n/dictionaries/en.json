@@ -1958,6 +1958,25 @@
         "dealInStage": "in {stage} • {value}",
         "contactCompany": "{company}"
       }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllAsRead": "Mark all as read",
+      "unreadCount": "{count} unread",
+      "emptyState": "No notifications yet",
+      "emptyStateHint": "You're all caught up! New alerts will appear here.",
+      "types": {
+        "booking": "Booking",
+        "lead": "Inbound Lead",
+        "invoice": "Invoice",
+        "info": "Notice",
+        "success": "Success",
+        "warning": "Alert"
+      },
+      "justNow": "Just now",
+      "minutesAgo": "{minutes}m ago",
+      "hoursAgo": "{hours}h ago",
+      "daysAgo": "{days}d ago"
     }
   }
 }

@@ -1958,6 +1958,25 @@
         "dealInStage": "في {stage} • {value}",
         "contactCompany": "{company}"
       }
+    },
+    "notifications": {
+      "title": "الإشعارات",
+      "markAllAsRead": "تعيين الكل كمقروء",
+      "unreadCount": "{count} غير مقروء",
+      "emptyState": "لا توجد إشعارات جديدة",
+      "emptyStateHint": "أنت على اطلاع دائم! ستظهر التنبيهات الجديدة هنا فور ورودها.",
+      "types": {
+        "booking": "حجز موعد",
+        "lead": "عميل محتمل جديد",
+        "invoice": "فاتورة",
+        "info": "إشعار",
+        "success": "نجاح",
+        "warning": "تنبيه"
+      },
+      "justNow": "الآن",
+      "minutesAgo": "منذ {minutes} د",
+      "hoursAgo": "منذ {hours} س",
+      "daysAgo": "منذ {days} يوم"
     }
   }
 }

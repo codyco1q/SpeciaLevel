@@ -18,6 +18,7 @@ import {
   type DayOfWeek,
 } from "@/lib/validations/calendar";
 import { z } from "zod";
+import { dispatchNotification } from "@/lib/services/notifications";
 
 /**
  * Calendar server actions.
@@ -819,6 +820,24 @@ export async function bookPublicAppointment(
         data?.error ||
         "Could not book appointment. Slot might no longer be available.",
     };
+  }
+
+  // Dispatch automated notification to the host team member
+  try {
+    const orgId = data.organization_id;
+    const hostUserId = data.host_user_id;
+    if (orgId && hostUserId) {
+      await dispatchNotification({
+        orgId,
+        userId: hostUserId,
+        title: "New Appointment Booked",
+        message: `${data.client_name} booked ${data.title}`,
+        type: "booking",
+        link: `/calendar?appointmentId=${data.appointment_id}`,
+      });
+    }
+  } catch (err) {
+    console.error("[calendar] Failed to dispatch appointment notification:", err);
   }
 
   revalidatePath("/calendar");
