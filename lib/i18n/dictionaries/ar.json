@@ -1907,6 +1907,57 @@
         "startImport": "بدء الاستيراد المجمع",
         "finish": "تم"
       }
+    },
+    "commandPalette": {
+      "triggerPlaceholder": "ابحث أو انتقل إلى...",
+      "shortcutMac": "⌘K",
+      "shortcutWin": "Ctrl K",
+      "searchPlaceholder": "ابحث أو انتقل إلى...",
+      "emptyState": "لم يتم العثور على نتائج.",
+      "searching": "جارٍ البحث...",
+      "groups": {
+        "navigation": "الانتقال السريع",
+        "actions": "إجراءات سريعة",
+        "contacts": "جهات الاتصال",
+        "deals": "الصفقات"
+      },
+      "actions": {
+        "createContact": "إنشاء جهة اتصال جديدة",
+        "createContactHint": "إضافة سجل جهة اتصال جديد",
+        "createDeal": "إنشاء صفقة جديدة",
+        "createDealHint": "إضافة صفقة للأنبوب",
+        "createInvoice": "إنشاء فاتورة جديدة",
+        "createInvoiceHint": "تحرير فاتورة عميل",
+        "bookAppointment": "حجز موعد",
+        "bookAppointmentHint": "فتح التقويم والمواعيد",
+        "copyBookingLink": "نسخ رابط الحجز الشخصي",
+        "copyBookingLinkHint": "نسخ رابط /book/ العام",
+        "bookingLinkCopied": "تم نسخ رابط الحجز إلى الحافظة!"
+      },
+      "items": {
+        "dashboard": "لوحة التحكم",
+        "contacts": "جهات الاتصال",
+        "crm": "إدارة علاقات العملاء (CRM)",
+        "calendar": "التقويم والمواعيد",
+        "forms": "نماذج الاستقطاب",
+        "invoicing": "الفواتير",
+        "chat": "محادثات الفريق",
+        "tasks": "مركز المهام",
+        "automations": "الأتمتة",
+        "telecom": "الاتصالات",
+        "analytics": "التحليلات ومؤشرات الأداء",
+        "ai": "استوديو الذكاء الاصطناعي",
+        "settings": "الإعدادات",
+        "time": "تتبع الوقت",
+        "employees": "الموظفون",
+        "departments": "الأقسام",
+        "roles": "الأدوار والصلاحيات",
+        "modules": "الوحدات والتطبيقات"
+      },
+      "hints": {
+        "dealInStage": "في {stage} • {value}",
+        "contactCompany": "{company}"
+      }
     }
   }
 }

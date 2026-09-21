@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   CircleDollarSign,
@@ -118,6 +119,15 @@ export function InvoicingView({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const searchParams = useSearchParams();
+  const urlNew = searchParams.get("new");
+
+  useEffect(() => {
+    if (urlNew === "true" || urlNew === "1") {
+      setCreateOpen(true);
+    }
+  }, [urlNew]);
 
   /** Refetch invoices + summary aggregates. */
   async function refreshAll() {

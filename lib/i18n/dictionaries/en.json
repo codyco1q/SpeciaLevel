@@ -1907,6 +1907,57 @@
         "startImport": "Start Bulk Import",
         "finish": "Done"
       }
+    },
+    "commandPalette": {
+      "triggerPlaceholder": "Search or jump to...",
+      "shortcutMac": "⌘K",
+      "shortcutWin": "Ctrl K",
+      "searchPlaceholder": "Search or jump to...",
+      "emptyState": "No results found.",
+      "searching": "Searching...",
+      "groups": {
+        "navigation": "Quick Navigation",
+        "actions": "Quick Actions",
+        "contacts": "Contacts",
+        "deals": "Deals"
+      },
+      "actions": {
+        "createContact": "Create New Contact",
+        "createContactHint": "Add a contact record",
+        "createDeal": "Create New Deal",
+        "createDealHint": "Create a CRM deal",
+        "createInvoice": "Create New Invoice",
+        "createInvoiceHint": "Draft a client invoice",
+        "bookAppointment": "Book Appointment",
+        "bookAppointmentHint": "Open calendar & scheduling",
+        "copyBookingLink": "Copy Personal Booking Link",
+        "copyBookingLinkHint": "Copy your public /book/ link",
+        "bookingLinkCopied": "Booking link copied to clipboard!"
+      },
+      "items": {
+        "dashboard": "Dashboard",
+        "contacts": "Contacts",
+        "crm": "CRM Pipelines",
+        "calendar": "Calendar",
+        "forms": "Inbound Forms",
+        "invoicing": "Invoicing",
+        "chat": "Team Chat",
+        "tasks": "Tasks Hub",
+        "automations": "Automations",
+        "telecom": "Telecommunications",
+        "analytics": "Analytics & BI",
+        "ai": "AI Studio",
+        "settings": "Settings",
+        "time": "Time Tracking",
+        "employees": "Employees",
+        "departments": "Departments",
+        "roles": "Roles & Permissions",
+        "modules": "Modules & Apps"
+      },
+      "hints": {
+        "dealInStage": "in {stage} • {value}",
+        "contactCompany": "{company}"
+      }
     }
   }
 }

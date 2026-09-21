@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Contact,
   Eye,
@@ -64,6 +64,16 @@ export function ContactsView({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<ContactSummaryRow | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const searchParams = useSearchParams();
+  const urlNew = searchParams.get("new");
+
+  useEffect(() => {
+    if (urlNew === "true" || urlNew === "1") {
+      setSelectedContact(null);
+      setContactDialogOpen(true);
+    }
+  }, [urlNew]);
 
   const refreshContacts = () => {
     startTransition(async () => {
