@@ -237,7 +237,7 @@ export function DealDetailDialog({
                   size="sm"
                   className="h-7 text-xs gap-1 px-2 text-primary"
                 >
-                  <Link href={`/crm/contacts/${deal.contact.id}`}>
+                  <Link href={`/contacts/${deal.contact.id}`}>
                     <span>{t.dealDetail.viewContact}</span>
                     <ExternalLink className="size-3 rtl:rotate-180" />
                   </Link>

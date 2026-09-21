@@ -234,7 +234,7 @@ export function AppointmentDetailDialog({
                     {appointment.contact.name}
                   </div>
                   <Link
-                    href={`/crm/contacts/${appointment.contact.id}`}
+                    href={`/contacts/${appointment.contact.id}`}
                     className="text-xs text-primary hover:underline inline-block mt-1"
                   >
                     {t.viewContact} →

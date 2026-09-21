@@ -186,7 +186,7 @@ export function ContactsTab({
                   <TableCell className="text-end">
                     <div className="flex items-center justify-end gap-1">
                       <Button type="button" size="sm" variant="outline" asChild>
-                        <Link href={`/crm/contacts/${contact.id}`}>
+                        <Link href={`/contacts/${contact.id}`}>
                           <Eye className="size-3.5" />
                           {t.contacts.viewProfile}
                         </Link>
