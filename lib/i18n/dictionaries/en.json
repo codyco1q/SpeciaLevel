@@ -835,7 +835,7 @@
         "brandSubtitle": "Official Invoice",
         "payNow": "Pay Now",
         "payNowModalTitle": "Payment Instructions",
-        "payNowModalSubtitle": "Direct Bank Transfer details for {invoiceNumber}",
+        "payNowModalSubtitle": "Choose a payment method for {invoiceNumber}",
         "bankName": "Bank Name",
         "bankValue": "SpeciaLevel Corporate Banking",
         "iban": "IBAN / Account Number",
@@ -846,7 +846,24 @@
         "onlinePaymentsComingSoon": "Online credit card and Apple Pay processing is coming soon. Please complete your transfer using the bank details above.",
         "alreadyPaidNotice": "This invoice has been marked as paid. No further action is required.",
         "invoiceExpired": "This invoice link is no longer active.",
-        "print": "Print / Save as PDF"
+        "print": "Print / Save as PDF",
+        "checkout": {
+          "cardTab": "Card Payment (Instant)",
+          "cardTabSubtitle": "Pay online securely with Stripe",
+          "bankTab": "Direct Bank Transfer (Manual)",
+          "payWithCard": "Pay Online with Credit / Debit Card",
+          "processing": "Redirecting to Stripe Checkout...",
+          "secureNotice": "Encrypted 256-bit SSL transaction processed by Stripe.",
+          "paidSuccessBanner": "Payment Received & Confirmed",
+          "paidSuccessSubtitle": "Thank you! The payment for invoice {invoiceNumber} has been verified and settled.",
+          "paidDate": "Payment Settled On",
+          "paymentMethod": "Settlement Method",
+          "providerStripe": "Credit / Debit Card (Stripe)",
+          "providerBank": "Direct Wire Transfer",
+          "providerManual": "Manual Settlement",
+          "transactionId": "Payment Intent / Ref ID",
+          "statusPaidInFull": "Paid in Full"
+        }
       },
       "errors": {
         "signedIn": "You must be signed in to do this.",
