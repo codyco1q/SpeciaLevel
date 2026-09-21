@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
+import { dispatchNotificationToOrgAdmins } from "@/lib/services/notifications";
 import { getDictionary, type Locale } from "@/lib/i18n/get-dictionary";
 import {
   createFormInputSchema,
@@ -468,6 +469,22 @@ export async function submitPublicForm(
   }
 
   const result = data as any;
+
+  // Dispatch alert to organization admins/managers
+  try {
+    if (result.organization_id) {
+      await dispatchNotificationToOrgAdmins({
+        orgId: result.organization_id,
+        title: "New Inbound Lead",
+        message: `${result.lead_name || "New lead"} submitted form: ${result.form_title || slug}`,
+        type: "lead",
+        link: `/forms?formId=${result.form_id || ""}`,
+        specificUserId: result.created_by,
+      });
+    }
+  } catch (err) {
+    console.error("[forms] Failed to dispatch lead notification:", err);
+  }
 
   return {
     status: "success",

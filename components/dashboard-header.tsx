@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Search } from "lucide-react";
+import { NotificationsPopover } from "@/components/notifications-popover";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { cn } from "@/lib/utils";
 
@@ -59,13 +60,18 @@ export function DashboardHeader({
         </button>
       </div>
 
-      {/* ── Header Right Badges / Context ──────────────────────────── */}
-      {organizationName && (
-        <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground font-medium">
-          <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
-          <span className="truncate max-w-[200px]">{organizationName}</span>
-        </div>
-      )}
+      {/* ── Header Right: Notifications & Organization Context ──────── */}
+      <div className="flex items-center gap-3">
+        <NotificationsPopover platform={platform} locale={locale} />
+
+        {organizationName && (
+          <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground font-medium border-s border-border/60 ps-3">
+            <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+            <span className="truncate max-w-[200px]">{organizationName}</span>
+          </div>
+        )}
+      </div>
     </header>
   );
 }
+
