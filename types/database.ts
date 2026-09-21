@@ -270,6 +270,8 @@ export type InvoiceStatus =
   | "overdue"
   | "cancelled";
 
+export type PaymentProvider = "manual" | "stripe" | "bank_transfer";
+
 /** NUMERIC columns arrive from PostgREST as strings by default. */
 export interface Invoice {
   id: string;
@@ -285,6 +287,11 @@ export interface Invoice {
   total: string | number;
   due_date: string | null;
   notes: string | null;
+  payment_provider?: PaymentProvider;
+  payment_intent_id?: string | null;
+  paid_at?: string | null;
+  share_token?: string;
+  is_shareable?: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;

@@ -13,7 +13,7 @@ import {
   type InvoiceInput,
 } from "@/lib/validations/invoicing";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
-import type { InvoiceStatus } from "@/types/database";
+import type { InvoiceStatus, PaymentProvider } from "@/types/database";
 
 /**
  * Invoicing server actions.
@@ -55,6 +55,9 @@ export interface InvoiceRow {
   total: number;
   dueDate: string | null;
   notes: string | null;
+  paymentProvider?: PaymentProvider;
+  paymentIntentId?: string | null;
+  paidAt?: string | null;
   createdAt: string;
   shareToken: string;
   isShareable: boolean;
@@ -64,6 +67,7 @@ export interface InvoiceRow {
 
 export interface PublicInvoiceData {
   id: string;
+  organizationId?: string;
   invoiceNumber: string;
   status: InvoiceStatus;
   currency: string;
@@ -73,6 +77,9 @@ export interface PublicInvoiceData {
   total: number;
   dueDate: string | null;
   notes: string | null;
+  paymentProvider?: PaymentProvider;
+  paymentIntentId?: string | null;
+  paidAt?: string | null;
   createdAt: string;
   shareToken: string;
   isShareable: boolean;
@@ -159,6 +166,9 @@ interface InvoiceJoinRow {
   total: string | number;
   due_date: string | null;
   notes: string | null;
+  payment_provider?: string | null;
+  payment_intent_id?: string | null;
+  paid_at?: string | null;
   created_at: string;
   share_token?: string | null;
   is_shareable?: boolean | null;
@@ -185,6 +195,9 @@ function toInvoiceRow(row: InvoiceJoinRow): InvoiceRow {
     total: Number(row.total) || 0,
     dueDate: row.due_date,
     notes: row.notes,
+    paymentProvider: (row.payment_provider as PaymentProvider) || "manual",
+    paymentIntentId: row.payment_intent_id ?? null,
+    paidAt: row.paid_at ?? null,
     createdAt: row.created_at,
     shareToken: row.share_token ?? "",
     isShareable: row.is_shareable ?? true,
@@ -276,6 +289,9 @@ export async function getInvoices(): Promise<InvoicingList | null> {
         total,
         due_date,
         notes,
+        payment_provider,
+        payment_intent_id,
+        paid_at,
         created_at,
         share_token,
         is_shareable,
@@ -323,6 +339,9 @@ export async function getInvoiceById(id: string): Promise<InvoiceRow | null> {
         total,
         due_date,
         notes,
+        payment_provider,
+        payment_intent_id,
+        paid_at,
         created_at,
         share_token,
         is_shareable,

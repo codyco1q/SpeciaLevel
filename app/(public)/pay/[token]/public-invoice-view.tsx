@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
+  AlertCircle,
   Building2,
   Check,
   CheckCircle2,
@@ -10,6 +12,8 @@ import {
   CreditCard,
   ExternalLink,
   Info,
+  Loader2,
+  Lock,
   Printer,
   ShieldCheck,
 } from "lucide-react";
@@ -31,11 +35,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Monogram } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { cn } from "@/lib/utils";
 import type { PublicInvoiceData } from "@/lib/actions/invoicing";
+import { createInvoiceCheckoutSession } from "@/lib/actions/payments";
 import {
   INVOICE_STATUS_BADGE_CLASSES,
   formatCurrency,
@@ -56,14 +62,21 @@ export function PublicInvoiceView({
   langSwitcher,
   locale,
 }: PublicInvoiceViewProps) {
+  const searchParams = useSearchParams();
+  const isSuccessParam = searchParams.get("success") === "true";
+  const isCanceledParam = searchParams.get("canceled") === "true";
+
   const t = platform.invoicing;
   const pay = t.publicPayment;
+  const checkout = pay?.checkout;
   const common = platform.common;
 
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const isPaid = invoice.status === "paid";
+  const isPaid = invoice.status === "paid" || isSuccessParam;
 
   async function copyText(field: string, text: string) {
     try {
@@ -71,7 +84,28 @@ export function PublicInvoiceView({
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
     } catch {
-      // ignore
+      // ignore clipboard error
+    }
+  }
+
+  async function handleStripeCheckout() {
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+
+    try {
+      const res = await createInvoiceCheckoutSession(invoice.shareToken);
+      if (res.status === "success" && res.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+      } else {
+        setCheckoutError(
+          res.error ||
+            "Unable to start checkout session. Please try again or use direct bank transfer."
+        );
+        setCheckoutLoading(false);
+      }
+    } catch (err: any) {
+      setCheckoutError(err?.message || "An unexpected error occurred.");
+      setCheckoutLoading(false);
     }
   }
 
@@ -100,11 +134,66 @@ export function PublicInvoiceView({
       <main className="mx-auto my-8 w-full max-w-4xl flex-1 px-4 sm:px-6 print:m-0 print:max-w-none print:p-0">
         {/* Status Callout (when paid) */}
         {isPaid && (
-          <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-700 dark:text-emerald-400 print:hidden">
-            <CheckCircle2 className="size-5 shrink-0" />
-            <div className="text-sm font-medium">
-              {pay?.alreadyPaidNotice ??
-                "This invoice has been marked as paid. No further action is required."}
+          <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-emerald-800 dark:text-emerald-300 print:hidden shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="size-6" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-base font-bold">
+                  {checkout?.paidSuccessBanner ?? "Payment Received & Confirmed"}
+                </h2>
+                <p className="text-sm opacity-90">
+                  {(
+                    checkout?.paidSuccessSubtitle ??
+                    "Thank you! The payment for invoice {invoiceNumber} has been verified and settled."
+                  ).replace("{invoiceNumber}", invoice.invoiceNumber)}
+                </p>
+                {(invoice.paidAt || invoice.paymentProvider || invoice.paymentIntentId) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-emerald-500/20 pt-3 text-xs opacity-95">
+                    {invoice.paidAt && (
+                      <div>
+                        <span className="font-semibold">
+                          {checkout?.paidDate ?? "Payment Settled On"}:{" "}
+                        </span>
+                        <span>{formatInvoiceDate(invoice.paidAt, locale)}</span>
+                      </div>
+                    )}
+                    {invoice.paymentProvider && (
+                      <div>
+                        <span className="font-semibold">
+                          {checkout?.paymentMethod ?? "Settlement Method"}:{" "}
+                        </span>
+                        <span>
+                          {invoice.paymentProvider === "stripe"
+                            ? checkout?.providerStripe ?? "Credit / Debit Card (Stripe)"
+                            : invoice.paymentProvider === "bank_transfer"
+                            ? checkout?.providerBank ?? "Direct Wire Transfer"
+                            : checkout?.providerManual ?? "Manual Settlement"}
+                        </span>
+                      </div>
+                    )}
+                    {invoice.paymentIntentId && (
+                      <div>
+                        <span className="font-semibold">
+                          {checkout?.transactionId ?? "Transaction ID"}:{" "}
+                        </span>
+                        <span className="font-mono">{invoice.paymentIntentId}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Canceled Notice */}
+        {isCanceledParam && !isPaid && (
+          <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 print:hidden">
+            <Info className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-sm">
+              Checkout was canceled. You can try again using card payment or complete your transfer with the bank details below.
             </div>
           </div>
         )}
@@ -139,10 +228,14 @@ export function PublicInvoiceView({
                   variant="outline"
                   className={cn(
                     "px-3 py-1 text-xs font-medium",
-                    INVOICE_STATUS_BADGE_CLASSES[invoice.status]
+                    isPaid
+                      ? INVOICE_STATUS_BADGE_CLASSES.paid
+                      : INVOICE_STATUS_BADGE_CLASSES[invoice.status]
                   )}
                 >
-                  {t.statuses[invoice.status]}
+                  {isPaid
+                    ? checkout?.statusPaidInFull ?? t.statuses.paid
+                    : t.statuses[invoice.status]}
                 </Badge>
               </div>
             </div>
@@ -322,13 +415,83 @@ export function PublicInvoiceView({
             <DialogDescription>
               {(
                 pay?.payNowModalSubtitle ??
-                "Direct Bank Transfer details for {invoiceNumber}"
+                "Choose a payment method for {invoiceNumber}"
               ).replace("{invoiceNumber}", invoice.invoiceNumber)}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+          <Tabs defaultValue="card" className="w-full">
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="card" className="gap-1.5 text-xs sm:text-sm">
+                <CreditCard className="size-4" />
+                <span>{checkout?.cardTab ?? "Card Payment"}</span>
+              </TabsTrigger>
+              <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm">
+                <Building2 className="size-4" />
+                <span>{checkout?.bankTab ?? "Bank Transfer"}</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* ── Card Checkout Tab ────────────────────────── */}
+            <TabsContent value="card" className="mt-4 space-y-4">
+              <div className="rounded-xl border border-border bg-muted/30 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    {t.detail.total}
+                  </span>
+                  <span className="text-xl font-bold text-primary">
+                    {formatCurrency(invoice.total, invoice.currency, locale)}
+                  </span>
+                </div>
+
+                <div className="border-t border-border pt-3">
+                  <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                    <Lock className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>
+                      {checkout?.secureNotice ??
+                        "Encrypted 256-bit SSL transaction processed by Stripe."}
+                    </span>
+                  </div>
+                </div>
+
+                {checkoutError && (
+                  <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                    <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                    <span>{checkoutError}</span>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full gap-2 font-semibold"
+                  disabled={checkoutLoading}
+                  onClick={handleStripeCheckout}
+                >
+                  {checkoutLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      <span>
+                        {checkout?.processing ??
+                          "Redirecting to Stripe Checkout..."}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="size-4" />
+                      <span>
+                        {checkout?.payWithCard ??
+                          "Pay Online with Credit / Debit Card"}
+                      </span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* ── Bank Transfer Tab ────────────────────────── */}
+            <TabsContent value="bank" className="mt-4 space-y-4">
+              <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
               <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <span>{pay?.bankName ?? "Bank Name"}</span>
                 <span className="text-foreground font-medium normal-case">
@@ -410,11 +573,15 @@ export function PublicInvoiceView({
             <div className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
               <Info className="size-4 shrink-0 text-primary mt-0.5" />
               <p>
-                {pay?.onlinePaymentsComingSoon ??
-                  "Online credit card and Apple Pay processing is coming soon. Please complete your transfer using the bank details above."}
+                Please include reference{" "}
+                <strong className="font-mono text-foreground">
+                  {invoice.invoiceNumber}
+                </strong>{" "}
+                with your transfer for immediate automatic matching.
               </p>
             </div>
-          </div>
+          </TabsContent>
+        </Tabs>
 
           <DialogFooter>
             <Button

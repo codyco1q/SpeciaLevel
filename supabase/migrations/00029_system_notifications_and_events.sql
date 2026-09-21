@@ -39,6 +39,7 @@ create index if not exists idx_system_notifications_user_created
 -- ------------------------------------------------------------
 alter table public.system_notifications enable row level security;
 
+drop policy if exists "Users can view their own notifications in their organization" on public.system_notifications;
 create policy "Users can view their own notifications in their organization"
   on public.system_notifications for select
   using (
@@ -46,6 +47,7 @@ create policy "Users can view their own notifications in their organization"
     and user_id = auth.uid()
   );
 
+drop policy if exists "Users can update their own notifications" on public.system_notifications;
 create policy "Users can update their own notifications"
   on public.system_notifications for update
   using (
@@ -56,6 +58,17 @@ create policy "Users can update their own notifications"
     organization_id = public.current_organization_id()
     and user_id = auth.uid()
   );
+
+drop policy if exists "Users can delete their own notifications" on public.system_notifications;
+create policy "Users can delete their own notifications"
+  on public.system_notifications for delete
+  using (
+    organization_id = public.current_organization_id()
+    and user_id = auth.uid()
+  );
+
+grant select, update, delete on public.system_notifications to authenticated;
+grant all on public.system_notifications to service_role;
 
 -- ------------------------------------------------------------
 -- 4. Update book_public_appointment RPC to return org & host IDs
@@ -237,6 +250,33 @@ begin
   ) values (
     v_profile.organization_id,
     v_profile.user_id,
+    v_profile.user_id,
+    v_profile.title || ' w/ ' || trim(p_client_name),
+    'Client: ' || trim(p_client_name) || ' (' || lower(trim(p_client_email)) || ')' || case when p_client_phone is not null and trim(p_client_phone) <> '' then ' - Phone: ' || trim(p_client_phone) else '' end || case when p_notes is not null and trim(p_notes) <> '' then E'\nNotes: ' || trim(p_notes) else '' end,
+    p_start_time,
+    v_end_time,
+    false,
+    'Online Video Call'
+  );
+
+  return jsonb_build_object(
+    'success', true,
+    'appointment_id', v_appointment_id,
+    'organization_id', v_profile.organization_id,
+    'host_user_id', v_profile.user_id,
+    'title', v_profile.title,
+    'host_name', coalesce(v_host.full_name, 'Host'),
+    'host_email', v_host.email,
+    'client_name', trim(p_client_name),
+    'client_email', lower(trim(p_client_email)),
+    'start_time', p_start_time,
+    'end_time', v_end_time,
+    'duration_minutes', v_profile.duration_minutes,
+    'org_name', v_org.name
+  );
+end;
+$_$;
+
 -- ------------------------------------------------------------
 -- 5. Update submit_public_form RPC to return org & form details
 -- ------------------------------------------------------------
@@ -425,40 +465,3 @@ $_$;
 
 grant execute on function public.book_public_appointment(uuid, text, text, text, text, timestamptz) to anon, authenticated, service_role;
 grant execute on function public.submit_public_form(text, jsonb, text) to anon, authenticated, service_role;
-
-    v_profile.user_id,
-    v_profile.title || ' w/ ' || trim(p_client_name),
-    'Client: ' || trim(p_client_name) || ' (' || lower(trim(p_client_email)) || ')' || case when p_client_phone is not null and trim(p_client_phone) <> '' then ' - Phone: ' || trim(p_client_phone) else '' end || case when p_notes is not null and trim(p_notes) <> '' then E'\nNotes: ' || trim(p_notes) else '' end,
-    p_start_time,
-    v_end_time,
-    false,
-    'Online Video Call'
-  );
-
-  return jsonb_build_object(
-    'success', true,
-    'appointment_id', v_appointment_id,
-    'title', v_profile.title,
-    'host_name', coalesce(v_host.full_name, 'Host'),
-    'host_email', v_host.email,
-    'client_name', trim(p_client_name),
-    'client_email', lower(trim(p_client_email)),
-    'start_time', p_start_time,
-    'end_time', v_end_time,
-    'duration_minutes', v_profile.duration_minutes,
-    'org_name', v_org.name,
-    'organization_id', v_profile.organization_id,
-    'host_user_id', v_profile.user_id
-  );
-end;
-$_$;
-
-create policy "Users can delete their own notifications"
-  on public.system_notifications for delete
-  using (
-    organization_id = public.current_organization_id()
-    and user_id = auth.uid()
-  );
-
-grant select, update, delete on public.system_notifications to authenticated;
-grant all on public.system_notifications to service_role;

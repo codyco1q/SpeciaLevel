@@ -835,7 +835,7 @@
         "brandSubtitle": "فاتورة رسمية",
         "payNow": "ادفع الآن",
         "payNowModalTitle": "تعليمات الدفع",
-        "payNowModalSubtitle": "تفاصيل التحويل البنكي المباشر لـ {invoiceNumber}",
+        "payNowModalSubtitle": "اختر طريقة الدفع المناسبة للفاتورة {invoiceNumber}",
         "bankName": "اسم البنك",
         "bankValue": "المصرفية المؤسسية سبيشال ليفل",
         "iban": "رقم الآيبان / الحساب",
@@ -846,7 +846,24 @@
         "onlinePaymentsComingSoon": "خدمة الدفع عبر البطاقات الائتمانية و Apple Pay قادمة قريبًا. يرجى إتمام التحويل باستخدام التفاصيل البنكية أعلاه.",
         "alreadyPaidNotice": "تم تحديد هذه الفاتورة كمدفوعة. لا يلزم اتخاذ أي إجراء إضافي.",
         "invoiceExpired": "لم يعد رابط هذه الفاتورة نشطًا.",
-        "print": "طباعة / حفظ PDF"
+        "print": "طباعة / حفظ PDF",
+        "checkout": {
+          "cardTab": "الدفع بالبطاقة (فوري)",
+          "cardTabSubtitle": "دفع إلكتروني فوري وآمن عبر Stripe",
+          "bankTab": "التحويل البنكي المباشر (يدوي)",
+          "payWithCard": "الدفع بواسطة البطاقة الائتمانية / الخصم",
+          "processing": "جاري التحويل لبوابة الدفع...",
+          "secureNotice": "عملية دفع آمنة ومشفرة بتقنية 256-bit SSL عبر Stripe.",
+          "paidSuccessBanner": "تم استلام وتأكيد الدفع",
+          "paidSuccessSubtitle": "شكرًا لك! تم تسوية وتأكيد سداد الفاتورة {invoiceNumber} بنجاح.",
+          "paidDate": "تاريخ التسوية",
+          "paymentMethod": "طريقة السداد",
+          "providerStripe": "بطاقة ائتمان / خصم (Stripe)",
+          "providerBank": "تحويل بنكي مباشر",
+          "providerManual": "تسوية يدوية",
+          "transactionId": "معرف العملية / المرجع",
+          "statusPaidInFull": "مدفوعة بالكامل"
+        }
       },
       "errors": {
         "signedIn": "يجب تسجيل الدخول للقيام بهذا الإجراء.",

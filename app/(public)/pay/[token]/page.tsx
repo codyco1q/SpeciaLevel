@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getPublicInvoiceByToken } from "@/lib/actions/invoicing";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
@@ -82,11 +83,13 @@ export default async function PublicPayPage({ params }: PayPageProps) {
   }
 
   return (
-    <PublicInvoiceView
-      invoice={invoice}
-      platform={platform}
-      langSwitcher={langSwitcher}
-      locale={locale}
-    />
+    <Suspense fallback={null}>
+      <PublicInvoiceView
+        invoice={invoice}
+        platform={platform}
+        langSwitcher={langSwitcher}
+        locale={locale}
+      />
+    </Suspense>
   );
 }
