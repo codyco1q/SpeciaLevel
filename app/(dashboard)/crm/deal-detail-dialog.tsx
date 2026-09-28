@@ -11,8 +11,11 @@ import {
   Mail,
   Pencil,
   Phone,
+  RotateCcw,
   Trash2,
+  Trophy,
   User,
+  XCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -34,12 +37,13 @@ import {
 import { cn } from "@/lib/utils";
 import {
   deleteDeal,
+  updateDealStatus,
   type DealRow,
+  type PipelineRow,
 } from "@/lib/actions/crm";
-import type { CrmStage } from "@/types/database";
 import {
-  CRM_STAGES,
-  CRM_STAGE_DOT_CLASSES,
+  getStageDotClass,
+  getStageName,
   formatCurrency,
   formatLeadDate,
 } from "./crm-meta";
@@ -52,11 +56,13 @@ interface DealDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   canManage: boolean;
   members: CrmMemberOption[];
+  pipelines?: PipelineRow[];
   platform: Dictionary["platform"];
   locale: Locale;
   onEdit: (deal: DealRow) => void;
   onDeleted: () => void;
-  onStageChange: (dealId: string, stage: CrmStage) => Promise<void>;
+  onStageChange: (dealId: string, stageId: string) => Promise<void>;
+  onWinLossPrompt?: (deal: DealRow, status: "won" | "lost", stageId?: string) => void;
 }
 
 export function DealDetailDialog({
@@ -64,13 +70,16 @@ export function DealDetailDialog({
   open,
   onOpenChange,
   canManage,
+  pipelines = [],
   platform,
   locale,
   onEdit,
   onDeleted,
   onStageChange,
+  onWinLossPrompt,
 }: DealDetailDialogProps) {
   const t = platform.crm;
+  const wl = t.winLoss;
   const common = platform.common;
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -79,12 +88,59 @@ export function DealDetailDialog({
 
   if (!deal) return null;
 
-  async function handleQuickStageChange(newStage: CrmStage) {
+  const currentPipeline = pipelines.find((p) => p.id === deal.pipelineId) || pipelines[0];
+  const availableStages = currentPipeline?.stages || [];
+  const activeStage = availableStages.find((s) => s.id === deal.stageId) || deal.stageObj;
+
+  const daysSinceUpdate = Math.floor(
+    (Date.now() - new Date(deal.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const isStale =
+    activeStage &&
+    activeStage.probability > 0 &&
+    activeStage.probability < 100 &&
+    daysSinceUpdate >= activeStage.staleDays;
+
+  const isWon = deal.wonReason !== null || deal.stage.toLowerCase() === "won";
+  const isLost = deal.lostReason !== null || deal.stage.toLowerCase() === "lost";
+  const isClosed = Boolean(deal.closedAt) || isWon || isLost;
+
+  async function handleQuickStageChange(newStageId: string) {
+    if (!deal) return;
+    const targetStage = availableStages.find((s) => s.id === newStageId);
+    if (targetStage && (targetStage.probability === 100 || targetStage.name.toLowerCase() === "won")) {
+      onOpenChange(false);
+      onWinLossPrompt?.(deal, "won", newStageId);
+      return;
+    }
+    if (targetStage && (targetStage.probability === 0 || targetStage.name.toLowerCase() === "lost")) {
+      onOpenChange(false);
+      onWinLossPrompt?.(deal, "lost", newStageId);
+      return;
+    }
+
+    setIsUpdatingStage(true);
+    setErrorMessage(null);
+    try {
+      await onStageChange(deal.id, newStageId);
+    } catch {
+      setErrorMessage(t.errors.updateFailed);
+    } finally {
+      setIsUpdatingStage(false);
+    }
+  }
+
+  async function handleReopen() {
     if (!deal) return;
     setIsUpdatingStage(true);
     setErrorMessage(null);
     try {
-      await onStageChange(deal.id, newStage);
+      const res = await updateDealStatus(deal.id, "open");
+      if (res.status === "error") {
+        setErrorMessage(res.error || "Failed to reopen deal");
+        return;
+      }
+      await onStageChange(deal.id, availableStages[0]?.id || deal.stage);
     } catch {
       setErrorMessage(t.errors.updateFailed);
     } finally {
@@ -125,31 +181,93 @@ export function DealDetailDialog({
       <DialogContent className="max-h-[90vh] sm:max-w-xl overflow-y-auto">
         <DialogHeader>
           <div className="flex flex-wrap items-center justify-between gap-2 pe-6">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={cn(
                   "size-2.5 shrink-0 rounded-full",
-                  CRM_STAGE_DOT_CLASSES[deal.stage]
+                  getStageDotClass(deal.stage, activeStage?.probability)
                 )}
                 aria-hidden="true"
               />
-              <Badge variant="outline" className="text-xs capitalize">
-                {t.stages[deal.stage]}
+              <Badge variant="outline" className="text-xs font-semibold">
+                {getStageName(activeStage?.name || deal.stage, t.stages as Record<string, string>)}
               </Badge>
+              {activeStage && (
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  {activeStage.probability}%
+                </span>
+              )}
+              {isStale && (
+                <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1 text-[10px] px-1.5 py-0">
+                  <Clock className="size-3" />
+                  {t.pipelines.staleDaysAgo.replace("{days}", String(daysSinceUpdate))}
+                </Badge>
+              )}
             </div>
             <p className="text-lg font-bold tracking-tight tabular-nums">
               {formatCurrency(deal.value, deal.currency, locale)}
             </p>
           </div>
-          <DialogTitle className="text-xl font-bold">{deal.title}</DialogTitle>
+          <DialogTitle className="text-xl font-bold mt-1">{deal.title}</DialogTitle>
           <DialogDescription className="sr-only">
             {deal.title}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
-          {/* Quick stage selector */}
-          <div className="rounded-lg border border-border bg-muted/30 p-3.5">
+        <div className="space-y-4 py-2">
+          {/* Closed outcome alert card */}
+          {isClosed && (
+            <div
+              className={cn(
+                "rounded-lg border p-3.5 space-y-2",
+                isWon
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                  : "border-red-500/30 bg-red-500/10 text-red-900 dark:text-red-200"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-xs">
+                  {isWon ? (
+                    <Trophy className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <XCircle className="size-4 text-red-600 dark:text-red-400" />
+                  )}
+                  <span>{isWon ? wl.wonTitle : wl.lostTitle}</span>
+                </div>
+                {deal.closedAt && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {wl.closedAt} {formatLeadDate(deal.closedAt, locale)}
+                  </span>
+                )}
+              </div>
+              {(deal.wonReason || deal.lostReason) && (
+                <p className="text-xs text-foreground/90 font-medium">
+                  <span className="font-bold text-muted-foreground me-1.5">
+                    {isWon ? wl.wonReason : wl.lostReason}:
+                  </span>
+                  {deal.wonReason || deal.lostReason}
+                </p>
+              )}
+              {canManage && (
+                <div className="pt-1 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] gap-1 px-2"
+                    onClick={handleReopen}
+                    disabled={isUpdatingStage}
+                  >
+                    <RotateCcw className="size-3" />
+                    {wl.markOpen}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quick stage selector & Won/Lost Buttons */}
+          <div className="rounded-lg border border-border bg-muted/30 p-3.5 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <label
                 htmlFor="deal-quick-stage"
@@ -159,29 +277,32 @@ export function DealDetailDialog({
               </label>
               <div className="flex items-center gap-2">
                 <Select
-                  value={deal.stage}
-                  onValueChange={(val) =>
-                    handleQuickStageChange(val as CrmStage)
-                  }
+                  value={deal.stageId || availableStages[0]?.id || ""}
+                  onValueChange={handleQuickStageChange}
                   disabled={isUpdatingStage}
                 >
                   <SelectTrigger
                     id="deal-quick-stage"
-                    className="h-8 w-44 text-xs font-medium"
+                    className="h-8 w-48 text-xs font-medium"
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CRM_STAGES.map((stage) => (
-                      <SelectItem key={stage} value={stage} className="text-xs">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "size-2 rounded-full",
-                              CRM_STAGE_DOT_CLASSES[stage]
-                            )}
-                          />
-                          <span>{t.stages[stage]}</span>
+                    {availableStages.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id} className="text-xs">
+                        <div className="flex items-center justify-between w-full gap-3">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "size-2 rounded-full",
+                                getStageDotClass(stage.name, stage.probability)
+                              )}
+                            />
+                            <span>{getStageName(stage.name, t.stages as Record<string, string>)}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {stage.probability}%
+                          </span>
                         </div>
                       </SelectItem>
                     ))}
@@ -192,6 +313,40 @@ export function DealDetailDialog({
                 )}
               </div>
             </div>
+
+            {/* Quick Won/Lost action buttons if open */}
+            {!isClosed && canManage && (
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-200 dark:border-red-900/50"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onWinLossPrompt?.(deal, "lost");
+                  }}
+                  disabled={isUpdatingStage}
+                >
+                  <XCircle className="size-3.5 me-1" />
+                  {wl.markLost}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 border-emerald-200 dark:border-emerald-900/50"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onWinLossPrompt?.(deal, "won");
+                  }}
+                  disabled={isUpdatingStage}
+                >
+                  <Trophy className="size-3.5 me-1" />
+                  {wl.markWon}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Core metadata grid */}

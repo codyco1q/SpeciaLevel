@@ -233,7 +233,28 @@ export interface UserContext {
 // CRM module (00011_crm_module.sql)
 // ============================================================
 
-export type CrmStage = "lead" | "contacted" | "proposal" | "won" | "lost";
+export type CrmStage = "lead" | "contacted" | "proposal" | "won" | "lost" | (string & {});
+
+export interface CrmPipeline {
+  id: string;
+  organization_id: string;
+  name: string;
+  is_default: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmPipelineStage {
+  id: string;
+  pipeline_id: string;
+  name: string;
+  order_index: number;
+  probability: number;
+  stale_days: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface CrmContact {
   id: string;
@@ -269,11 +290,16 @@ export interface CrmDeal {
   id: string;
   organization_id: string;
   contact_id: string | null;
+  pipeline_id: string | null;
+  stage_id: string | null;
   title: string;
   value: string | number;
   currency: string;
   stage: CrmStage;
   notes: string | null;
+  lost_reason: string | null;
+  won_reason: string | null;
+  closed_at: string | null;
   assigned_to: string | null;
   created_by: string;
   created_at: string;
