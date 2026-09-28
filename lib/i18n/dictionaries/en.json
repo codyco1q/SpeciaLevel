@@ -1258,10 +1258,14 @@
         "outbound": "Outbound"
       },
       "callStatuses": {
+        "queued": "Queued",
+        "ringing": "Ringing",
+        "in-progress": "In Progress",
         "completed": "Completed",
         "missed": "Missed",
         "busy": "Busy",
         "failed": "Failed",
+        "no-answer": "No Answer",
         "voicemail": "Voicemail"
       },
       "smsStatuses": {
@@ -2267,6 +2271,45 @@
         "missedCalls": "Missed Calls",
         "totalSms": "Total SMS"
       }
+    },
+    "dialer": {
+      "title": "Phone Dialer",
+      "openDialer": "Open Dialer",
+      "minimize": "Minimize dialer",
+      "maximize": "Expand dialer",
+      "close": "Close dialer",
+      "idle": "Ready to call",
+      "calling": "Calling...",
+      "connected": "Connected",
+      "ended": "Call Ended",
+      "call": "Call",
+      "endCall": "End Call",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "hold": "Hold",
+      "resume": "Resume",
+      "keypad": "Keypad",
+      "callerId": "Caller ID",
+      "selectCallerId": "Select Caller ID...",
+      "destinationPlaceholder": "Enter phone number...",
+      "postCallSummary": "Call Summary & Notes",
+      "outcome": "Call Outcome",
+      "outcomes": {
+        "completed": "Connected / Successful",
+        "interested": "Interested / Qualified",
+        "followUp": "Follow-up Required",
+        "noAnswer": "No Answer",
+        "leftVoicemail": "Left Voicemail",
+        "busy": "Busy / Call Back"
+      },
+      "callDuration": "Duration",
+      "notesPlaceholder": "Add notes about this call (e.g. key discussion points, next steps)...",
+      "saveSummary": "Save Call Note",
+      "saving": "Saving...",
+      "savedSuccess": "Call note saved successfully",
+      "quickCall": "Call {name}",
+      "noActiveNumber": "No active carrier number available",
+      "audioFeedback": "Keypad audio enabled"
     }
   }
 }

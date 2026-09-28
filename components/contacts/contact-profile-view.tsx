@@ -35,6 +35,7 @@ import {
 } from "@/lib/actions/contacts";
 import { CRM_STAGE_DOT_CLASSES, formatCurrency, formatLeadDate } from "@/app/(dashboard)/crm/crm-meta";
 import { INVOICE_STATUS_BADGE_CLASSES } from "@/app/(dashboard)/invoicing/invoicing-meta";
+import { openGlobalDialer } from "@/lib/stores/dialer-store";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { ContactDialog } from "./contact-dialog";
 import { DeleteContactDialog } from "./delete-contact-dialog";
@@ -185,10 +186,26 @@ export function ContactProfileView({
                     <Phone className="size-3.5" />
                     <span>{t.contactDialog.phoneLabel}</span>
                   </dt>
-                  <dd className="text-end font-medium">
+                  <dd className="text-end font-medium flex items-center gap-2">
                     <a href={`tel:${profile.phone}`} className="text-foreground hover:underline">
                       {profile.phone}
                     </a>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        openGlobalDialer({
+                          destinationNumber: profile.phone || "",
+                          contactName: profile.name,
+                          contactId: profile.id,
+                        })
+                      }
+                      className="size-7 rounded-full text-primary hover:bg-primary/10"
+                      title={platform.dialer.call}
+                    >
+                      <PhoneCall className="size-3.5" />
+                    </Button>
                   </dd>
                 </div>
               )}
@@ -442,6 +459,22 @@ export function ContactProfileView({
                         </div>
                         <p className="mt-1 text-muted-foreground">{call.summary || `${call.durationSeconds}s duration`}</p>
                       </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                          openGlobalDialer({
+                            destinationNumber: call.direction === "outbound" ? call.toNumber : call.fromNumber,
+                            contactName: profile.name,
+                            contactId: profile.id,
+                          })
+                        }
+                        className="size-7 rounded-full text-muted-foreground hover:text-foreground shrink-0"
+                        title={platform.dialer.call}
+                      >
+                        <PhoneCall className="size-3.5" />
+                      </Button>
                     </div>
                   ))}
                   {profile.communications.sms.map((sms) => (

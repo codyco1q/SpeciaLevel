@@ -24,10 +24,14 @@ export type TelecomDirection = (typeof TELECOM_DIRECTIONS)[number];
 
 /** Call outcome statuses (the DB default is 'completed'). */
 export const TELECOM_CALL_STATUSES = [
+  "queued",
+  "ringing",
+  "in-progress",
   "completed",
   "missed",
   "busy",
   "failed",
+  "no-answer",
   "voicemail",
 ] as const;
 

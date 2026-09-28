@@ -16,6 +16,7 @@ import {
   Trophy,
   User,
   XCircle,
+  PhoneCall,
 } from "lucide-react";
 import {
   Dialog,
@@ -35,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { openGlobalDialer } from "@/lib/stores/dialer-store";
 import {
   deleteDeal,
   updateDealStatus,
@@ -386,17 +388,38 @@ export function DealDetailDialog({
                 {t.dealDetail.contact}
               </h4>
               {deal.contact && (
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs gap-1 px-2 text-primary"
-                >
-                  <Link href={`/contacts/${deal.contact.id}`}>
-                    <span>{t.dealDetail.viewContact}</span>
-                    <ExternalLink className="size-3 rtl:rotate-180" />
-                  </Link>
-                </Button>
+                <div className="flex items-center gap-1">
+                  {deal.contact.phone && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        openGlobalDialer({
+                          destinationNumber: deal.contact?.phone || "",
+                          contactName: deal.contact?.name,
+                          contactId: deal.contact?.id,
+                        })
+                      }
+                      className="h-7 text-xs gap-1 px-2 text-primary"
+                      title={platform.dialer.call}
+                    >
+                      <PhoneCall className="size-3" />
+                      <span>{platform.dialer.call}</span>
+                    </Button>
+                  )}
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs gap-1 px-2 text-primary"
+                  >
+                    <Link href={`/contacts/${deal.contact.id}`}>
+                      <span>{t.dealDetail.viewContact}</span>
+                      <ExternalLink className="size-3 rtl:rotate-180" />
+                    </Link>
+                  </Button>
+                </div>
               )}
             </div>
 

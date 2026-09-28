@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   X,
   Tag,
+  PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ import { ContactDialog } from "./contact-dialog";
 import { DeleteContactDialog } from "./delete-contact-dialog";
 import { ImportContactsDialog } from "./import-contacts-dialog";
 import { getContacts, type ContactSummaryRow } from "@/lib/actions/contacts";
+import { openGlobalDialer } from "@/lib/stores/dialer-store";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { cn } from "@/lib/utils";
 
@@ -366,7 +368,29 @@ export function ContactsView({
                       <a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a>
                     </td>
                     <td className="p-3 text-muted-foreground truncate">
-                      {c.phone ? <a href={`tel:${c.phone}`} className="hover:underline">{c.phone}</a> : "—"}
+                      {c.phone ? (
+                        <div className="flex items-center gap-1.5">
+                          <a href={`tel:${c.phone}`} className="hover:underline">{c.phone}</a>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() =>
+                              openGlobalDialer({
+                                destinationNumber: c.phone || "",
+                                contactName: c.name,
+                                contactId: c.id,
+                              })
+                            }
+                            className="size-6 text-primary hover:bg-primary/10 rounded-full"
+                            title={platform.dialer.call}
+                          >
+                            <PhoneCall className="size-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="p-3 text-muted-foreground truncate max-w-[150px]">{c.company || "—"}</td>
                     <td className="p-3">
@@ -422,6 +446,21 @@ export function ContactsView({
                               <span>{t.viewProfile}</span>
                             </Link>
                           </DropdownMenuItem>
+                          {c.phone && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                openGlobalDialer({
+                                  destinationNumber: c.phone || "",
+                                  contactName: c.name,
+                                  contactId: c.id,
+                                })
+                              }
+                              className="flex items-center gap-2 text-primary"
+                            >
+                              <PhoneCall className="size-4" />
+                              <span>{platform.dialer.call}</span>
+                            </DropdownMenuItem>
+                          )}
                           {canManage && (
                             <>
                               <DropdownMenuItem onClick={() => handleOpenEdit(c)} className="flex items-center gap-2">
