@@ -2,21 +2,17 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
-import type { InvitationRow } from "./page";
-import { GeneralSettingsTab } from "./general-settings-tab";
-import { InvitationsTab } from "./invitations-tab";
+import type { Organization } from "@/types/database";
+import { GeneralBrandingTab } from "./general-branding-tab";
+import { SecurityTab } from "./security-tab";
+import { BillingDefaultsTab } from "./billing-defaults-tab";
 import { ProfileTab } from "./profile-tab";
 
 export interface SettingsClientProps {
-  organization: { id: string; name: string; slug: string; timezone: string };
+  organization: Organization;
   profile: { fullName: string | null; jobTitle: string | null };
   userEmail: string;
-  roles: { id: string; name: string; key: string; isSystem: boolean }[];
-  departments: { id: string; name: string }[];
-  contacts: { id: string; name: string; email: string; company: string | null }[];
-  invitations: InvitationRow[];
   canManage: boolean;
-  /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
 }
@@ -25,10 +21,6 @@ export function SettingsClient({
   organization,
   profile,
   userEmail,
-  roles,
-  departments,
-  contacts,
-  invitations,
   canManage,
   platform,
   locale,
@@ -42,34 +34,39 @@ export function SettingsClient({
         <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
 
-      <Tabs defaultValue="general">
-        <TabsList>
-          <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
-          <TabsTrigger value="invitations">{t.tabInvitations}</TabsTrigger>
-          <TabsTrigger value="profile">{t.tabProfile}</TabsTrigger>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsTrigger value="general">{t.tabGeneral || "General & Branding"}</TabsTrigger>
+          <TabsTrigger value="security">{t.tabSecurity || "Security & Controls"}</TabsTrigger>
+          <TabsTrigger value="billing">{t.tabBilling || "Invoicing & Defaults"}</TabsTrigger>
+          <TabsTrigger value="profile">{t.tabProfile || "Profile"}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general">
-          <GeneralSettingsTab
+        <TabsContent value="general" className="space-y-4">
+          <GeneralBrandingTab
             organization={organization}
             canManage={canManage}
             platform={platform}
           />
         </TabsContent>
 
-        <TabsContent value="invitations">
-          <InvitationsTab
-            invitations={invitations}
-            roles={roles}
-            departments={departments}
-            contacts={contacts}
+        <TabsContent value="security" className="space-y-4">
+          <SecurityTab
+            organization={organization}
             canManage={canManage}
             platform={platform}
-            locale={locale}
           />
         </TabsContent>
 
-        <TabsContent value="profile">
+        <TabsContent value="billing" className="space-y-4">
+          <BillingDefaultsTab
+            organization={organization}
+            canManage={canManage}
+            platform={platform}
+          />
+        </TabsContent>
+
+        <TabsContent value="profile" className="space-y-4">
           <ProfileTab
             profile={profile}
             userEmail={userEmail}

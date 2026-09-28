@@ -3,11 +3,45 @@
 // Mirror the schema defined in supabase/migrations/00001_initial_schema.sql
 // ============================================================
 
+export interface OrganizationAddress {
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+}
+
+export interface OrganizationSecuritySettings {
+  allowed_domains: string[];
+  session_timeout_minutes: number;
+  prevent_member_deletion: boolean;
+}
+
+export interface OrganizationBillingDefaults {
+  payment_terms: string;
+  default_tax_rate: number;
+  bank_name: string;
+  iban: string;
+  swift: string;
+  instructions?: string;
+}
+
 export interface Organization {
   id: string;
   name: string;
   slug: string;
+  logo_url?: string | null;
+  legal_name?: string | null;
+  tax_id?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  website?: string | null;
+  address?: OrganizationAddress;
+  default_currency?: string;
   timezone: string;
+  date_format?: string;
+  security_settings?: OrganizationSecuritySettings;
+  billing_defaults?: OrganizationBillingDefaults;
   created_at: string;
   updated_at: string;
 }

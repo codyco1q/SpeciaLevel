@@ -48,6 +48,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UserPlus } from "lucide-react";
+import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import {
   createEmployee,
   updateEmployee,
@@ -60,7 +63,9 @@ import {
   initialEmployeeActionState,
   type EmployeeFormValues,
 } from "@/lib/validations/employees";
-import type { EmployeeRow } from "./page";
+import type { EmployeeRow, EmployeeInvitationRow } from "./page";
+import { InviteEmployeeDialog } from "./invite-employee-dialog";
+import { PendingInvitationsTab } from "./pending-invitations-tab";
 
 const EMPLOYEE_STATUSES = ["active", "suspended", "invited"] as const;
 
@@ -73,7 +78,22 @@ export interface RoleOption {
   id: string;
   name: string;
   isSystem: boolean;
+  key?: string;
 }
+
+export interface EmployeeDirectoryProps {
+  employees: EmployeeRow[];
+  invitations: EmployeeInvitationRow[];
+  departments: DepartmentOption[];
+  roles: RoleOption[];
+  contacts?: { id: string; name: string; email: string; company: string | null }[];
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  platform: Dictionary["platform"];
+  locale: Locale;
+}
+
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -397,22 +417,21 @@ function DeleteEmployeeDialog({
 
 export function EmployeeDirectory({
   employees,
+  invitations,
   departments,
   roles,
+  contacts = [],
   canCreate,
   canUpdate,
   canDelete,
-}: {
-  employees: EmployeeRow[];
-  departments: DepartmentOption[];
-  roles: RoleOption[];
-  canCreate: boolean;
-  canUpdate: boolean;
-  canDelete: boolean;
-}) {
+  platform,
+  locale,
+}: EmployeeDirectoryProps) {
+  const tEmp = platform.employees;
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [dialogState, setDialogState] = useState<{
     mode: "create" | "edit" | "delete";
     employee: EmployeeRow | null;
@@ -441,80 +460,115 @@ export function EmployeeDirectory({
     });
   }, [employees, search, departmentFilter, roleFilter]);
 
+  const pendingInvitationsCount = invitations.filter(
+    (i) => i.status === "pending"
+  ).length;
+
+
   return (
     <>
-      {employees.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-medium">No employees yet</p>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {tEmp?.title || "Employees"}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {canCreate
-              ? "Add your first employee to start building your team."
-              : "Employees will appear here once they are added."}
+            {tEmp?.subtitle ||
+              "Manage the people in your organization and pending team invitations."}
           </p>
-          {canCreate && (
-            <Button
-              className="mt-4"
-              onClick={() => setDialogState({ mode: "create", employee: null })}
-            >
-              <Plus />
-              Add employee
-            </Button>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or email…"
-              className="w-64 pl-8"
-            />
-          </div>
-
-          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="All departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All departments</SelectItem>
-              {departments.map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All roles" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              {roles.map((role) => (
-                <SelectItem key={role.id} value={role.id}>
-                  {role.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {canCreate && (
-          <Button
-            onClick={() => setDialogState({ mode: "create", employee: null })}
-          >
-            <Plus />
-            Add employee
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDialogState({ mode: "create", employee: null })}
+              className="gap-1.5"
+            >
+              <Plus className="size-4" />
+              {tEmp?.addEmployee || "Add Directly"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setInviteOpen(true)}
+              className="gap-1.5"
+            >
+              <UserPlus className="size-4" />
+              {tEmp?.inviteEmployee || "Invite Employee"}
+            </Button>
+          </div>
         )}
       </div>
-<div className="rounded-lg border border-border bg-card">
+
+      <Tabs defaultValue="active" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="active" className="gap-2">
+            {tEmp?.tabActive || "Active Employees"}
+            <Badge variant="secondary" className="px-1.5 py-0 text-xs">
+              {employees.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="invitations" className="gap-2">
+            {tEmp?.tabInvitations || "Pending Invitations"}
+            {pendingInvitationsCount > 0 && (
+              <Badge variant="secondary" className="px-1.5 py-0 text-xs">
+                {pendingInvitationsCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name or email…"
+                  className="w-64 pl-8"
+                />
+              </div>
+
+              <Select
+                value={departmentFilter}
+                onValueChange={setDepartmentFilter}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="All departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All departments</SelectItem>
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card">
+
         <Table>
           <TableHeader>
             <TableRow>
@@ -621,7 +675,28 @@ export function EmployeeDirectory({
           </TableBody>
         </Table>
           </div>
-        </>
+        </TabsContent>
+
+        <TabsContent value="invitations">
+          <PendingInvitationsTab
+            invitations={invitations}
+            canManage={canCreate}
+            onOpenInvite={() => setInviteOpen(true)}
+            platform={platform}
+            locale={locale}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {inviteOpen && (
+        <InviteEmployeeDialog
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          roles={roles}
+          departments={departments}
+          contacts={contacts}
+          platform={platform}
+        />
       )}
 
       {dialogState?.mode === "create" && (

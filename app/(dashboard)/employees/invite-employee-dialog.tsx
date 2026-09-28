@@ -32,10 +32,10 @@ import {
   type InviteActionState,
 } from "@/lib/validations/invites";
 
-interface InviteMemberDialogProps {
+interface InviteEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  roles: { id: string; name: string; key: string; isSystem: boolean }[];
+  roles: { id: string; name: string; key?: string; isSystem: boolean }[];
   departments: { id: string; name: string }[];
   contacts: {
     id: string;
@@ -43,19 +43,19 @@ interface InviteMemberDialogProps {
     email: string;
     company: string | null;
   }[];
-  /** Localized copy for the current render. */
   platform: Dictionary["platform"];
 }
 
-export function InviteMemberDialog({
+export function InviteEmployeeDialog({
   open,
   onOpenChange,
   roles,
   departments,
   contacts,
   platform,
-}: InviteMemberDialogProps) {
+}: InviteEmployeeDialogProps) {
   const t = platform.settings;
+  const tEmp = platform.employees;
   const [state, formAction, isPending] = useActionState(
     async (_prevState: InviteActionState, formData: FormData) =>
       createInvitation({
@@ -84,30 +84,20 @@ export function InviteMemberDialog({
   });
 
   const watchedRoleId = useWatch({ control, name: "role_id" });
-  // The Client contact selector is only relevant for the system Client
-  // role (scoped portal access linked to a CRM contact).
-  const isClientRole =
-    roles.some(
-      (role) => role.id === watchedRoleId && role.key === "client"
-    );
+  const isClientRole = roles.some(
+    (role) => role.id === watchedRoleId && role.key === "client"
+  );
 
-  // Reset the form every time the dialog opens.
   useEffect(() => {
     if (open) {
-      reset({
-        email: "",
-        role_id: "",
-        department_id: "",
-        contact_id: "",
-      });
+      reset({ email: "", role_id: "", department_id: "", contact_id: "" });
     }
   }, [open, reset]);
 
-  // Close shortly after a successful save.
   useEffect(() => {
     if (state.status === "success") {
       reset({ email: "", role_id: "", department_id: "", contact_id: "" });
-      const timeout = setTimeout(() => onOpenChange(false), 500);
+      const timeout = setTimeout(() => onOpenChange(false), 600);
       return () => clearTimeout(timeout);
     }
   }, [state.status, reset, onOpenChange]);
@@ -123,55 +113,51 @@ export function InviteMemberDialog({
     const formData = new FormData();
     formData.set("email", values.email);
     formData.set("role_id", values.role_id);
-    formData.set("department_id", values.department_id ?? "");
-    formData.set("contact_id", values.contact_id ?? "");
+    if (values.department_id) formData.set("department_id", values.department_id);
+    if (values.contact_id) formData.set("contact_id", values.contact_id);
     formAction(formData);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t.inviteMember}</DialogTitle>
-          <DialogDescription>{t.inviteMemberDescription}</DialogDescription>
+          <DialogTitle>{tEmp?.inviteEmployee || t.inviteMember}</DialogTitle>
+          <DialogDescription>
+            {tEmp?.inviteEmployeeDescription || t.inviteMemberDescription}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="invite-email">{t.emailLabel}</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder={t.emailPlaceholder}
-              autoComplete="off"
-              aria-invalid={Boolean(emailError)}
-              {...register("email")}
-            />
-            {emailError && (
-              <p role="alert" className="text-sm text-destructive">
-                {emailError}
-              </p>
-            )}
-          </div>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="employee-invite-email">{t.emailLabel}</Label>
+              <Input
+                id="employee-invite-email"
+                type="email"
+                placeholder={t.emailPlaceholder}
+                autoComplete="off"
+                aria-invalid={Boolean(emailError)}
+                {...register("email")}
+              />
+              {emailError && (
+                <p role="alert" className="text-xs text-destructive">
+                  {emailError}
+                </p>
+              )}
+            </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="invite-role">{t.roleLabel}</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="employee-invite-role">{t.roleLabel}</Label>
               <Controller
                 control={control}
                 name="role_id"
                 render={({ field }) => (
-                  <Select
-                    value={field.value || "none"}
-                    onValueChange={(value) =>
-                      field.onChange(value === "none" ? "" : value)
-                    }
-                  >
-                    <SelectTrigger id="invite-role" className="w-full">
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="employee-invite-role" className="w-full">
                       <SelectValue placeholder={t.selectRole} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">{t.selectRole}</SelectItem>
                       {roles.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
                           {role.name}
@@ -183,14 +169,16 @@ export function InviteMemberDialog({
                 )}
               />
               {roleError && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-xs text-destructive">
                   {roleError}
                 </p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="invite-department">{t.departmentLabel}</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="employee-invite-department">
+                {t.departmentLabel}
+              </Label>
               <Controller
                 control={control}
                 name="department_id"
@@ -201,7 +189,7 @@ export function InviteMemberDialog({
                       field.onChange(value === "none" ? "" : value)
                     }
                   >
-                    <SelectTrigger id="invite-department" className="w-full">
+                    <SelectTrigger id="employee-invite-department" className="w-full">
                       <SelectValue placeholder={t.noDepartment} />
                     </SelectTrigger>
                     <SelectContent>
@@ -216,15 +204,17 @@ export function InviteMemberDialog({
                 )}
               />
               {departmentError && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-xs text-destructive">
                   {departmentError}
                 </p>
               )}
             </div>
 
             {isClientRole && (
-              <div className="space-y-2">
-                <Label htmlFor="invite-contact">{t.clientContactLabel}</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="employee-invite-contact">
+                  {t.clientContactLabel}
+                </Label>
                 <Controller
                   control={control}
                   name="contact_id"
@@ -235,7 +225,7 @@ export function InviteMemberDialog({
                         field.onChange(value === "none" ? "" : value)
                       }
                     >
-                      <SelectTrigger id="invite-contact" className="w-full">
+                      <SelectTrigger id="employee-invite-contact" className="w-full">
                         <SelectValue placeholder={t.noClientContact} />
                       </SelectTrigger>
                       <SelectContent>
@@ -251,7 +241,7 @@ export function InviteMemberDialog({
                   )}
                 />
                 {contactError && (
-                  <p role="alert" className="text-sm text-destructive">
+                  <p role="alert" className="text-xs text-destructive">
                     {contactError}
                   </p>
                 )}
@@ -273,6 +263,14 @@ export function InviteMemberDialog({
           )}
 
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
+              {platform.common.cancel}
+            </Button>
             <Button type="submit" disabled={isPending}>
               {isPending ? <Loader2 className="animate-spin" /> : <UserPlus />}
               {t.sendInvitation}
@@ -283,3 +281,4 @@ export function InviteMemberDialog({
     </Dialog>
   );
 }
+

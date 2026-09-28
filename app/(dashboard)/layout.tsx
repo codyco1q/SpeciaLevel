@@ -41,6 +41,7 @@ export default async function DashboardLayout({
       <Sidebar
         permissions={userContext.permissions}
         organizationName={userContext.organization?.name}
+        logoUrl={userContext.organization?.logo_url}
         userFullName={userContext.profile.full_name ?? undefined}
         userEmail={userContext.user.email}
         locale={locale}
@@ -58,6 +59,7 @@ export default async function DashboardLayout({
           userFullName={userContext.profile.full_name ?? undefined}
           userEmail={userContext.user.email}
           organizationName={userContext.organization?.name}
+          logoUrl={userContext.organization?.logo_url}
         />
         <main className="flex-1 overflow-y-auto bg-background print:h-auto print:overflow-visible print:bg-white">
           {children}
