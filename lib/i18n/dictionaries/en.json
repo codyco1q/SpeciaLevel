@@ -1713,14 +1713,29 @@
           "moveUp": "Move Up",
           "moveDown": "Move Down",
           "removeField": "Remove",
+          "optionsHint": "Enter options separated by commas (e.g. Design, Development, Marketing)",
+          "customHtmlLabel": "Custom HTML / Code Snippet",
+          "customHtmlPlaceholder": "<div class=\"rounded-lg border p-4 bg-muted/40 text-sm\">\n  <p class=\"font-medium\">Custom Notice or Embedded Widget</p>\n</div>",
+          "customHtmlHint": "Paste valid HTML / CSS markup. Rendered cleanly into the form layout.",
+          "quickAdd": "Quick Add Field",
           "types": {
             "text": "Short Text",
             "email": "Email Address",
             "phone": "Phone Number",
             "textarea": "Long Text / Textarea",
             "select": "Dropdown Select",
-            "number": "Number"
+            "number": "Number",
+            "multiselect": "Multi-Select Checkboxes",
+            "custom_html": "Custom HTML / Embed"
           }
+        },
+        "preview": {
+          "title": "Live Interactive Preview",
+          "subtitle": "Real-time client view as visitors see it on /f/{slug}",
+          "deviceDesktop": "Desktop View",
+          "deviceMobile": "Mobile View",
+          "testBanner": "Interactive Client Preview Mode",
+          "noFieldsYet": "Add form fields on the left to see the interactive preview."
         },
         "settingsTab": {
           "submitButtonTextLabel": "Submit Button Text",

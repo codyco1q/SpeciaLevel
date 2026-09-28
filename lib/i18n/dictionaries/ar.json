@@ -1713,14 +1713,29 @@
           "moveUp": "تحريك لأعلى",
           "moveDown": "تحريك لأسفل",
           "removeField": "إزالة",
+          "optionsHint": "أدخل الخيارات مفصولة بفواصل (مثال: تصميم، برمجة، تسويق)",
+          "customHtmlLabel": "كود HTML / مقتطف برمجي مخصص",
+          "customHtmlPlaceholder": "<div class=\"rounded-lg border p-4 bg-muted/40 text-sm\">\n  <p class=\"font-medium\">ملاحظة مخصصة أو عنصر مضمن</p>\n</div>",
+          "customHtmlHint": "أدخل كود HTML / CSS صالح وسيتم عرضه بشكل متناسق داخل النموذج.",
+          "quickAdd": "إضافة سريعة لحقل",
           "types": {
             "text": "نص قصير",
             "email": "بريد إلكتروني",
             "phone": "رقم الهاتف",
             "textarea": "نص طويل / فقرة",
             "select": "قائمة منسدلة",
-            "number": "رقم"
+            "number": "رقم",
+            "multiselect": "اختيار متعدد (مربعات اختيار)",
+            "custom_html": "تضمين كود HTML مخصص"
           }
+        },
+        "preview": {
+          "title": "معاينة تفاعلية مباشرة",
+          "subtitle": "عرض حي للنموذج على /f/{slug} كما يراه عملاؤك",
+          "deviceDesktop": "عرض الحاسوب",
+          "deviceMobile": "عرض الجوال",
+          "testBanner": "وضع معاينة العميل التفاعلي",
+          "noFieldsYet": "أضف حقولاً من اللوحة الجانبية لمشاهدة المعاينة المباشرة."
         },
         "settingsTab": {
           "submitButtonTextLabel": "نص زر الإرسال",

@@ -15,10 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, LoaderCircle, Send } from "lucide-react";
+import { Check, CheckCircle2, LoaderCircle, Send } from "lucide-react";
 import { submitPublicForm } from "@/lib/actions/forms";
 import type { PublicFormData } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
+import { cn } from "@/lib/utils";
 
 interface PublicFormViewProps {
   form: PublicFormData;
@@ -33,7 +34,7 @@ export function PublicFormView({
   langSwitcher,
   locale,
 }: PublicFormViewProps) {
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [serverSuccessMessage, setServerSuccessMessage] = useState<string | null>(null);
@@ -42,8 +43,31 @@ export function PublicFormView({
 
   const t = dictionary.public;
 
-  const handleFieldChange = (fieldId: string, value: string) => {
+  const handleFieldChange = (fieldId: string, value: any) => {
     setFormData((prev) => ({ ...prev, [fieldId]: value }));
+    if (errors[fieldId]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+    }
+  };
+
+  const handleMultiSelectToggle = (fieldId: string, option: string) => {
+    setFormData((prev) => {
+      const currentList: string[] = Array.isArray(prev[fieldId])
+        ? [...prev[fieldId]]
+        : [];
+      const idx = currentList.indexOf(option);
+      if (idx > -1) {
+        currentList.splice(idx, 1);
+      } else {
+        currentList.push(option);
+      }
+      return { ...prev, [fieldId]: currentList };
+    });
+
     if (errors[fieldId]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -57,7 +81,19 @@ export function PublicFormView({
     const newErrors: Record<string, string> = {};
 
     for (const field of form.fields) {
-      const val = formData[field.id]?.trim() || "";
+      if (field.type === "custom_html") continue;
+
+      const rawVal = formData[field.id];
+
+      if (field.type === "multiselect") {
+        const selectedOptions = Array.isArray(rawVal) ? rawVal : [];
+        if (field.required && selectedOptions.length === 0) {
+          newErrors[field.id] = t.requiredFieldError;
+        }
+        continue;
+      }
+
+      const val = typeof rawVal === "string" ? rawVal.trim() : "";
 
       if (field.required && !val) {
         newErrors[field.id] = t.requiredFieldError;
@@ -173,12 +209,25 @@ export function PublicFormView({
 
                 {/* Form Fields */}
                 <div className="space-y-4">
-                  {form.fields.map((field) => (
-                    <div key={field.id} className="space-y-1.5">
-                      <Label
-                        htmlFor={field.id}
-                        className="text-xs font-semibold"
-                      >
+                  {form.fields.map((field) => {
+                    if (field.type === "custom_html") {
+                      return (
+                        <div
+                          key={field.id}
+                          className="rounded-xl overflow-hidden border border-border/70 bg-muted/20 p-4 text-sm [&_a]:text-primary [&_a]:underline"
+                          dangerouslySetInnerHTML={{
+                            __html: field.customHtml || field.placeholder || "",
+                          }}
+                        />
+                      );
+                    }
+
+                    return (
+                      <div key={field.id} className="space-y-1.5">
+                        <Label
+                          htmlFor={field.id}
+                          className="text-xs font-semibold"
+                        >
                         {field.label}
                         {field.required && (
                           <span className="text-destructive ml-1">*</span>
@@ -225,6 +274,45 @@ export function PublicFormView({
                             ))}
                           </SelectContent>
                         </Select>
+                      ) : field.type === "multiselect" ? (
+                        <div className="space-y-2 pt-0.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {(field.options || []).map((opt) => {
+                              const selected = Array.isArray(formData[field.id])
+                                ? (formData[field.id] as string[]).includes(opt)
+                                : false;
+                              return (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  onClick={() =>
+                                    handleMultiSelectToggle(field.id, opt)
+                                  }
+                                  className={cn(
+                                    "flex items-center gap-2.5 p-2.5 px-3 rounded-lg border text-xs text-start transition-all cursor-pointer select-none",
+                                    selected
+                                      ? "border-primary bg-primary/10 text-primary font-semibold shadow-xs"
+                                      : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:bg-muted/40"
+                                  )}
+                                >
+                                  <div
+                                    className={cn(
+                                      "size-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                      selected
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-muted-foreground/40 bg-background"
+                                    )}
+                                  >
+                                    {selected && (
+                                      <Check className="size-3 stroke-[3]" />
+                                    )}
+                                  </div>
+                                  <span className="truncate">{opt}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       ) : (
                         <Input
                           id={field.id}
@@ -260,7 +348,8 @@ export function PublicFormView({
                         </p>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
 
                 {/* Submit Button */}

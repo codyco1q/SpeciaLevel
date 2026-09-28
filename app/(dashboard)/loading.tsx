@@ -1,54 +1,32 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Monogram } from "@/components/brand";
 
 export default function DashboardLoading() {
   return (
     <div
-      className="space-y-6 p-8 animate-in fade-in-50 duration-200"
-      aria-busy="true"
-      aria-live="polite"
+      aria-hidden="true"
+      className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none backdrop-blur-[2px] bg-background/30"
     >
-      {/* Header skeleton */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-72" />
-        </div>
-        <Skeleton className="h-9 w-32 shrink-0" />
-      </div>
+      <div className="relative flex flex-col items-center justify-center">
+        {/* Ambient Glow */}
+        <div className="absolute -inset-6 rounded-full bg-primary/25 blur-2xl animate-pulse" />
 
-      {/* Metric cards skeleton */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {/* High-Tech Dual-Ring Spinner */}
+        <div className="relative flex items-center justify-center size-20">
+          {/* Outer Ring */}
+          <div className="size-20 rounded-full border-2 border-primary/20 border-t-primary border-r-primary/80 animate-spin" />
+
+          {/* Inner Reverse Ring */}
           <div
-            key={i}
-            className="rounded-lg border border-border bg-card p-4 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="size-5 rounded-full" />
-            </div>
-            <Skeleton className="mt-3 h-7 w-20" />
-            <Skeleton className="mt-2 h-3 w-32" />
-          </div>
-        ))}
-      </div>
+            className="absolute size-14 rounded-full border-2 border-primary/10 border-b-primary border-l-primary/60"
+            style={{
+              animation: "spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite reverse",
+            }}
+          />
 
-      {/* Main panel skeleton */}
-      <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <Skeleton className="h-9 w-64" />
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-24" />
+          {/* Center Logo / Monogram */}
+          <div className="absolute flex items-center justify-center">
+            <Monogram className="size-8 text-xs shadow-md shadow-primary/40 animate-pulse" />
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
         </div>
       </div>
     </div>

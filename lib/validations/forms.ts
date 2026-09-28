@@ -6,7 +6,9 @@ export type FormFieldType =
   | "phone"
   | "textarea"
   | "select"
-  | "number";
+  | "number"
+  | "multiselect"
+  | "custom_html";
 
 export interface FormField {
   id: string;
@@ -16,6 +18,7 @@ export interface FormField {
   placeholder?: string;
   options?: string[];
   helpText?: string;
+  customHtml?: string;
 }
 
 export type DealStage = "lead" | "contacted" | "proposal" | "won" | "lost";
@@ -99,11 +102,21 @@ export interface FormValidationErrors {
 export const formFieldSchema = z.object({
   id: z.string().min(1),
   label: z.string().trim().min(1, { message: "Field label is required" }),
-  type: z.enum(["text", "email", "phone", "textarea", "select", "number"]),
+  type: z.enum([
+    "text",
+    "email",
+    "phone",
+    "textarea",
+    "select",
+    "number",
+    "multiselect",
+    "custom_html",
+  ]),
   required: z.boolean().default(false),
   placeholder: z.string().optional(),
   options: z.array(z.string()).optional(),
   helpText: z.string().optional(),
+  customHtml: z.string().optional(),
 });
 
 export const formSettingsSchema = z.object({

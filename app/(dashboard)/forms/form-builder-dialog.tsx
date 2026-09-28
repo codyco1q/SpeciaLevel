@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -34,7 +35,10 @@ import {
   Globe,
   LoaderCircle,
   Sparkles,
+  Layers,
+  Code2,
 } from "lucide-react";
+import { FormPreviewPane } from "./form-preview-pane";
 import { createForm, updateForm } from "@/lib/actions/forms";
 import type {
   FormRow,
@@ -43,6 +47,7 @@ import type {
   DealStage,
 } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
+import { cn } from "@/lib/utils";
 
 interface FormBuilderDialogProps {
   form: FormRow | null;
@@ -180,16 +185,65 @@ export function FormBuilderDialog({
     }
   };
 
-  const handleAddField = () => {
-    const newField: FormField = {
-      id: `f_${Date.now()}`,
-      label: `Field ${fields.length + 1}`,
-      type: "text",
-      required: false,
-      placeholder: "",
-    };
-    setFields([...fields, newField]);
+  // Field addition handled by addFieldOfType below
+
+  const addFieldOfType = (type: FormFieldType = "text") => {
+    const id = `f_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    let defaultLabel = "New Field";
+    let defaultPlaceholder = "";
+    let defaultOptions: string[] | undefined = undefined;
+    let defaultCustomHtml: string | undefined = undefined;
+
+    switch (type) {
+      case "text":
+        defaultLabel = "Short Text";
+        defaultPlaceholder = "Enter text...";
+        break;
+      case "email":
+        defaultLabel = "Email Address";
+        defaultPlaceholder = "user@example.com";
+        break;
+      case "phone":
+        defaultLabel = "Phone Number";
+        defaultPlaceholder = "+1 (555) 000-0000";
+        break;
+      case "textarea":
+        defaultLabel = "Detailed Message";
+        defaultPlaceholder = "Write your message here...";
+        break;
+      case "select":
+        defaultLabel = "Select Option";
+        defaultOptions = ["Option 1", "Option 2", "Option 3"];
+        break;
+      case "multiselect":
+        defaultLabel = "Select Services / Interests";
+        defaultOptions = ["Design", "Development", "Marketing", "Consulting"];
+        break;
+      case "number":
+        defaultLabel = "Quantity / Budget";
+        defaultPlaceholder = "100";
+        break;
+      case "custom_html":
+        defaultLabel = "Custom Section";
+        defaultCustomHtml = `<div class="p-3 bg-muted/40 rounded-lg border text-sm">\n  <p class="font-medium text-foreground">💡 Important Notice</p>\n  <p class="text-xs text-muted-foreground mt-0.5">Please review before submitting.</p>\n</div>`;
+        break;
+    }
+
+    setFields((prev) => [
+      ...prev,
+      {
+        id,
+        label: defaultLabel,
+        type,
+        required: false,
+        placeholder: defaultPlaceholder,
+        options: defaultOptions,
+        customHtml: defaultCustomHtml,
+      },
+    ]);
   };
+
+  const handleAddField = () => addFieldOfType("text");
 
   const handleUpdateField = (index: number, patch: Partial<FormField>) => {
     const updated = [...fields];
@@ -272,41 +326,60 @@ export function FormBuilderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden flex flex-col p-0">
-        <DialogHeader className="p-6 pb-4 border-b border-border">
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" />
-            {isEdit ? t.editTitle : t.createTitle}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            {isEdit ? t.editDescription : t.createDescription}
-          </DialogDescription>
+      <DialogContent className="sm:max-w-none w-[94vw] max-w-6xl h-[88vh] max-h-[920px] p-0 flex flex-col gap-0 overflow-hidden bg-background">
+        <DialogHeader className="p-4 px-6 border-b border-border bg-card/60 flex flex-row items-center justify-between space-y-0 shrink-0">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <Sparkles className="size-4 text-primary" />
+                {isEdit ? t.editTitle : t.createTitle}
+              </DialogTitle>
+              <Badge
+                variant={isPublished ? "default" : "secondary"}
+                className="text-[11px] font-semibold uppercase"
+              >
+                {isPublished ? "Published" : "Draft"}
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {isEdit ? t.editDescription : t.createDescription}
+            </DialogDescription>
+          </div>
+
+          {slug && (
+            <div className="hidden sm:flex items-center gap-2 text-xs font-mono bg-muted/60 px-3 py-1.5 rounded-md border text-muted-foreground">
+              <Globe className="size-3.5 text-primary shrink-0" />
+              <span>/f/{slug}</span>
+            </div>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="flex-1 flex flex-col overflow-hidden"
-          >
-            <div className="px-6 border-b border-border bg-muted/20">
-              <TabsList className="h-10">
-                <TabsTrigger value="fields" className="text-xs">
-                  {t.tabs.fields}
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="text-xs">
-                  {t.tabs.settings}
-                </TabsTrigger>
-                {isEdit && (
-                  <TabsTrigger value="share" className="text-xs">
+          <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+            {/* Left Column: Form Builder Controls */}
+            <div className="w-full lg:w-1/2 flex flex-col min-h-0 overflow-y-auto border-r border-border p-6 space-y-6">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full flex flex-col min-h-0"
+              >
+                <TabsList className="grid grid-cols-3 w-full shrink-0 mb-4">
+                  <TabsTrigger value="fields" className="text-xs">
+                    {t.tabs.fields}
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs">
+                    {t.tabs.settings}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="share"
+                    disabled={!isEdit && !slug}
+                    className="text-xs"
+                  >
                     {t.tabs.share}
                   </TabsTrigger>
-                )}
-              </TabsList>
-            </div>
+                </TabsList>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {serverError && (
+                {serverError && (
                 <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium">
                   {serverError}
                 </div>
@@ -386,9 +459,93 @@ export function FormBuilderDialog({
 
                 {/* Form Fields Section */}
                 <div className="space-y-4 pt-2">
+                  {/* Quick Add Palette */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-primary" />
+                      <span>{t.fieldsTab.quickAdd || "Quick Add Field"}</span>
+                    </Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("text")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.text}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("email")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.email}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("phone")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.phone}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("textarea")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.textarea}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("select")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.select}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("multiselect")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.multiselect}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("number")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Plus className="size-3" /> {t.fieldsTab.types.number}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("custom_html")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Code2 className="size-3 text-primary" />{" "}
+                        {t.fieldsTab.types.custom_html}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold tracking-tight">
-                      {t.fieldsTab.fieldsListTitle} ({fields.length})
+                    <h3 className="text-sm font-bold tracking-tight flex items-center gap-1.5">
+                      <Layers className="size-4 text-primary" />
+                      <span>{t.fieldsTab.fieldsListTitle} ({fields.length})</span>
                     </h3>
                     <Button
                       type="button"
@@ -396,7 +553,7 @@ export function FormBuilderDialog({
                       size="sm"
                       onClick={handleAddField}
                     >
-                      <Plus className="size-3.5" />
+                      <Plus className="size-3.5 me-1" />
                       {t.fieldsTab.addField}
                     </Button>
                   </div>
@@ -497,8 +654,14 @@ export function FormBuilderDialog({
                                 <SelectItem value="select">
                                   {t.fieldsTab.types.select}
                                 </SelectItem>
+                                <SelectItem value="multiselect">
+                                  {t.fieldsTab.types.multiselect}
+                                </SelectItem>
                                 <SelectItem value="number">
                                   {t.fieldsTab.types.number}
+                                </SelectItem>
+                                <SelectItem value="custom_html">
+                                  {t.fieldsTab.types.custom_html}
                                 </SelectItem>
                               </SelectContent>
                             </Select>
@@ -521,24 +684,59 @@ export function FormBuilderDialog({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-[11px] text-muted-foreground">
-                              {t.fieldsTab.fieldPlaceholder}
+                        {field.type === "custom_html" ? (
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground font-medium flex items-center justify-between">
+                              <span>
+                                {t.fieldsTab.customHtmlLabel ||
+                                  "Custom HTML / Code Snippet"}
+                              </span>
+                              <span className="text-[10px] text-primary">
+                                HTML & CSS
+                              </span>
                             </Label>
-                            <Input
-                              value={field.placeholder ?? ""}
+                            <Textarea
+                              value={field.customHtml || ""}
                               onChange={(e) =>
                                 handleUpdateField(idx, {
-                                  placeholder: e.target.value,
+                                  customHtml: e.target.value,
                                 })
                               }
-                              placeholder="Optional placeholder..."
-                              className="h-8 text-xs"
+                              rows={3}
+                              placeholder={
+                                t.fieldsTab.customHtmlPlaceholder ||
+                                '<div class="p-3 bg-muted rounded-lg text-sm">\n  <p>Custom disclaimer or styling banner</p>\n</div>'
+                              }
+                              className="font-mono text-xs"
                             />
+                            <p className="text-[10px] text-muted-foreground">
+                              {t.fieldsTab.customHtmlHint ||
+                                "Rendered cleanly in the form layout."}
+                            </p>
                           </div>
+                        ) : null}
 
-                          {field.type === "select" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {field.type !== "custom_html" && (
+                          <>
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-muted-foreground">
+                                {t.fieldsTab.fieldPlaceholder}
+                              </Label>
+                              <Input
+                                value={field.placeholder ?? ""}
+                                onChange={(e) =>
+                                  handleUpdateField(idx, {
+                                    placeholder: e.target.value,
+                                  })
+                                }
+                                placeholder="Optional placeholder..."
+                                className="h-8 text-xs"
+                              />
+                            </div>
+
+                          {(field.type === "select" ||
+                            field.type === "multiselect") && (
                             <div className="space-y-1">
                               <Label className="text-[11px] text-muted-foreground">
                                 {t.fieldsTab.fieldOptions}
@@ -553,11 +751,19 @@ export function FormBuilderDialog({
                                       .filter(Boolean),
                                   })
                                 }
-                                placeholder={t.fieldsTab.fieldOptionsPlaceholder}
+                                placeholder={
+                                  t.fieldsTab.fieldOptionsPlaceholder
+                                }
                                 className="h-8 text-xs"
                               />
+                              <p className="text-[10px] text-muted-foreground">
+                                {t.fieldsTab.optionsHint ||
+                                  "Enter options separated by commas."}
+                              </p>
                             </div>
                           )}
+                        </>
+                      )}
                         </div>
                       </div>
                     ))}
@@ -675,8 +881,7 @@ export function FormBuilderDialog({
               </TabsContent>
 
               {/* ── SHARE & EMBED TAB ── */}
-              {isEdit && (
-                <TabsContent value="share" className="space-y-6 mt-0">
+              <TabsContent value="share" className="space-y-6 mt-0">
                   {/* Direct Link */}
                   <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -783,22 +988,42 @@ export function FormBuilderDialog({
                     </div>
                   </div>
                 </TabsContent>
+              </Tabs>
+            </div>
+
+            {/* Right Column: Live Interactive Preview */}
+            <FormPreviewPane
+              title={title}
+              slug={slug}
+              description={description}
+              fields={fields}
+              submitButtonText={submitButtonText}
+              dictionary={dictionary}
+            />
+          </div>
+
+          <DialogFooter className="p-4 px-6 border-t border-border bg-muted/10 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            <div>
+              {serverError && (
+                <p className="text-xs font-medium text-destructive">
+                  {serverError}
+                </p>
               )}
             </div>
-          </Tabs>
 
-          <DialogFooter className="p-4 px-6 border-t border-border bg-muted/10 flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              {t.cancel}
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <LoaderCircle className="size-4 animate-spin" />}
-              {isEdit ? t.submitUpdate : t.submitCreate}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                {t.cancel}
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending && <LoaderCircle className="size-4 animate-spin" />}
+                {isEdit ? t.submitUpdate : t.submitCreate}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
