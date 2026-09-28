@@ -309,9 +309,9 @@ export function ContactProfileView({
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{deal.title}</p>
                         <div className="mt-0.5 flex items-center gap-1.5">
-                          <span className={cn("size-2 rounded-full", CRM_STAGE_DOT_CLASSES[deal.stage])} />
+                          <span className={cn("size-2 rounded-full", CRM_STAGE_DOT_CLASSES[deal.stage.toLowerCase()] || "bg-primary")} />
                           <span className="text-xs text-muted-foreground">
-                            {t.stages[deal.stage]}
+                            {(t.stages as Record<string, string>)[deal.stage.toLowerCase()] || deal.stage}
                           </span>
                         </div>
                       </div>

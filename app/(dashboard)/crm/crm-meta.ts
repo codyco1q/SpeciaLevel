@@ -8,18 +8,45 @@ export const CRM_STAGES: CrmStage[] = [
   "lead",
   "contacted",
   "proposal",
+  "negotiation",
   "won",
   "lost",
 ];
 
 /** Semantic column dots: open → neutral, warm, amber, green, red. */
-export const CRM_STAGE_DOT_CLASSES: Record<CrmStage, string> = {
+export const CRM_STAGE_DOT_CLASSES: Record<string, string> = {
   lead: "bg-muted-foreground",
   contacted: "bg-blue-500",
+  qualified: "bg-blue-500",
   proposal: "bg-amber-500",
+  negotiation: "bg-indigo-500",
   won: "bg-emerald-500",
   lost: "bg-red-500",
 };
+
+export function getStageDotClass(stage: string, probability?: number): string {
+  const normalized = stage.toLowerCase().trim();
+  if (CRM_STAGE_DOT_CLASSES[normalized]) {
+    return CRM_STAGE_DOT_CLASSES[normalized];
+  }
+  if (probability !== undefined) {
+    if (probability === 100) return "bg-emerald-500";
+    if (probability === 0) return "bg-red-500";
+    if (probability >= 70) return "bg-indigo-500";
+    if (probability >= 40) return "bg-amber-500";
+    if (probability >= 20) return "bg-blue-500";
+    return "bg-slate-400";
+  }
+  return "bg-primary";
+}
+
+export function getStageName(stage: string, dictionaryStages?: Record<string, string>): string {
+  const normalized = stage.toLowerCase().trim();
+  if (dictionaryStages && dictionaryStages[normalized]) {
+    return dictionaryStages[normalized];
+  }
+  return stage;
+}
 
 export const LEAD_STATUSES: MarketingLeadStatus[] = [
   "new",

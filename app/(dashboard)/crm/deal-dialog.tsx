@@ -33,8 +33,9 @@ import {
   updateDeal,
   type DealRow,
   type MarketingLeadRow,
+  type PipelineRow,
 } from "@/lib/actions/crm";
-import { CRM_CURRENCIES, CRM_STAGES } from "./crm-meta";
+import { CRM_CURRENCIES, getStageName } from "./crm-meta";
 import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
 export interface CrmMemberOption {
@@ -52,21 +53,21 @@ interface DealDialogProps {
   deal?: DealRow | null;
   /** Active organization members available for assignment. */
   members: CrmMemberOption[];
+  pipelines?: PipelineRow[];
+  activePipelineId?: string;
   onSaved: () => void;
   /** Localized copy + validation messages for the current render. */
   platform: Dictionary["platform"];
 }
 
-/**
- * Create / convert / edit deal dialog backed by react-hook-form + the shared
- * Zod schema.
- */
 export function DealDialog({
   open,
   onOpenChange,
   lead = null,
   deal = null,
   members,
+  pipelines = [],
+  activePipelineId,
   onSaved,
   platform,
 }: DealDialogProps) {
@@ -77,11 +78,22 @@ export function DealDialog({
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const fallbackPipelineId = activePipelineId || pipelines[0]?.id || "";
+  const initialPipeline = pipelines.find((p) => p.id === (deal?.pipelineId || fallbackPipelineId)) || pipelines[0];
+
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>(
+    deal?.pipelineId || fallbackPipelineId
+  );
+
+  const currentPipeline = pipelines.find((p) => p.id === selectedPipelineId) || initialPipeline;
+  const currentStages = currentPipeline?.stages || [];
+
   const {
     register,
     handleSubmit,
     reset,
     control,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<CrmDealInput>({
@@ -90,22 +102,28 @@ export function DealDialog({
       title: "",
       value: 0,
       currency: "USD",
-      stage: "lead",
+      pipelineId: fallbackPipelineId,
+      stageId: currentStages[0]?.id || "",
+      stage: currentStages[0]?.name.toLowerCase() || "lead",
       notes: "",
       assignedTo: "",
       contact: { name: "", email: "", company: "", phone: "" },
     },
   });
 
-  // Re-seed the form every time the dialog opens so it always reflects a
-  // pristine create form, the lead being converted, or the deal being edited.
   useEffect(() => {
     if (!open) return;
+    const initialPipe = pipelines.find((p) => p.id === (deal?.pipelineId || activePipelineId || pipelines[0]?.id)) || pipelines[0];
+    const initialPipeId = initialPipe?.id || "";
+    setSelectedPipelineId(initialPipeId);
+
     if (deal) {
       reset({
         title: deal.title,
         value: deal.value,
         currency: (deal.currency as "USD" | "EUR" | "GBP" | "AED" | "SAR") || "USD",
+        pipelineId: deal.pipelineId || initialPipeId,
+        stageId: deal.stageId || initialPipe?.stages[0]?.id || "",
         stage: deal.stage,
         notes: deal.notes ?? "",
         assignedTo: deal.assignee?.id ?? "",
@@ -118,11 +136,13 @@ export function DealDialog({
       });
     } else {
       reset({
-        title: "",
+        title: lead ? `${lead.name} — ${lead.company || lead.packageOfInterest || "Inquiry"}` : "",
         value: 0,
         currency: "USD",
-        stage: "lead",
-        notes: "",
+        pipelineId: initialPipeId,
+        stageId: initialPipe?.stages[0]?.id || "",
+        stage: initialPipe?.stages[0]?.name.toLowerCase() || "lead",
+        notes: lead ? [lead.bottleneck && `Bottleneck: ${lead.bottleneck}`, lead.packageOfInterest && `Package: ${lead.packageOfInterest}`].filter(Boolean).join("\n") : "",
         assignedTo: "",
         contact: {
           name: lead?.name ?? "",
@@ -132,9 +152,19 @@ export function DealDialog({
         },
       });
     }
-  }, [open, lead, deal, reset]);
+    setServerError(null);
+  }, [open, deal, lead, activePipelineId, pipelines, reset]);
 
-  // Clear any leftover server error the moment the dialog closes.
+  function handlePipelineSelect(pipeId: string) {
+    setSelectedPipelineId(pipeId);
+    setValue("pipelineId", pipeId);
+    const pipe = pipelines.find((p) => p.id === pipeId);
+    if (pipe && pipe.stages[0]) {
+      setValue("stageId", pipe.stages[0].id);
+      setValue("stage", pipe.stages[0].name.toLowerCase());
+    }
+  }
+
   const handleOpenChange = (next: boolean) => {
     if (!next) setServerError(null);
     onOpenChange(next);
@@ -143,9 +173,9 @@ export function DealDialog({
   const onSubmit = handleSubmit((values) => {
     setServerError(null);
     startTransition(() => {
-      const action = isEdit
+      const action = isEdit && deal
         ? updateDeal(deal.id, values)
-        : isConvert
+        : isConvert && lead
           ? convertLeadToDeal(lead.id, values)
           : createDeal(values);
       void action.then((result) => {
@@ -166,6 +196,7 @@ export function DealDialog({
           return;
         }
         onSaved();
+        onOpenChange(false);
       });
     });
   });
@@ -205,6 +236,28 @@ export function DealDialog({
               </p>
             )}
           </div>
+
+          {/* Pipeline Selector (if multiple pipelines) */}
+          {pipelines.length > 1 && (
+            <div className="grid gap-2">
+              <Label htmlFor="deal-pipeline">{t.pipelines.pipeline}</Label>
+              <Select
+                value={selectedPipelineId}
+                onValueChange={handlePipelineSelect}
+              >
+                <SelectTrigger id="deal-pipeline" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelines.map((pipe) => (
+                    <SelectItem key={pipe.id} value={pipe.id}>
+                      {pipe.name} {pipe.isDefault ? `(${t.pipelines.isDefault})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="grid gap-2">
@@ -252,22 +305,24 @@ export function DealDialog({
             <div className="grid gap-2">
               <Label htmlFor="deal-stage">{t.dealDialog.stageLabel}</Label>
               <Controller
-                name="stage"
+                name="stageId"
                 control={control}
                 render={({ field }) => (
                   <Select
-                    value={field.value}
-                    onValueChange={(value) =>
-                      field.onChange(value as CrmDealInput["stage"])
-                    }
+                    value={field.value || currentStages[0]?.id || ""}
+                    onValueChange={(val) => {
+                      field.onChange(val);
+                      const matched = currentStages.find((s) => s.id === val);
+                      if (matched) setValue("stage", matched.name.toLowerCase());
+                    }}
                   >
                     <SelectTrigger id="deal-stage" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CRM_STAGES.map((stage) => (
-                        <SelectItem key={stage} value={stage}>
-                          {t.stages[stage]}
+                      {currentStages.map((stage) => (
+                        <SelectItem key={stage.id} value={stage.id}>
+                          {getStageName(stage.name, t.stages as Record<string, string>)}
                         </SelectItem>
                       ))}
                     </SelectContent>

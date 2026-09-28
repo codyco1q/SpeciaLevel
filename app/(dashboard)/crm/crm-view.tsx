@@ -1,17 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  AlertTriangle,
   Building2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Contact,
+  DollarSign,
+  Layers,
+  Percent,
   Plus,
+  TrendingUp,
+  Trophy,
   User,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Tabs,
   TabsList,
@@ -30,39 +45,63 @@ import { cn } from "@/lib/utils";
 import {
   getDeals,
   getMarketingLeads,
+  getPipelines,
   updateDealStage,
   type DealRow,
   type MarketingLeadRow,
+  type PipelineRow,
+  type PipelineStageRow,
 } from "@/lib/actions/crm";
-import type { CrmStage } from "@/types/database";
 import {
-  CRM_STAGES,
-  CRM_STAGE_DOT_CLASSES,
+  getStageDotClass,
+  getStageName,
   LEAD_STATUS_BADGE_CLASSES,
   formatCurrency,
   formatLeadDate,
 } from "./crm-meta";
 import { DealDialog, type CrmMemberOption } from "./deal-dialog";
 import { DealDetailDialog } from "./deal-detail-dialog";
-import { ContactsTab } from "./contacts-tab";
-import type { ContactSummaryRow } from "@/lib/actions/crm-contacts";
+import { PipelineManagerDialog } from "./pipeline-manager-dialog";
+import { WinLossDialog } from "./win-loss-dialog";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface DealCardProps {
   deal: DealRow;
-  onMove: (dealId: string, stage: CrmStage) => void;
+  stageObj?: PipelineStageRow;
+  onMove: (dealId: string, stageId: string) => void;
   onSelect: (deal: DealRow) => void;
-  /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
+  hasPrev: boolean;
+  hasNext: boolean;
+  prevStageId?: string;
+  nextStageId?: string;
 }
 
-/** Single pipeline card: identity, value, and chevron stage moves. */
-function DealCard({ deal, onMove, onSelect, platform, locale }: DealCardProps) {
+function DealCard({
+  deal,
+  stageObj,
+  onMove,
+  onSelect,
+  platform,
+  locale,
+  hasPrev,
+  hasNext,
+  prevStageId,
+  nextStageId,
+}: DealCardProps) {
   const t = platform.crm;
-  const stageIndex = CRM_STAGES.indexOf(deal.stage);
-  const hasPrev = stageIndex > 0;
-  const hasNext = stageIndex < CRM_STAGES.length - 1;
+  const daysSinceUpdate = Math.floor(
+    (Date.now() - new Date(deal.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const isStale =
+    stageObj &&
+    stageObj.probability > 0 &&
+    stageObj.probability < 100 &&
+    daysSinceUpdate >= stageObj.staleDays;
+
+  const isWon = deal.wonReason !== null || deal.stage.toLowerCase() === "won";
+  const isLost = deal.lostReason !== null || deal.stage.toLowerCase() === "lost";
 
   return (
     <div
@@ -75,11 +114,27 @@ function DealCard({ deal, onMove, onSelect, platform, locale }: DealCardProps) {
           onSelect(deal);
         }
       }}
-      className="cursor-pointer rounded-lg border border-border bg-card p-3 shadow-sm transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="cursor-pointer rounded-lg border border-border bg-card p-3 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <p className="text-sm font-semibold leading-snug">{deal.title}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold leading-snug text-foreground line-clamp-2">
+          {deal.title}
+        </p>
+        {isWon && (
+          <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] px-1 py-0 shrink-0">
+            <Trophy className="size-2.5 me-0.5" />
+            {t.stages.won}
+          </Badge>
+        )}
+        {isLost && (
+          <Badge variant="outline" className="border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] px-1 py-0 shrink-0">
+            <XCircle className="size-2.5 me-0.5" />
+            {t.stages.lost}
+          </Badge>
+        )}
+      </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {deal.contact && (
           <span className="inline-flex min-w-0 items-center gap-1">
             <Building2 className="h-3 w-3 shrink-0" />
@@ -98,47 +153,55 @@ function DealCard({ deal, onMove, onSelect, platform, locale }: DealCardProps) {
         )}
       </div>
 
-      <p className="mt-2 text-sm font-semibold tracking-tight tabular-nums">
-        {formatCurrency(deal.value, deal.currency, locale)}
-      </p>
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <p className="text-sm font-bold tracking-tight tabular-nums text-foreground">
+          {formatCurrency(deal.value, deal.currency, locale)}
+        </p>
 
-      <div className="mt-2 flex items-center justify-between gap-1 border-t border-border/60 pt-2">
+        {isStale && (
+          <Badge
+            variant="outline"
+            className="border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1 text-[10px] px-1.5 py-0 shrink-0"
+          >
+            <Clock className="size-2.5" />
+            {t.pipelines.staleBadge} {daysSinceUpdate}d
+          </Badge>
+        )}
+      </div>
+
+      <div className="mt-2.5 flex items-center justify-between gap-1 border-t border-border/60 pt-2">
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="size-7 p-0"
-          disabled={!hasPrev}
+          disabled={!hasPrev || !prevStageId}
           onClick={(e) => {
             e.stopPropagation();
-            onMove(deal.id, CRM_STAGES[stageIndex - 1]);
+            if (prevStageId) onMove(deal.id, prevStageId);
           }}
+          className="h-6 px-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
           aria-label={t.movePrevious}
+          title={t.movePrevious}
         >
-          <ChevronLeft className="size-4 rtl:rotate-180" />
+          <ChevronLeft className="h-3.5 w-3.5 rtl:rotate-180" />
         </Button>
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium">
-          <span
-            className={cn(
-              "size-2 shrink-0 rounded-full",
-              CRM_STAGE_DOT_CLASSES[deal.stage]
-            )}
-          />
-          <span className="truncate">{t.stages[deal.stage]}</span>
+        <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+          {stageObj ? `${stageObj.probability}%` : ""}
         </span>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="size-7 p-0"
-          disabled={!hasNext}
+          disabled={!hasNext || !nextStageId}
           onClick={(e) => {
             e.stopPropagation();
-            onMove(deal.id, CRM_STAGES[stageIndex + 1]);
+            if (nextStageId) onMove(deal.id, nextStageId);
           }}
+          className="h-6 px-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
           aria-label={t.moveNext}
+          title={t.moveNext}
         >
-          <ChevronRight className="size-4 rtl:rotate-180" />
+          <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         </Button>
       </div>
     </div>
@@ -146,87 +209,72 @@ function DealCard({ deal, onMove, onSelect, platform, locale }: DealCardProps) {
 }
 
 interface CrmViewProps {
+  initialPipelines: PipelineRow[];
   initialDeals: DealRow[];
   initialLeads: MarketingLeadRow[];
   members: CrmMemberOption[];
-  initialContacts: ContactSummaryRow[];
   canManage: boolean;
-  /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
-  /** Localized package-of-interest labels from the contact form dict. */
   packageLabels: Record<string, string>;
   initialTab?: string;
+  initialPipelineId?: string;
 }
 
-/**
- * CRM orchestrator: Pipeline (kanban board) and Inbound Leads (table of
- * website inquiries). Stage moves are available to any `crm.view` holder;
- * creating deals and converting leads require `crm.manage` (the Inbound
- * Leads tab is hidden for view-only members because RLS restricts lead
- * reads to managers).
- */
 export function CrmView({
+  initialPipelines,
   initialDeals,
   initialLeads,
   members,
-  initialContacts,
   canManage,
   platform,
   locale,
   packageLabels,
   initialTab,
+  initialPipelineId,
 }: CrmViewProps) {
   const t = platform.crm;
+  const pDict = t.pipelines;
   const common = platform.common;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlTab = searchParams.get("tab");
 
-  const resolvedInitialTab =
-    urlTab === "contacts" || initialTab === "contacts"
-      ? "contacts"
-      : (urlTab === "leads" || initialTab === "leads") && canManage
-        ? "leads"
-        : "pipeline";
+  const [pipelines, setPipelines] = useState<PipelineRow[]>(initialPipelines);
+  const fallbackPipelineId = initialPipelineId || initialPipelines[0]?.id || "";
+  const [activePipelineId, setActivePipelineId] = useState<string>(
+    searchParams.get("pipelineId") || fallbackPipelineId
+  );
 
   const [deals, setDeals] = useState<DealRow[]>(initialDeals);
   const [leads, setLeads] = useState<MarketingLeadRow[]>(initialLeads);
-  const [tab, setTab] = useState<string>(resolvedInitialTab);
+  const [tab, setTab] = useState<string>(
+    searchParams.get("tab") === "leads" && canManage ? "leads" : "pipeline"
+  );
+
   const [createOpen, setCreateOpen] = useState(false);
-  const [convertingLead, setConvertingLead] =
-    useState<MarketingLeadRow | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [convertingLead, setConvertingLead] = useState<MarketingLeadRow | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<DealRow | null>(null);
   const [editingDeal, setEditingDeal] = useState<DealRow | null>(null);
+
+  const [winLossModalOpen, setWinLossModalOpen] = useState(false);
+  const [winLossDeal, setWinLossDeal] = useState<DealRow | null>(null);
+  const [winLossStatus, setWinLossStatus] = useState<"won" | "lost">("won");
+  const [winLossTargetStageId, setWinLossTargetStageId] = useState<string | undefined>(undefined);
+
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const urlDealId = searchParams.get("dealId");
-  const urlNew = searchParams.get("new");
+  const activePipeline =
+    pipelines.find((p) => p.id === activePipelineId) || pipelines[0];
+  const activeStages = activePipeline?.stages || [];
 
-  useEffect(() => {
-    if (urlTab === "contacts") {
-      setTab("contacts");
-    } else if (urlTab === "leads" && canManage) {
-      setTab("leads");
-    } else if (urlTab === "pipeline") {
-      setTab("pipeline");
-    }
-  }, [urlTab, canManage]);
-
-  useEffect(() => {
-    if (urlDealId && deals.length > 0) {
-      const match = deals.find((d) => d.id === urlDealId);
-      if (match) {
-        setSelectedDeal(match);
-      }
-    }
-  }, [urlDealId, deals]);
-
-  useEffect(() => {
-    if (urlNew === "true" || urlNew === "1") {
-      setCreateOpen(true);
-    }
-  }, [urlNew]);
+  const handlePipelineChange = (newPipelineId: string) => {
+    setActivePipelineId(newPipelineId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("pipelineId", newPipelineId);
+    router.replace(`/crm?${params.toString()}`, { scroll: false });
+  };
 
   const handleTabChange = (nextTab: string) => {
     setTab(nextTab);
@@ -236,145 +284,304 @@ export function CrmView({
     } else {
       params.set("tab", nextTab);
     }
-    const query = params.toString();
-    router.replace(query ? `/crm?${query}` : "/crm", { scroll: false });
+    router.replace(`/crm?${params.toString()}`, { scroll: false });
   };
 
-  /** Refetch deals (and leads when permitted). */
-  async function refreshAll() {
-    const rows = await getDeals();
-    if (rows) {
-      setDeals(rows);
-      if (selectedDeal) {
-        const refreshed = rows.find((d) => d.id === selectedDeal.id);
-        if (refreshed) setSelectedDeal(refreshed);
+  async function refreshData() {
+    startTransition(async () => {
+      const [newPipelines, newDeals, newLeads] = await Promise.all([
+        getPipelines(),
+        getDeals(),
+        canManage ? getMarketingLeads() : Promise.resolve([]),
+      ]);
+      if (newPipelines && newPipelines.length > 0) setPipelines(newPipelines);
+      if (newDeals) {
+        setDeals(newDeals);
+        if (selectedDeal) {
+          const matched = newDeals.find((d) => d.id === selectedDeal.id);
+          if (matched) setSelectedDeal(matched);
+        }
       }
-    }
-    if (canManage) {
-      const leadRows = await getMarketingLeads();
-      if (leadRows) setLeads(leadRows);
-    }
+      if (newLeads) setLeads(newLeads);
+    });
   }
 
-  async function handleStageMove(dealId: string, stage: CrmStage) {
-    if (actionError) setActionError(null);
-    const result = await updateDealStage(dealId, stage);
-    if (result.status === "error") {
-      setActionError(result.error ?? t.errors.updateFailed);
+  function handleStageMove(dealId: string, stageId: string) {
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal) return;
+
+    const targetStage = activeStages.find((s) => s.id === stageId);
+    if (targetStage && (targetStage.probability === 100 || targetStage.name.toLowerCase() === "won")) {
+      setWinLossDeal(deal);
+      setWinLossStatus("won");
+      setWinLossTargetStageId(stageId);
+      setWinLossModalOpen(true);
       return;
     }
-    setDeals((current) =>
-      current.map((deal) => (deal.id === dealId ? { ...deal, stage } : deal))
-    );
-    setSelectedDeal((prev) =>
-      prev && prev.id === dealId ? { ...prev, stage } : prev
-    );
-    await refreshAll();
-  }
-
-  function handleDealSaved() {
-    setCreateOpen(false);
-    setConvertingLead(null);
-    setEditingDeal(null);
-    void refreshAll();
-  }
-
-  function handleDealDeleted() {
-    if (selectedDeal) {
-      setDeals((prev) => prev.filter((d) => d.id !== selectedDeal.id));
+    if (targetStage && (targetStage.probability === 0 || targetStage.name.toLowerCase() === "lost")) {
+      setWinLossDeal(deal);
+      setWinLossStatus("lost");
+      setWinLossTargetStageId(stageId);
+      setWinLossModalOpen(true);
+      return;
     }
-    setSelectedDeal(null);
-    void refreshAll();
+
+    startTransition(async () => {
+      setActionError(null);
+      const res = await updateDealStage(dealId, stageId);
+      if (res.status === "error") {
+        setActionError(res.error || t.errors.updateFailed);
+        return;
+      }
+      refreshData();
+    });
   }
 
-  const dealsByStage = (stage: CrmStage) =>
-    deals.filter((deal) => deal.stage === stage);
+  function handlePromptWinLoss(deal: DealRow, status: "won" | "lost", stageId?: string) {
+    setWinLossDeal(deal);
+    setWinLossStatus(status);
+    setWinLossTargetStageId(stageId);
+    setWinLossModalOpen(true);
+  }
+
+  const pipelineDeals = deals.filter(
+    (d) => !d.pipelineId || (activePipeline && d.pipelineId === activePipeline.id)
+  );
+
+  const totalPipelineValue = pipelineDeals
+    .filter((d) => d.stage.toLowerCase() !== "lost" && !d.lostReason)
+    .reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+
+  const weightedValue = pipelineDeals.reduce((sum, d) => {
+    const stage = activeStages.find((s) => s.id === d.stageId) || d.stageObj;
+    const prob = stage
+      ? stage.probability
+      : d.stage.toLowerCase() === "won"
+        ? 100
+        : d.stage.toLowerCase() === "lost"
+          ? 0
+          : 50;
+    return sum + (Number(d.value) || 0) * (prob / 100);
+  }, 0);
+
+  const activeDealsCount = pipelineDeals.filter((d) => {
+    const stage = activeStages.find((s) => s.id === d.stageId) || d.stageObj;
+    const isClosed =
+      d.closedAt !== null ||
+      d.wonReason !== null ||
+      d.lostReason !== null ||
+      d.stage.toLowerCase() === "won" ||
+      d.stage.toLowerCase() === "lost" ||
+      (stage && (stage.probability === 100 || stage.probability === 0));
+    return !isClosed;
+  }).length;
+
+  const wonDeals = pipelineDeals.filter(
+    (d) => d.wonReason !== null || d.stage.toLowerCase() === "won"
+  );
+  const wonTotalValue = wonDeals.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+  const activeCurrency = pipelineDeals[0]?.currency || "USD";
+
+  const getDealsForStage = (stage: PipelineStageRow) => {
+    return pipelineDeals.filter((d) => {
+      if (d.stageId) return d.stageId === stage.id;
+      return d.stage.toLowerCase() === stage.name.toLowerCase();
+    });
+  };
 
   return (
-    <div>
-      {/* Page header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
+    <div className="space-y-6">
+      {/* Top Header with Pipeline Switcher & Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Layers className="size-6 text-primary shrink-0" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
+              <p className="text-xs text-muted-foreground">{t.subtitle}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 ms-0 sm:ms-4">
+            <Select value={activePipeline?.id || ""} onValueChange={handlePipelineChange}>
+              <SelectTrigger className="h-9 w-[190px] text-xs font-semibold bg-card">
+                <SelectValue placeholder={pDict.switchPipeline} />
+              </SelectTrigger>
+              <SelectContent>
+                {pipelines.map((pipe) => (
+                  <SelectItem key={pipe.id} value={pipe.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{pipe.name}</span>
+                      {pipe.isDefault && (
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
+                          {pDict.isDefault}
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {canManage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs gap-1.5"
+                onClick={() => setManagerOpen(true)}
+              >
+                <Layers className="size-3.5" />
+                <span>{pDict.managePipelines}</span>
+              </Button>
+            )}
+          </div>
         </div>
-        {canManage && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            {t.newDeal}
-          </Button>
-        )}
+
+        <div className="flex items-center gap-2">
+          {canManage && (
+            <Button size="sm" className="h-9 text-xs gap-1.5" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              <span>{t.newDeal}</span>
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Metrics Bar */}
+      {tab === "pipeline" && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-xs font-semibold">{pDict.totalValue}</span>
+              <DollarSign className="size-4" />
+            </div>
+            <p className="mt-2 text-xl font-bold tracking-tight text-foreground tabular-nums">
+              {formatCurrency(totalPipelineValue, activeCurrency, locale)}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-xs font-semibold">{pDict.weightedValue}</span>
+              <Percent className="size-4" />
+            </div>
+            <p className="mt-2 text-xl font-bold tracking-tight text-foreground tabular-nums">
+              {formatCurrency(weightedValue, activeCurrency, locale)}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-xs font-semibold">{pDict.activeDeals}</span>
+              <TrendingUp className="size-4" />
+            </div>
+            <p className="mt-2 text-xl font-bold tracking-tight text-foreground tabular-nums">
+              {activeDealsCount}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-xs font-semibold">{pDict.closedWon}</span>
+              <Trophy className="size-4 text-emerald-500" />
+            </div>
+            <p className="mt-2 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
+              {wonDeals.length} <span className="text-xs font-normal text-muted-foreground">({formatCurrency(wonTotalValue, activeCurrency, locale)})</span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {actionError && (
         <div
           role="alert"
-          className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-center gap-2"
         >
-          {actionError}
+          <AlertTriangle className="size-4 shrink-0" />
+          <span>{actionError}</span>
         </div>
       )}
 
-      <Tabs
-        value={tab}
-        onValueChange={handleTabChange}
-        className="w-full"
-      >
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         <TabsList>
           <TabsTrigger value="pipeline">{t.tabs.pipeline}</TabsTrigger>
-          <TabsTrigger value="contacts">{t.tabs.contacts}</TabsTrigger>
-          {canManage && (
-            <TabsTrigger value="leads">{t.tabs.inboundLeads}</TabsTrigger>
-          )}
+          {canManage && <TabsTrigger value="leads">{t.tabs.inboundLeads}</TabsTrigger>}
         </TabsList>
 
-        {/* ── Pipeline board ─────────────────────────────────── */}
+        {/* ── Dynamic Pipeline Kanban Board ──────────────────── */}
         <TabsContent value="pipeline" className="mt-4">
-          {deals.length === 0 ? (
+          {activeStages.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-10 text-center">
-              <p className="text-sm font-medium">{t.noDealsYet}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {canManage
-                  ? t.noDealsYetHintManage
-                  : t.noDealsYetHintView}
-              </p>
+              <p className="text-sm font-medium">{pDict.mustHaveOneStage}</p>
             </div>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-2">
-              {CRM_STAGES.map((stage) => (
-                <div key={stage} className="w-72 shrink-0">
-                  <div className="mb-2 flex items-center gap-2 px-1">
-                    <span
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        CRM_STAGE_DOT_CLASSES[stage]
-                      )}
-                    />
-                    <p className="text-sm font-semibold">{t.stages[stage]}</p>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground tabular-nums">
-                      {dealsByStage(stage).length}
-                    </span>
-                  </div>
-                  <div className="space-y-2 rounded-lg bg-muted/40 p-2">
-                    {dealsByStage(stage).length === 0 ? (
-                      <p className="px-1 py-3 text-center text-xs text-muted-foreground">
-                        {t.noDealsInColumn}
-                      </p>
-                    ) : (
-                      dealsByStage(stage).map((deal) => (
-                        <DealCard
-                          key={deal.id}
-                          deal={deal}
-                          onMove={handleStageMove}
-                          onSelect={setSelectedDeal}
-                          platform={platform}
-                          locale={locale}
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-1">
+              {activeStages.map((stage, sIdx) => {
+                const stageDeals = getDealsForStage(stage);
+                const stageTotalVal = stageDeals.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+                const hasPrev = sIdx > 0;
+                const hasNext = sIdx < activeStages.length - 1;
+                const prevStageId = hasPrev ? activeStages[sIdx - 1].id : undefined;
+                const nextStageId = hasNext ? activeStages[sIdx + 1].id : undefined;
+
+                return (
+                  <div key={stage.id} className="w-72 shrink-0 flex flex-col">
+                    {/* Column Header */}
+                    <div className="mb-2 flex items-center justify-between px-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className={cn(
+                            "size-2.5 shrink-0 rounded-full",
+                            getStageDotClass(stage.name, stage.probability)
+                          )}
                         />
-                      ))
-                    )}
+                        <p className="text-sm font-bold truncate">
+                          {getStageName(stage.name, t.stages as Record<string, string>)}
+                        </p>
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 font-mono text-muted-foreground">
+                          {stage.probability}%
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                        <span className="font-semibold tabular-nums">
+                          {stageDeals.length}
+                        </span>
+                        <span>•</span>
+                        <span className="tabular-nums">
+                          {formatCurrency(stageTotalVal, activeCurrency, locale)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Column Cards Container */}
+                    <div className="space-y-2 rounded-xl bg-muted/40 p-2 min-h-[140px] flex-1">
+                      {stageDeals.length === 0 ? (
+                        <p className="py-8 text-center text-xs text-muted-foreground/60 italic">
+                          {t.noDealsInColumn}
+                        </p>
+                      ) : (
+                        stageDeals.map((deal) => (
+                          <DealCard
+                            key={deal.id}
+                            deal={deal}
+                            stageObj={stage}
+                            onMove={handleStageMove}
+                            onSelect={setSelectedDeal}
+                            platform={platform}
+                            locale={locale}
+                            hasPrev={hasPrev}
+                            hasNext={hasNext}
+                            prevStageId={prevStageId}
+                            nextStageId={nextStageId}
+                          />
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -460,15 +667,6 @@ export function CrmView({
           </TabsContent>
         )}
 
-        {/* ── Contacts directory ─────────────────────────────── */}
-        <TabsContent value="contacts" className="mt-4">
-          <ContactsTab
-            initialContacts={initialContacts}
-            canManage={canManage}
-            platform={platform}
-            locale={locale}
-          />
-        </TabsContent>
       </Tabs>
 
       {/* Deal Detail Dialog */}
@@ -480,16 +678,20 @@ export function CrmView({
         }}
         canManage={canManage}
         members={members}
+        pipelines={pipelines}
         platform={platform}
         locale={locale}
-        onStageChange={handleStageMove}
+        onStageChange={async (dealId, stageId) => {
+          handleStageMove(dealId, stageId);
+        }}
+        onWinLossPrompt={handlePromptWinLoss}
         onEdit={(deal) => {
           setEditingDeal(deal);
         }}
-        onDeleted={handleDealDeleted}
+        onDeleted={refreshData}
       />
 
-      {/* Dialogs */}
+      {/* Deal Dialog */}
       <DealDialog
         open={createOpen || convertingLead !== null || editingDeal !== null}
         onOpenChange={(open) => {
@@ -502,7 +704,31 @@ export function CrmView({
         lead={convertingLead}
         deal={editingDeal}
         members={members}
-        onSaved={handleDealSaved}
+        pipelines={pipelines}
+        activePipelineId={activePipeline?.id}
+        onSaved={refreshData}
+        platform={platform}
+      />
+
+      {/* Pipeline Manager Dialog */}
+      <PipelineManagerDialog
+        open={managerOpen}
+        onOpenChange={setManagerOpen}
+        pipelines={pipelines}
+        activePipelineId={activePipeline?.id}
+        onPipelineSelect={handlePipelineChange}
+        onSaved={refreshData}
+        platform={platform}
+      />
+
+      {/* Win/Loss Modal */}
+      <WinLossDialog
+        open={winLossModalOpen}
+        onOpenChange={setWinLossModalOpen}
+        deal={winLossDeal}
+        status={winLossStatus}
+        targetStageId={winLossTargetStageId}
+        onSaved={refreshData}
         platform={platform}
       />
     </div>

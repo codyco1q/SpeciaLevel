@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
-import { getDeals, getMarketingLeads } from "@/lib/actions/crm";
-import { getContacts } from "@/lib/actions/crm-contacts";
+import { getDeals, getMarketingLeads, getPipelines } from "@/lib/actions/crm";
 import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { CrmView } from "./crm-view";
@@ -14,10 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function CrmPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tab?: string }>;
+  searchParams?: Promise<{ tab?: string; pipelineId?: string; dealId?: string; new?: string }>;
 }) {
   const resolvedParams = searchParams ? await searchParams : undefined;
   const initialTab = resolvedParams?.tab;
+  const initialPipelineId = resolvedParams?.pipelineId;
+
   const userContext = await getCurrentUserContext();
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
@@ -58,16 +59,17 @@ export default async function CrmPage({
     email: profile.email ?? null,
   }));
 
-  const initialDeals = await getDeals();
-  const initialContacts = await getContacts();
+  const pipelines = await getPipelines();
+  const activePipeline =
+    pipelines.find((p) => p.id === initialPipelineId) || pipelines[0];
 
-  // Inbound leads are RLS-restricted to `crm.manage` holders — only fetch
-  // them for managers (the tab is hidden for view-only members anyway).
+  const initialDeals = await getDeals(activePipeline?.id);
   const initialLeads = canManage ? (await getMarketingLeads()) ?? [] : [];
 
   return (
     <div className="p-8">
       <CrmView
+        initialPipelines={pipelines}
         initialDeals={initialDeals ?? []}
         initialLeads={initialLeads}
         members={members}
@@ -75,8 +77,8 @@ export default async function CrmPage({
         platform={platform}
         locale={locale}
         packageLabels={dict.contact.form.packageOptions}
-        initialContacts={initialContacts ?? []}
         initialTab={initialTab}
+        initialPipelineId={activePipeline?.id}
       />
     </div>
   );
