@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,27 +10,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { InvitationRow } from "./page";
+import type { EmployeeInvitationRow } from "./page";
 import type { Dictionary } from "@/lib/i18n/get-dictionary";
 
-interface RevokeInvitationDialogProps {
-  invitation: InvitationRow;
+interface RevokeEmployeeInvitationDialogProps {
+  invitation: EmployeeInvitationRow;
   error: string | null;
   isPending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
-  /** Localized copy for the current render. */
   platform: Dictionary["platform"];
 }
 
-export function RevokeInvitationDialog({
+export function RevokeEmployeeInvitationDialog({
   invitation,
   error,
   isPending,
   onCancel,
   onConfirm,
   platform,
-}: RevokeInvitationDialogProps) {
+}: RevokeEmployeeInvitationDialogProps) {
   const t = platform.settings;
 
   return (

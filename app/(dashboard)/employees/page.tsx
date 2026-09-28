@@ -2,9 +2,25 @@ import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/auth/rbac";
+import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { EmployeeDirectory } from "./employee-directory";
 
 export const dynamic = "force-dynamic";
+
+export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+
+export interface EmployeeInvitationRow {
+  id: string;
+  email: string;
+  roleName: string;
+  departmentName: string | null;
+  contactName: string | null;
+  invitedByName: string | null;
+  status: InvitationStatus;
+  token: string;
+  createdAt: string;
+  expiresAt: string;
+}
 
 export interface EmployeeRow {
   id: string;
@@ -19,6 +35,33 @@ export interface EmployeeRow {
   createdAt: string;
 }
 
+interface InvitationJoin {
+  id: string;
+  email: string;
+  status: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
+  role?: { name?: string } | { name?: string }[] | null;
+  department?: { name?: string } | { name?: string }[] | null;
+  contact?: { name?: string } | { name?: string }[] | null;
+  invited_by_profile?:
+    | { full_name?: string }
+    | { full_name?: string }[]
+    | null;
+}
+
+function pickJoinedValue(value: unknown, key: string): string | null {
+  if (!value) return null;
+  const row = Array.isArray(value) ? value[0] : value;
+  if (row && typeof row === "object" && key in row) {
+    const field = (row as Record<string, unknown>)[key];
+    return typeof field === "string" ? field : null;
+  }
+  return null;
+}
+
+
 export default async function EmployeesPage() {
   const userContext = await getCurrentUserContext();
 
@@ -27,73 +70,109 @@ export default async function EmployeesPage() {
   const organization = userContext.organization;
   if (!organization) redirect("/onboarding");
 
-  if (!hasPermission("employees.view", userContext.permissions)) {
+  const { platform } = await getDictionary();
+  const locale = await getLocale();
+
+  const isOwnerOrAdmin = userContext.roles.some(
+    (role) => role.key === "owner" || role.key === "admin"
+  );
+  const canView =
+    isOwnerOrAdmin ||
+    hasPermission("employees.view", userContext.permissions) ||
+    hasPermission("employees.manage", userContext.permissions);
+
+  if (!canView) {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Employees</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {platform.employees?.title || "Employees"}
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            You don&apos;t have permission to view employees.
+            {platform.employees?.noPermissionBody ||
+              "You don't have permission to view employees."}
           </p>
         </div>
       </div>
     );
   }
 
-  const canCreate = hasPermission("employees.create", userContext.permissions);
-  const canUpdate = hasPermission("employees.update", userContext.permissions);
-  const canDelete = hasPermission("employees.delete", userContext.permissions);
+  const canCreate =
+    isOwnerOrAdmin ||
+    hasPermission("employees.create", userContext.permissions) ||
+    hasPermission("employees.manage", userContext.permissions) ||
+    hasPermission("users.invite", userContext.permissions) ||
+    hasPermission("settings.manage", userContext.permissions);
+
+  const canUpdate =
+    isOwnerOrAdmin ||
+    hasPermission("employees.update", userContext.permissions) ||
+    hasPermission("employees.manage", userContext.permissions);
+
+  const canDelete =
+    isOwnerOrAdmin ||
+    hasPermission("employees.delete", userContext.permissions) ||
+    hasPermission("employees.manage", userContext.permissions);
 
   const supabase = await createServerClient();
 
-  // Departments for the filter + form select.
-  const { data: departments } = await supabase
-    .from("departments")
-    .select("id, name")
-    .eq("organization_id", organization.id)
-    .order("name", { ascending: true });
 
-  // Roles for the filter + form select (non-system roles first, then system).
-  const { data: roles } = await supabase
-    .from("roles")
-    .select("id, name, key, is_system")
-    .eq("organization_id", organization.id)
-    .order("is_system", { ascending: true })
-    .order("name", { ascending: true });
+  const [
+    departmentsResult,
+    rolesResult,
+    profilesResult,
+    invitesResult,
+    contactsResult,
+  ] = await Promise.all([
+    supabase
+      .from("departments")
+      .select("id, name")
+      .eq("organization_id", organization.id)
+      .order("name", { ascending: true }),
+    supabase
+      .from("roles")
+      .select("id, name, key, is_system")
+      .eq("organization_id", organization.id)
+      .order("is_system", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("profiles")
+      .select(
+        `
+          id,
+          full_name,
+          email,
+          job_title,
+          department_id,
+          status,
+          created_at,
+          department:departments(name),
+          roles:user_roles(role_id, roles(name))
+        `
+      )
+      .eq("organization_id", organization.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("organization_invitations")
+      .select(
+        `id, email, status, token, created_at, expires_at,
+         role:roles!fk_organization_invitations_role(name),
+         department:departments!fk_organization_invitations_department(name),
+         contact:crm_contacts!fk_organization_invitations_contact(name),
+         invited_by_profile:profiles!fk_organization_invitations_invited_by(full_name)`
+      )
+      .eq("organization_id", organization.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("crm_contacts")
+      .select("id, name, email, company")
+      .eq("organization_id", organization.id)
+      .order("name", { ascending: true }),
+  ]);
 
-  // Employees = profiles in this org, with their role mapping embedded.
-  const { data: profiles, error: profilesError } = await supabase
-    .from("profiles")
-    .select(
-      `
-        id,
-        full_name,
-        email,
-        job_title,
-        department_id,
-        status,
-        created_at,
-        department:departments(name),
-        roles:user_roles(role_id, roles(name))
-      `
-    )
-    .eq("organization_id", organization.id)
-    .order("created_at", { ascending: false });
+  const profiles = profilesResult.data ?? [];
 
-  if (profilesError || !profiles) {
-    return (
-      <div className="p-8">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">Employees</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Could not load employees. Please try again.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const rows: EmployeeRow[] = (profiles ?? []).map((profile) => {
+  const employeeRows: EmployeeRow[] = profiles.map((profile) => {
     const roleBindings = (profile.roles ?? []) as {
       role_id: string;
       roles?: { name?: string } | { name?: string }[] | null;
@@ -126,29 +205,58 @@ export default async function EmployeesPage() {
     };
   });
 
+  const invitationRows: EmployeeInvitationRow[] = (
+    (invitesResult.data ?? []) as InvitationJoin[]
+  ).map((invitation): EmployeeInvitationRow => {
+    const stored = (invitation.status ?? "pending") as InvitationStatus;
+    const status =
+      stored === "pending" && new Date(invitation.expires_at) <= new Date()
+        ? "expired"
+        : stored;
+
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      roleName: pickJoinedValue(invitation.role, "name") ?? "—",
+      departmentName: pickJoinedValue(invitation.department, "name"),
+      contactName: pickJoinedValue(invitation.contact, "name"),
+      invitedByName: pickJoinedValue(
+        invitation.invited_by_profile,
+        "full_name"
+      ),
+      status,
+      token: invitation.token,
+      createdAt: invitation.created_at,
+      expiresAt: invitation.expires_at,
+    };
+  });
+
   return (
     <div className="p-8">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold tracking-tight">Employees</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage the people in your organization.
-        </p>
-      </div>
-
       <EmployeeDirectory
-        employees={rows}
-        departments={(departments ?? []).map((d) => ({
+        employees={employeeRows}
+        invitations={invitationRows}
+        departments={(departmentsResult.data ?? []).map((d) => ({
           id: d.id,
           name: d.name,
         }))}
-        roles={(roles ?? []).map((r) => ({
+        roles={(rolesResult.data ?? []).map((r) => ({
           id: r.id,
           name: r.name,
+          key: r.key,
           isSystem: r.is_system,
+        }))}
+        contacts={(contactsResult.data ?? []).map((c) => ({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          company: c.company ?? null,
         }))}
         canCreate={canCreate}
         canUpdate={canUpdate}
         canDelete={canDelete}
+        platform={platform}
+        locale={locale}
       />
     </div>
   );

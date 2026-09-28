@@ -54,7 +54,17 @@ async function requireInviteManage(): Promise<
     };
   }
 
-  if (!hasPermission("settings.manage", userContext.permissions)) {
+  const isOwnerOrAdmin = userContext.roles.some(
+    (role) => role.key === "owner" || role.key === "admin"
+  );
+  const canManage =
+    isOwnerOrAdmin ||
+    hasPermission("settings.manage", userContext.permissions) ||
+    hasPermission("employees.manage", userContext.permissions) ||
+    hasPermission("employees.create", userContext.permissions) ||
+    hasPermission("users.invite", userContext.permissions);
+
+  if (!canManage) {
     return {
       ok: false,
       error: {
@@ -227,13 +237,53 @@ export async function createInvitation(data: {
     };
   }
 
+  revalidatePath("/employees");
+  revalidatePath("/settings");
+  return { status: "success" };
+}
+
+/**
+ * Resend / renew a pending invitation in the current organization.
+ * Extends the expiration date by 7 days and resets status to pending.
+ */
+export async function resendInvitation(
+  invitationId: string
+): Promise<InviteActionState> {
+  const auth = await requireInviteManage();
+  if (!auth.ok) return auth.error;
+
+  const dict = await getDictionary();
+  const err = dict.platform.settings.errors;
+
+  const admin = createServiceRoleClient();
+  const newExpiration = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const { error: updateError } = await admin
+    .from("organization_invitations")
+    .update({
+      expires_at: newExpiration,
+      status: "pending",
+    })
+    .eq("id", invitationId)
+    .eq("organization_id", auth.organizationId);
+
+  if (updateError) {
+    return {
+      status: "error",
+      error: err.inviteCreateFailed || "Could not resend invitation.",
+    };
+  }
+
+  revalidatePath("/employees");
   revalidatePath("/settings");
   return { status: "success" };
 }
 
 /**
  * Revoke a pending invitation in the current organization.
- * Requires the `settings.manage` permission.
+ * Requires member management permission.
  */
 export async function revokeInvitation(
   invitationId: string
@@ -290,6 +340,7 @@ export async function revokeInvitation(
     };
   }
 
+  revalidatePath("/employees");
   revalidatePath("/settings");
   return { status: "success" };
 }

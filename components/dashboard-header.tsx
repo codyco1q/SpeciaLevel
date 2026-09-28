@@ -11,6 +11,7 @@ interface DashboardHeaderProps {
   locale: Locale;
   permissions: string[];
   organizationName?: string;
+  logoUrl?: string | null;
   userFullName?: string;
   userEmail?: string;
 }
@@ -19,6 +20,7 @@ export function DashboardHeader({
   platform,
   locale,
   organizationName,
+  logoUrl,
 }: DashboardHeaderProps) {
   const [isMac, setIsMac] = React.useState(false);
 
@@ -66,7 +68,18 @@ export function DashboardHeader({
 
         {organizationName && (
           <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground font-medium border-s border-border/60 ps-3">
-            <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+            {logoUrl ? (
+              <div className="relative flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border/70 bg-background">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={logoUrl}
+                  alt={organizationName}
+                  className="size-full object-contain p-0.5"
+                />
+              </div>
+            ) : (
+              <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+            )}
             <span className="truncate max-w-[200px]">{organizationName}</span>
           </div>
         )}

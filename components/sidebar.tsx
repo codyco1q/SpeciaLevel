@@ -34,6 +34,7 @@ import { DashboardLocaleSwitcher } from "@/components/dashboard/locale-switcher"
 export interface SidebarProps {
   permissions: string[];
   organizationName?: string;
+  logoUrl?: string | null;
   userFullName?: string;
   userEmail?: string;
   locale: Locale;
@@ -46,6 +47,7 @@ export interface SidebarProps {
 export default function Sidebar({
   permissions,
   organizationName,
+  logoUrl,
   userFullName,
   userEmail,
   locale,
@@ -214,12 +216,27 @@ export default function Sidebar({
   return (
     <aside className="flex h-full w-64 flex-col border-e border-border bg-card print:hidden">
       {/* Logo */}
-      <div className="flex items-center gap-2 border-b border-border px-6 py-5">
-        <Monogram className="size-8 rounded-lg" />
-        <div>
-          <p className="text-sm font-semibold">SpeciaLevel</p>
+      <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+        {logoUrl ? (
+          <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/80 bg-background/80 shadow-xs">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoUrl}
+              alt={organizationName || "Logo"}
+              className="h-full w-full object-contain p-0.5"
+            />
+          </div>
+        ) : (
+          <Monogram className="size-8 shrink-0 rounded-lg" />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold leading-tight">
+            {organizationName || "SpeciaLevel"}
+          </p>
           {organizationName && (
-            <p className="text-xs text-muted-foreground">{organizationName}</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              SpeciaLevel Workspace
+            </p>
           )}
         </div>
       </div>
