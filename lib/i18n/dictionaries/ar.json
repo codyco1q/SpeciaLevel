@@ -268,7 +268,9 @@
       "modules": "الوحدات",
       "settings": "الإعدادات",
       "logout": "تسجيل الخروج",
-      "user": "مستخدم"
+      "user": "مستخدم",
+      "messaging": "الرسائل",
+      "phoneNumbers": "أرقام الهاتف"
     },
     "dashboard": {
       "welcomeBack": "مرحبًا بعودتك",
@@ -1581,7 +1583,6 @@
         "description": "ادعُ زملاء العمل بأدوار وأقسام محددة مسبقًا."
       }
     },
-
     "ai": {
       "navLabel": "الذكاء الاصطناعي والوكلاء",
       "title": "الذكاء الاصطناعي والوكلاء",
@@ -2124,7 +2125,9 @@
         "employees": "الموظفون",
         "departments": "الأقسام",
         "roles": "الأدوار والصلاحيات",
-        "modules": "الوحدات والتطبيقات"
+        "modules": "الوحدات والتطبيقات",
+        "messaging": "الرسائل والمحادثات",
+        "phoneNumbers": "أرقام الهاتف ومزود الخدمة"
       },
       "hints": {
         "dealInStage": "في {stage} • {value}",
@@ -2149,6 +2152,121 @@
       "minutesAgo": "منذ {minutes} د",
       "hoursAgo": "منذ {hours} س",
       "daysAgo": "منذ {days} يوم"
+    },
+    "messaging": {
+      "title": "الرسائل والمحادثات",
+      "subtitle": "تعاون مع فريقك عبر القنوات الداخلية وتواصل مع جهات الاتصال عبر صندوق الرسائل النصية الموحد.",
+      "noPermissionBody": "لا تملك صلاحية عرض الرسائل.",
+      "tabs": {
+        "internal": "القنوات الداخلية",
+        "external": "المحادثات الخارجية"
+      },
+      "external": {
+        "title": "المحادثات الخارجية",
+        "subtitle": "تواصل ثنائي الاتجاه عبر الرسائل النصية القصيرة (SMS) مع جهات اتصال العملاء والعملاء المحتملين.",
+        "searchPlaceholder": "ابحث في جهات الاتصال بالاسم، البريد الإلكتروني، أو الهاتف...",
+        "noThreads": "لا توجد محادثات حتى الآن",
+        "noThreadsHint": "اختر جهة اتصال من القائمة لبدء المحادثة ومراسلة العملاء.",
+        "selectPrompt": "اختر محادثة لعرض سجل الرسائل",
+        "selectPromptDesc": "اختر أي جهة اتصال من القائمة لعرض المحادثات وإرسال ردود SMS فورية.",
+        "typePlaceholder": "اكتب رسالة SMS إلى {name}...",
+        "send": "إرسال SMS",
+        "sending": "جارٍ الإرسال...",
+        "fromNumber": "من الرقم",
+        "toNumber": "إلى الرقم",
+        "carrierActive": "المزود مفعل",
+        "noCarrier": "لا يوجد رقم مزود نشط",
+        "viewProfile": "عرض ملف جهة الاتصال",
+        "contactDetails": "تفاصيل جهة الاتصال",
+        "phone": "الهاتف",
+        "email": "البريد الإلكتروني",
+        "company": "الشركة",
+        "titleLabel": "المسمى الوظيفي",
+        "noPhone": "لا يوجد رقم هاتف مسجل لجهة الاتصال هذه.",
+        "noPhoneHint": "يرجى إضافة رقم هاتف صحيح في ملف جهة الاتصال لإرسال الرسائل النصية.",
+        "delivered": "تم التسليم",
+        "sent": "تم الإرسال",
+        "failed": "فشل",
+        "received": "مستلمة",
+        "inbound": "واردة",
+        "outbound": "صادرة",
+        "newConversation": "محادثة جديدة",
+        "startWithContact": "بدء محادثة مع جهة اتصال"
+      }
+    },
+    "phoneNumbers": {
+      "title": "أرقام الهاتف ومزود الخدمة",
+      "subtitle": "إدارة مخزون أرقام الهواتف، إعداد بيانات مزود الاتصالات (BYOC)، ومراجعة سجلات المكالمات والرسائل.",
+      "noPermissionBody": "لا تملك صلاحية عرض أرقام الهاتف.",
+      "tabs": {
+        "inventory": "مخزون الأرقام",
+        "carrier": "إعدادات مزود الاتصال (BYOC)",
+        "auditLogs": "سجلات المكالمات والرسائل"
+      },
+      "inventory": {
+        "title": "مخزون الأرقام",
+        "description": "أرقام الهواتف المخصصة والمتاحة عبر مؤسستك.",
+        "addNumber": "إضافة رقم هاتف",
+        "editNumber": "تعديل الرقم",
+        "deleteNumber": "حذف",
+        "deleteConfirm": "هل أنت متأكد من رغبتك في حذف هذا الرقم من المخزون؟",
+        "number": "رقم الهاتف",
+        "friendlyName": "الاسم التعريفي",
+        "capabilities": "القدرات",
+        "status": "الحالة",
+        "assignedAgent": "الموظف المعين",
+        "unassigned": "غير مخصص",
+        "noNumbers": "لا توجد أرقام مسجلة في المخزون",
+        "noNumbersHint": "أضف أرقام هاتفك أو اربط مزود الخدمة لبدء الاستخدام.",
+        "voice": "صوتي",
+        "sms": "رسائل SMS",
+        "active": "نشط",
+        "inactive": "غير نشط",
+        "pending": "قيد الانتظار",
+        "addDialogTitle": "إضافة رقم هاتف",
+        "addDialogDesc": "تسجيل رقم هاتف جديد لتوجيه المكالمات والرسائل.",
+        "editDialogTitle": "تعديل رقم الهاتف",
+        "editDialogDesc": "تحديث بيانات رقم الهاتف والموظف المعين.",
+        "phoneNumberPlaceholder": "+966 50 123 4567",
+        "friendlyNamePlaceholder": "مثال: خط المبيعات المباشر",
+        "selectAgent": "اختر موظفاً...",
+        "save": "حفظ الرقم",
+        "saving": "جارٍ الحفظ..."
+      },
+      "carrier": {
+        "title": "ربط مزود الاتصالات المباشر (BYOC)",
+        "description": "قم بإعداد مفاتيح API الخاصة بـ Twilio أو Telnyx لتوجيه المكالمات والرسائل النصية مباشرة.",
+        "provider": "مزود الخدمة",
+        "accountSid": "معرّف الحساب (Account SID)",
+        "accountSidPlaceholder": "مثال: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "authToken": "رمز المصادقة (Auth Token)",
+        "authTokenPlaceholder": "أدخل رمز المصادقة",
+        "apiKeySid": "معرّف مفتاح API (اختياري)",
+        "apiKeySidPlaceholder": "مثال: SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "apiKeySecret": "سر مفتاح API (اختياري)",
+        "apiKeySecretPlaceholder": "أدخل سر مفتاح API",
+        "twimlAppSid": "معرّف تطبيق TwiML (اختياري)",
+        "twimlAppSidPlaceholder": "مثال: APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "isActive": "تفعيل توجيه مزود الخدمة",
+        "isActiveDesc": "عند التفعيل، سيتم إرسال الرسائل والمكالمات الصادرة عبر هذا المزود مباشرة.",
+        "save": "حفظ بيانات المزود",
+        "saving": "جارٍ الحفظ...",
+        "testConnection": "اختبار الاتصال",
+        "testing": "جارٍ اختبار الاتصال...",
+        "testSuccess": "تم التحقق من اتصال مزود الخدمة بنجاح!",
+        "testFailed": "فشل اختبار الاتصال بمزود الخدمة",
+        "savedSuccess": "تم حفظ إعدادات مزود الخدمة بنجاح."
+      },
+      "auditLogs": {
+        "title": "سجلات المكالمات والرسائل",
+        "description": "سجل كامل وتاريخي لجميع المكالمات والرسائل النصية الصادرة والواردة.",
+        "callsTab": "سجل المكالمات",
+        "smsTab": "سجل الرسائل النصية",
+        "totalCalls": "إجمالي المكالمات",
+        "totalMinutes": "إجمالي الدقائق",
+        "missedCalls": "المكالمات الفائتة",
+        "totalSms": "إجمالي الرسائل النصية"
+      }
     }
   }
 }

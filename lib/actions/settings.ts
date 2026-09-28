@@ -10,13 +10,6 @@ import {
 } from "@/lib/validations/settings";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 
-export {
-  requireOrganizationManage,
-  updateOrganizationSettings,
-  uploadOrganizationLogo,
-  removeOrganizationLogo,
-} from "./organizations";
-
 function parseFieldErrors(
   issues: z.ZodIssue[]
 ): SettingsActionState["fieldErrors"] {

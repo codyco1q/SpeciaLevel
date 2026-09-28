@@ -391,3 +391,39 @@ export interface SystemNotification {
   created_at: string;
 }
 
+
+// ============================================================
+// Carrier & Phone Number Management (00033_messaging_and_phone_numbers.sql)
+// ============================================================
+
+export type PhoneCarrierProvider = "twilio" | "telnyx" | "custom";
+
+export interface PhoneCarrierSettings {
+  id: string;
+  organization_id: string;
+  provider: PhoneCarrierProvider;
+  account_sid: string | null;
+  auth_token_encrypted: string | null;
+  api_key_sid: string | null;
+  api_key_secret_encrypted: string | null;
+  twiml_app_sid: string | null;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export interface PhoneNumberCapabilities {
+  voice: boolean;
+  sms: boolean;
+}
+
+export interface PhoneNumber {
+  id: string;
+  organization_id: string;
+  phone_number: string;
+  friendly_name: string | null;
+  capabilities: PhoneNumberCapabilities;
+  status: "active" | "inactive" | "pending";
+  assigned_user_id: string | null;
+  created_at: string;
+}
+

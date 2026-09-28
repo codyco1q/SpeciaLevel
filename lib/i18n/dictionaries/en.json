@@ -268,7 +268,9 @@
       "modules": "Modules",
       "settings": "Settings",
       "logout": "Sign out",
-      "user": "User"
+      "user": "User",
+      "messaging": "Messaging",
+      "phoneNumbers": "Phone Numbers"
     },
     "dashboard": {
       "welcomeBack": "Welcome back",
@@ -1581,7 +1583,6 @@
         "description": "Invite teammates with pre-assigned roles and departments."
       }
     },
-
     "ai": {
       "navLabel": "AI & Agents",
       "title": "AI & Intelligent Agents",
@@ -2124,7 +2125,9 @@
         "employees": "Employees",
         "departments": "Departments",
         "roles": "Roles & Permissions",
-        "modules": "Modules & Apps"
+        "modules": "Modules & Apps",
+        "messaging": "Messaging",
+        "phoneNumbers": "Phone Numbers"
       },
       "hints": {
         "dealInStage": "in {stage} • {value}",
@@ -2149,6 +2152,121 @@
       "minutesAgo": "{minutes}m ago",
       "hoursAgo": "{hours}h ago",
       "daysAgo": "{days}d ago"
+    },
+    "messaging": {
+      "title": "Messaging",
+      "subtitle": "Collaborate with your team across internal channels and communicate with contacts via external SMS inbox.",
+      "noPermissionBody": "You do not have permission to view messaging.",
+      "tabs": {
+        "internal": "Internal Channels",
+        "external": "External Conversations"
+      },
+      "external": {
+        "title": "External Conversations",
+        "subtitle": "Two-way SMS communication with CRM contacts and leads.",
+        "searchPlaceholder": "Search contacts by name, email, or phone...",
+        "noThreads": "No conversations yet",
+        "noThreadsHint": "Select a contact from the list or create a contact to begin messaging.",
+        "selectPrompt": "Select a conversation to view message history",
+        "selectPromptDesc": "Choose any contact from the left list to read messages and send SMS replies in real time.",
+        "typePlaceholder": "Type an SMS message to {name}...",
+        "send": "Send SMS",
+        "sending": "Sending...",
+        "fromNumber": "From Number",
+        "toNumber": "To Number",
+        "carrierActive": "Carrier Active",
+        "noCarrier": "No Active Carrier Number",
+        "viewProfile": "View Contact Profile",
+        "contactDetails": "Contact Details",
+        "phone": "Phone",
+        "email": "Email",
+        "company": "Company",
+        "titleLabel": "Title",
+        "noPhone": "No phone number configured for this contact.",
+        "noPhoneHint": "Add a valid phone number in the contact profile to send SMS messages.",
+        "delivered": "Delivered",
+        "sent": "Sent",
+        "failed": "Failed",
+        "received": "Received",
+        "inbound": "Inbound",
+        "outbound": "Outbound",
+        "newConversation": "New Conversation",
+        "startWithContact": "Start conversation with a contact"
+      }
+    },
+    "phoneNumbers": {
+      "title": "Phone Numbers & Carrier",
+      "subtitle": "Manage phone number inventory, configure BYOC carrier credentials, and audit communication logs.",
+      "noPermissionBody": "You do not have permission to view phone numbers.",
+      "tabs": {
+        "inventory": "Numbers Inventory",
+        "carrier": "Carrier Credentials (BYOC)",
+        "auditLogs": "Call & SMS Audit Logs"
+      },
+      "inventory": {
+        "title": "Numbers Inventory",
+        "description": "Active phone numbers provisioned and assigned across your organization.",
+        "addNumber": "Add Phone Number",
+        "editNumber": "Edit Number",
+        "deleteNumber": "Delete",
+        "deleteConfirm": "Are you sure you want to remove this phone number from your inventory?",
+        "number": "Phone Number",
+        "friendlyName": "Friendly Name",
+        "capabilities": "Capabilities",
+        "status": "Status",
+        "assignedAgent": "Assigned Agent",
+        "unassigned": "Unassigned",
+        "noNumbers": "No phone numbers in inventory",
+        "noNumbersHint": "Add a phone number or connect your carrier to begin routing calls and SMS.",
+        "voice": "Voice",
+        "sms": "SMS",
+        "active": "Active",
+        "inactive": "Inactive",
+        "pending": "Pending",
+        "addDialogTitle": "Add Phone Number",
+        "addDialogDesc": "Register a new phone number to route calls and SMS.",
+        "editDialogTitle": "Edit Phone Number",
+        "editDialogDesc": "Update phone number details and assignment.",
+        "phoneNumberPlaceholder": "+1 555 123 4567",
+        "friendlyNamePlaceholder": "e.g. Sales Inbound Hotline",
+        "selectAgent": "Select an agent...",
+        "save": "Save Number",
+        "saving": "Saving..."
+      },
+      "carrier": {
+        "title": "Bring Your Own Carrier (BYOC)",
+        "description": "Connect your Twilio or Telnyx account credentials to send SMS and handle voice calls directly.",
+        "provider": "Carrier Provider",
+        "accountSid": "Account SID",
+        "accountSidPlaceholder": "e.g. ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "authToken": "Auth Token",
+        "authTokenPlaceholder": "Enter Auth Token",
+        "apiKeySid": "API Key SID (Optional)",
+        "apiKeySidPlaceholder": "e.g. SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "apiKeySecret": "API Key Secret (Optional)",
+        "apiKeySecretPlaceholder": "Enter API Key Secret",
+        "twimlAppSid": "TwiML App SID (Optional)",
+        "twimlAppSidPlaceholder": "e.g. APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "isActive": "Enable Carrier Routing",
+        "isActiveDesc": "When active, outbound SMS and voice calls will be dispatched via this carrier configuration.",
+        "save": "Save Credentials",
+        "saving": "Saving...",
+        "testConnection": "Test Connection",
+        "testing": "Testing connection...",
+        "testSuccess": "Carrier credentials verified successfully!",
+        "testFailed": "Connection test failed",
+        "savedSuccess": "Carrier settings updated successfully."
+      },
+      "auditLogs": {
+        "title": "Communication Audit Logs",
+        "description": "Historical ledger of all voice calls and SMS dispatched or received across the workspace.",
+        "callsTab": "Call History",
+        "smsTab": "SMS History",
+        "totalCalls": "Total Calls",
+        "totalMinutes": "Total Minutes",
+        "missedCalls": "Missed Calls",
+        "totalSms": "Total SMS"
+      }
     }
   }
 }

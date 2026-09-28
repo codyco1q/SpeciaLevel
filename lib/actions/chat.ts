@@ -439,6 +439,7 @@ export async function createChannel(
   }
 
   revalidatePath("/chat");
+  revalidatePath("/messaging");
   return {
     status: "success",
     channel: toChannelRow(inserted as unknown as ChannelSelectRow),
@@ -548,6 +549,7 @@ export async function updateChannel(
   }
 
   revalidatePath("/chat");
+  revalidatePath("/messaging");
   return {
     status: "success",
     channel: toChannelRow(updated as unknown as ChannelSelectRow),
@@ -620,6 +622,7 @@ export async function deleteChannel(
   }
 
   revalidatePath("/chat");
+  revalidatePath("/messaging");
   return { status: "success" };
 }
 
@@ -794,5 +797,6 @@ export async function updateChannelMembers(
   }
 
   revalidatePath("/chat");
+  revalidatePath("/messaging");
   return { status: "success" };
 }

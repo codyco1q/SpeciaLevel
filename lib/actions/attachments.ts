@@ -350,6 +350,7 @@ export async function createAttachmentRecord(
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
   revalidatePath("/chat");
+  revalidatePath("/messaging");
 
   const row = inserted as unknown as AttachmentJoinRow;
   const downloadUrl = await signAttachmentDownloadUrl(row.storage_path);
@@ -438,6 +439,7 @@ export async function deleteAttachment(
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
   revalidatePath("/chat");
+  revalidatePath("/messaging");
 
   return { status: "success", attachments: [], attachment: null };
 }
