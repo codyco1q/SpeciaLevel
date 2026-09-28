@@ -5,7 +5,7 @@ import { Cairo, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
-import { TopLoader } from "@/components/top-loader";
+import { RouteLoadingIndicator } from "@/components/route-loading-indicator";
 import { getLocale } from "@/lib/i18n/get-dictionary";
 
 const geistSans = Geist({
@@ -64,7 +64,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <Suspense fallback={null}>
-            <TopLoader />
+            <RouteLoadingIndicator />
           </Suspense>
           {children}
         </ThemeProvider>
