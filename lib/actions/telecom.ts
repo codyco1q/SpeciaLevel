@@ -375,6 +375,7 @@ export async function logCall(data: unknown): Promise<LogCallResult> {
   }
 
   revalidatePath("/telecom");
+  revalidatePath("/phone-numbers");
   return {
     status: "success",
     call: toTelecomCallRow(inserted as unknown as TelecomCallJoinRow),
@@ -472,6 +473,8 @@ export async function sendSms(data: unknown): Promise<SendSmsResult> {
   }
 
   revalidatePath("/telecom");
+  revalidatePath("/phone-numbers");
+  revalidatePath("/messaging");
   return {
     status: "success",
     sms: toTelecomSmsRow(inserted as unknown as TelecomSmsJoinRow),

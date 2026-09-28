@@ -127,7 +127,7 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "Chat",
     description: "Real-time team messaging and channels.",
     icon: MessageSquare,
-    link: "/chat",
+    link: "/messaging",
   },
   {
     key: "crm",
@@ -162,7 +162,7 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     name: "Telecommunications",
     description: "Phone systems and calling features.",
     icon: Phone,
-    link: "/telecom",
+    link: "/phone-numbers",
   },
   {
     key: "forms",

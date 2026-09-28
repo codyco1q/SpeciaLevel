@@ -77,7 +77,7 @@ export default function Sidebar({
     },
     {
       label: cp.navChat,
-      href: "/chat",
+      href: "/messaging",
       icon: MessageSquare,
       permission: "chat.view",
     },
@@ -116,8 +116,8 @@ export default function Sidebar({
       permission: "tasks.view",
     },
     {
-      label: t.chat,
-      href: "/chat",
+      label: t.messaging ?? t.chat,
+      href: "/messaging",
       icon: MessageSquare,
       permission: "chat.view",
     },
@@ -146,8 +146,8 @@ export default function Sidebar({
       permission: "marketing.view",
     },
     {
-      label: t.telecommunications,
-      href: "/telecom",
+      label: t.phoneNumbers ?? t.telecommunications,
+      href: "/phone-numbers",
       icon: PhoneCall,
       permission: "telecom.view",
     },
