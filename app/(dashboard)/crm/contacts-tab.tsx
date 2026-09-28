@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Contact, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Contact, Eye, Pencil, Plus, Search, Trash2, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   getContacts,
   type ContactSummaryRow,
 } from "@/lib/actions/crm-contacts";
+import { openGlobalDialer } from "@/lib/stores/dialer-store";
 import { formatCurrency, formatLeadDate } from "./crm-meta";
 import { ContactDialog } from "./contact-dialog";
 import { DeleteContactDialog } from "./delete-contact-dialog";
@@ -185,6 +186,24 @@ export function ContactsTab({
                   </TableCell>
                   <TableCell className="text-end">
                     <div className="flex items-center justify-end gap-1">
+                      {contact.phone && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() =>
+                            openGlobalDialer({
+                              destinationNumber: contact.phone || "",
+                              contactName: contact.name,
+                              contactId: contact.id,
+                            })
+                          }
+                          className="size-8 rounded-md text-primary hover:bg-primary/10"
+                          title={platform.dialer.call}
+                        >
+                          <PhoneCall className="size-3.5" />
+                        </Button>
+                      )}
                       <Button type="button" size="sm" variant="outline" asChild>
                         <Link href={`/contacts/${contact.id}`}>
                           <Eye className="size-3.5" />

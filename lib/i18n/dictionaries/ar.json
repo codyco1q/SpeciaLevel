@@ -1258,10 +1258,14 @@
         "outbound": "صادر"
       },
       "callStatuses": {
+        "queued": "في الانتظار",
+        "ringing": "يرن",
+        "in-progress": "جارية",
         "completed": "مكتملة",
         "missed": "فائتة",
         "busy": "مشغول",
         "failed": "فشلت",
+        "no-answer": "لا يوجد رد",
         "voicemail": "بريد صوتي"
       },
       "smsStatuses": {
@@ -2267,6 +2271,45 @@
         "missedCalls": "المكالمات الفائتة",
         "totalSms": "إجمالي الرسائل النصية"
       }
+    },
+    "dialer": {
+      "title": "لوحة الاتصال الهاتفي",
+      "openDialer": "فتح لوحة الاتصال",
+      "minimize": "تصغير لوحة الاتصال",
+      "maximize": "تكبير لوحة الاتصال",
+      "close": "إغلاق لوحة الاتصال",
+      "idle": "جاهز للاتصال",
+      "calling": "جارٍ الاتصال...",
+      "connected": "المكالمة متصلة",
+      "ended": "انتهت المكالمة",
+      "call": "اتصال",
+      "endCall": "إنهاء المكالمة",
+      "mute": "كتم الصوت",
+      "unmute": "إلغاء الكتم",
+      "hold": "تعليق المكالمة",
+      "resume": "استئناف المكالمة",
+      "keypad": "لوحة الأرقام",
+      "callerId": "رقم المتصل (Caller ID)",
+      "selectCallerId": "اختر رقم المتصل...",
+      "destinationPlaceholder": "أدخل رقم الهاتف...",
+      "postCallSummary": "ملخص المكالمة والملاحظات",
+      "outcome": "نتيجة المكالمة",
+      "outcomes": {
+        "completed": "تم الاتصال بنجاح",
+        "interested": "مهتم / مؤهل",
+        "followUp": "متابعة مطلوبة",
+        "noAnswer": "لا يوجد رد",
+        "leftVoicemail": "تم ترك بريد صوتي",
+        "busy": "الخط مشغول / إعادة المحاولة"
+      },
+      "callDuration": "المدة",
+      "notesPlaceholder": "أضف ملاحظات حول المكالمة (أهم النقاط، الخطوات القادمة)...",
+      "saveSummary": "حفظ ملاحظة المكالمة",
+      "saving": "جارٍ الحفظ...",
+      "savedSuccess": "تم حفظ ملاحظة المكالمة بنجاح",
+      "quickCall": "اتصال بـ {name}",
+      "noActiveNumber": "لا يوجد رقم مزود نشط متاح",
+      "audioFeedback": "تم تفعيل نغمات لوحة الأرقام"
     }
   }
 }

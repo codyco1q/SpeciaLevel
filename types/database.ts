@@ -427,3 +427,51 @@ export interface PhoneNumber {
   created_at: string;
 }
 
+// ============================================================
+// Telephony Voice Tokens & Call Recordings (00034_telephony_voice_tokens.sql)
+// ============================================================
+
+export type TelecomCallStatus =
+  | "queued"
+  | "ringing"
+  | "in-progress"
+  | "completed"
+  | "missed"
+  | "busy"
+  | "failed"
+  | "no-answer"
+  | "voicemail";
+
+export type TelecomCallDirection = "inbound" | "outbound";
+
+export interface TelecomCall {
+  id: string;
+  organization_id: string;
+  contact_id: string | null;
+  direction: TelecomCallDirection;
+  status: TelecomCallStatus;
+  from_number: string;
+  to_number: string;
+  caller_phone_number_id: string | null;
+  duration_seconds: number;
+  recording_url: string | null;
+  summary: string | null;
+  notes: string | null;
+  outcome: string | null;
+  agent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CallRecording {
+  id: string;
+  organization_id: string;
+  call_id: string | null;
+  recording_url: string;
+  duration_seconds: number;
+  file_size_bytes: number | null;
+  mime_type: string;
+  created_at: string;
+}
+
+

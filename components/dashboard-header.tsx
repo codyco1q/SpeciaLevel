@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Search } from "lucide-react";
+import { Search, PhoneCall } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { NotificationsPopover } from "@/components/notifications-popover";
+import { openGlobalDialer } from "@/lib/stores/dialer-store";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,10 @@ export function DashboardHeader({
     }
   };
 
+  const handleOpenDialer = () => {
+    openGlobalDialer();
+  };
+
   const t = platform.commandPalette;
   const shortcutLabel = isMac ? t.shortcutMac : t.shortcutWin;
 
@@ -62,8 +68,20 @@ export function DashboardHeader({
         </button>
       </div>
 
-      {/* ── Header Right: Notifications & Organization Context ──────── */}
-      <div className="flex items-center gap-3">
+      {/* ── Header Right: Phone Dialer, Notifications & Org Context ── */}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={handleOpenDialer}
+          className="relative size-9 rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title={platform.dialer.openDialer}
+          aria-label={platform.dialer.openDialer}
+        >
+          <PhoneCall className="size-4" />
+        </Button>
+
         <NotificationsPopover platform={platform} locale={locale} />
 
         {organizationName && (
@@ -87,4 +105,5 @@ export function DashboardHeader({
     </header>
   );
 }
+
 

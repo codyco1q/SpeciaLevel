@@ -17,6 +17,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ShieldAlert,
+  PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { openGlobalDialer } from "@/lib/stores/dialer-store";
 import {
   getContactSmsThread,
   sendExternalSms,
@@ -374,6 +376,25 @@ export function ExternalInboxView({
               </div>
 
               <div className="flex items-center gap-2">
+                {activeContact.phone && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openGlobalDialer({
+                        destinationNumber: activeContact.phone || "",
+                        contactName: activeContact.name,
+                        contactId: activeContact.id,
+                      })
+                    }
+                    className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+                    title={platform.dialer.call}
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{platform.dialer.call}</span>
+                  </Button>
+                )}
                 <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5">
                   <Link href={`/contacts/${activeContact.id}`}>
                     <User className="h-3.5 w-3.5" />

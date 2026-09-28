@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Sidebar from "@/components/sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CommandPalette } from "@/components/command-palette";
+import { FloatingDialer } from "@/components/dialer/floating-dialer";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 
@@ -70,6 +71,8 @@ export default async function DashboardLayout({
         locale={locale}
         permissions={userContext.permissions}
       />
+      <FloatingDialer platform={dict.platform} locale={locale} />
     </div>
   );
 }
+
