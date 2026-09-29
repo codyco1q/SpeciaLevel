@@ -24,68 +24,6 @@ import type {
   McpToolDefinition,
 } from "@/types/database";
 
-export interface ProviderCatalogItem {
-  id: AiModelProviderType;
-  name: string;
-  description: string;
-  defaultModels: string[];
-  requiresBaseUrl: boolean;
-  docUrl: string;
-}
-
-export const PROVIDER_CATALOG: ProviderCatalogItem[] = [
-  {
-    id: "openai",
-    name: "OpenAI",
-    description: "Connect GPT-4o, GPT-4o-mini, o1, and embeddings with your OpenAI API Key.",
-    defaultModels: ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "gpt-4-turbo"],
-    requiresBaseUrl: false,
-    docUrl: "https://platform.openai.com/api-keys",
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic Claude",
-    description: "Claude 3.5 Sonnet, Claude 3.5 Haiku, and Opus models for high-reasoning tasks.",
-    defaultModels: [
-      "claude-3-5-sonnet-20241022",
-      "claude-3-5-haiku-20241022",
-      "claude-3-opus-20240229",
-    ],
-    requiresBaseUrl: false,
-    docUrl: "https://console.anthropic.com/settings/keys",
-  },
-  {
-    id: "gemini",
-    name: "Google Gemini",
-    description: "Gemini 1.5 Pro, 1.5 Flash, and multimodal models via Google AI Studio.",
-    defaultModels: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash-exp"],
-    requiresBaseUrl: false,
-    docUrl: "https://aistudio.google.com/app/apikey",
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    description: "Unified gateway to hundreds of open & proprietary models with a single key.",
-    defaultModels: [
-      "anthropic/claude-3.5-sonnet",
-      "openai/gpt-4o",
-      "meta-llama/llama-3.3-70b-instruct",
-      "deepseek/deepseek-chat",
-      "google/gemini-pro-1.5",
-    ],
-    requiresBaseUrl: false,
-    docUrl: "https://openrouter.ai/keys",
-  },
-  {
-    id: "custom_openai",
-    name: "Custom OpenAI-Compatible",
-    description: "Self-hosted vLLM, Ollama, LocalAI, LM Studio, or custom proxy gateways.",
-    defaultModels: ["llama3", "mistral", "qwen2.5", "default-model"],
-    requiresBaseUrl: true,
-    docUrl: "https://ollama.ai",
-  },
-];
-
 function maskKey(key: string | null | undefined): string {
   if (!key) return "";
   if (key.length <= 8) return "••••••••";

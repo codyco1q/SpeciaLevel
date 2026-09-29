@@ -19,12 +19,14 @@ import { AiProviderIcon } from "./ai-provider-icon";
 import { ProviderConfigDialog } from "./provider-config-dialog";
 import { McpServerDialog } from "./mcp-server-dialog";
 import {
-  PROVIDER_CATALOG,
   getAiProviders,
   getMcpServers,
   toggleMcpServer,
-  type ProviderCatalogItem,
 } from "@/lib/actions/ai-providers";
+import {
+  PROVIDER_CATALOG,
+  type ProviderCatalogItem,
+} from "@/lib/validations/ai-providers";
 import type { AiModelProvider, AiMcpServer } from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
