@@ -37,6 +37,7 @@ import {
   Sparkles,
   Layers,
   Code2,
+  X,
 } from "lucide-react";
 import { FormPreviewPane } from "./form-preview-pane";
 import { createForm, updateForm } from "@/lib/actions/forms";
@@ -48,6 +49,144 @@ import type {
 } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { cn } from "@/lib/utils";
+
+interface FieldOptionsManagerProps {
+  options: string[];
+  onChange: (options: string[]) => void;
+  label?: string;
+  placeholder?: string;
+  addLabel?: string;
+}
+
+function FieldOptionsManager({
+  options = [],
+  onChange,
+  label = "Options",
+  placeholder = "Option name...",
+  addLabel = "Add",
+}: FieldOptionsManagerProps) {
+  const [newOption, setNewOption] = useState("");
+
+  const handleAdd = () => {
+    const trimmed = newOption.trim();
+    if (!trimmed) return;
+    onChange([...options, trimmed]);
+    setNewOption("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAdd();
+    }
+  };
+
+  const handleUpdate = (index: number, value: string) => {
+    const next = [...options];
+    next[index] = value;
+    onChange(next);
+  };
+
+  const handleRemove = (index: number) => {
+    onChange(options.filter((_, i) => i !== index));
+  };
+
+  const handleMove = (index: number, direction: "up" | "down") => {
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (target < 0 || target >= options.length) return;
+    const next = [...options];
+    const temp = next[index];
+    next[index] = next[target];
+    next[target] = temp;
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-2 pt-2 border-t border-border/60 col-span-full">
+      <div className="flex items-center justify-between">
+        <Label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+          <span>{label}</span>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-mono">
+            {options.length}
+          </Badge>
+        </Label>
+      </div>
+
+      {/* Options List */}
+      {options.length > 0 && (
+        <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
+          {options.map((opt, optIdx) => (
+            <div
+              key={optIdx}
+              className="flex items-center gap-1.5 p-1 px-2 rounded-lg border border-border/80 bg-background hover:border-foreground/20 transition-all group"
+            >
+              <div className="flex flex-col gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={() => handleMove(optIdx, "up")}
+                  disabled={optIdx === 0}
+                  className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+                  title="Move up"
+                >
+                  <ArrowUp className="size-2.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMove(optIdx, "down")}
+                  disabled={optIdx === options.length - 1}
+                  className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
+                  title="Move down"
+                >
+                  <ArrowDown className="size-2.5" />
+                </button>
+              </div>
+
+              <Input
+                value={opt}
+                onChange={(e) => handleUpdate(optIdx, e.target.value)}
+                className="h-7 text-xs flex-1 bg-transparent border-0 shadow-none focus-visible:ring-1 px-1.5"
+                placeholder={`Option ${optIdx + 1}`}
+              />
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRemove(optIdx)}
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 rounded"
+                title="Remove option"
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add New Option Input */}
+      <div className="flex items-center gap-2">
+        <Input
+          value={newOption}
+          onChange={(e) => setNewOption(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="h-8 text-xs flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAdd}
+          disabled={!newOption.trim()}
+          className="h-8 text-xs gap-1 shrink-0"
+        >
+          <Plus className="size-3.5" />
+          <span>{addLabel}</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 interface FormBuilderDialogProps {
   form: FormRow | null;
@@ -716,55 +855,41 @@ export function FormBuilderDialog({
                           </div>
                         ) : null}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {field.type !== "custom_html" && (
-                          <>
-                            <div className="space-y-1">
-                              <Label className="text-[11px] text-muted-foreground">
-                                {t.fieldsTab.fieldPlaceholder}
-                              </Label>
-                              <Input
-                                value={field.placeholder ?? ""}
-                                onChange={(e) =>
-                                  handleUpdateField(idx, {
-                                    placeholder: e.target.value,
-                                  })
-                                }
-                                placeholder="Optional placeholder..."
-                                className="h-8 text-xs"
-                              />
-                            </div>
+                          <div className="space-y-1">
+                            <Label className="text-[11px] text-muted-foreground">
+                              {t.fieldsTab.fieldPlaceholder}
+                            </Label>
+                            <Input
+                              value={field.placeholder ?? ""}
+                              onChange={(e) =>
+                                handleUpdateField(idx, {
+                                  placeholder: e.target.value,
+                                })
+                              }
+                              placeholder="Optional placeholder..."
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        )}
 
-                          {(field.type === "select" ||
-                            field.type === "multiselect") && (
-                            <div className="space-y-1">
-                              <Label className="text-[11px] text-muted-foreground">
-                                {t.fieldsTab.fieldOptions}
-                              </Label>
-                              <Input
-                                value={field.options?.join(", ") ?? ""}
-                                onChange={(e) =>
-                                  handleUpdateField(idx, {
-                                    options: e.target.value
-                                      .split(",")
-                                      .map((s) => s.trim())
-                                      .filter(Boolean),
-                                  })
-                                }
-                                placeholder={
-                                  t.fieldsTab.fieldOptionsPlaceholder
-                                }
-                                className="h-8 text-xs"
-                              />
-                              <p className="text-[10px] text-muted-foreground">
-                                {t.fieldsTab.optionsHint ||
-                                  "Enter options separated by commas."}
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                        </div>
+                        {(field.type === "select" ||
+                          field.type === "multiselect") && (
+                          <FieldOptionsManager
+                            options={field.options || []}
+                            onChange={(opts) =>
+                              handleUpdateField(idx, {
+                                options: opts,
+                              })
+                            }
+                            label={t.fieldsTab.fieldOptions || "Field Options"}
+                            placeholder={
+                              t.fieldsTab.fieldOptionsPlaceholder ||
+                              "Option name..."
+                            }
+                            addLabel="Add"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>

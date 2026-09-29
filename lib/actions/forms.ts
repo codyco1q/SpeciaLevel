@@ -505,7 +505,7 @@ export async function submitPublicForm(
             id: result.form_id,
             title: result.form_title || slug,
           },
-          data: parsed.data.data,
+          data: submissionData,
         },
       });
     }

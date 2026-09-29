@@ -115,6 +115,23 @@ export async function getIntegrations(): Promise<ProviderIntegrationItem[]> {
           last_sync_at: existing.last_sync_at,
         },
       };
+    }
+    return {
+      definition: def,
+      integration: {
+        provider: def.id,
+        category: def.category,
+        status: "disconnected",
+        credentials: {},
+        config: {},
+        last_sync_at: null,
+      },
+    };
+  });
+
+  return result;
+}
+
 /**
  * Saves (upserts) integration credentials and config for the current organization.
  */
@@ -413,23 +430,4 @@ export async function testIntegrationConnection(
         latencyMs,
       };
   }
-}
-
-
-    }
-
-    return {
-      definition: def,
-      integration: {
-        provider: def.id,
-        category: def.category,
-        status: "disconnected",
-        credentials: {},
-        config: {},
-        last_sync_at: null,
-      },
-    };
-  });
-
-  return result;
 }

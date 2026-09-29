@@ -105,6 +105,9 @@ export function WorkflowBuilderStudio({
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [actionPickerOpen, setActionPickerOpen] = useState(false);
   const [insertAtIndex, setInsertAtIndex] = useState<number | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   const [isSaving, startSaving] = useTransition();
   const [isTesting, startTesting] = useTransition();

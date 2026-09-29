@@ -256,7 +256,7 @@ interface EditableStage {
   const selectedPipe = pipelines.find((p) => p.id === selectedPipeId);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-4xl w-[90vw] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader className="p-6 pb-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Layers className="size-5 text-primary" />
@@ -267,9 +267,9 @@ interface EditableStage {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-hidden min-h-[440px]">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-[440px]">
           {/* Left Sidebar: Pipelines list */}
-          <div className="md:col-span-4 border-e border-border bg-muted/20 p-4 space-y-3 overflow-y-auto flex flex-col justify-between">
+          <div className="w-full md:w-1/3 md:min-w-[240px] md:max-w-[320px] border-b md:border-b-0 md:border-e border-border bg-muted/20 p-4 space-y-3 overflow-y-auto flex flex-col justify-between shrink-0">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -329,7 +329,7 @@ interface EditableStage {
           </div>
 
           {/* Right Area: Active pipeline editor */}
-          <div className="md:col-span-8 p-6 overflow-y-auto space-y-6 flex-1">
+          <div className="flex-1 p-6 overflow-y-auto space-y-6">
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="pipe-name" className="text-sm font-semibold">
@@ -377,34 +377,34 @@ interface EditableStage {
                 </Button>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {stages.map((stage, idx) => (
                   <div
                     key={stage.id || `temp-${idx}`}
-                    className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border border-border bg-card shadow-xs transition-all hover:border-foreground/20"
+                    className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 p-3 rounded-lg border border-border bg-card shadow-xs transition-all hover:border-foreground/20"
                   >
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleMoveStage(idx, "up")}
                         disabled={idx === 0 || isPending}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                         title="Move Up"
                       >
-                        <ArrowUp className="size-3" />
+                        <ArrowUp className="size-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleMoveStage(idx, "down")}
                         disabled={idx === stages.length - 1 || isPending}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                         title="Move Down"
                       >
-                        <ArrowDown className="size-3" />
+                        <ArrowDown className="size-3.5" />
                       </button>
                     </div>
 
-                    <div className="flex-1 min-w-[140px]">
+                    <div className="flex-1 min-w-[160px]">
                       <Input
                         value={stage.name}
                         onChange={(e) => handleStageChange(idx, "name", e.target.value)}
@@ -413,7 +413,7 @@ interface EditableStage {
                       />
                     </div>
 
-                    <div className="w-24">
+                    <div className="w-24 shrink-0">
                       <div className="relative">
                         <Input
                           type="number"
@@ -427,7 +427,7 @@ interface EditableStage {
                               Math.min(100, Math.max(0, Number(e.target.value) || 0))
                             )
                           }
-                          className="h-8 text-xs pe-6 text-end"
+                          className="h-8 text-xs pe-6 text-end font-mono"
                         />
                         <span className="absolute end-2 top-2 text-[10px] text-muted-foreground pointer-events-none">
                           %
@@ -435,7 +435,7 @@ interface EditableStage {
                       </div>
                     </div>
 
-                    <div className="w-28">
+                    <div className="w-28 shrink-0">
                       <div className="relative">
                         <Input
                           type="number"
@@ -449,7 +449,7 @@ interface EditableStage {
                               Math.max(1, Number(e.target.value) || 14)
                             )
                           }
-                          className="h-8 text-xs pe-7 text-end"
+                          className="h-8 text-xs pe-7 text-end font-mono"
                         />
                         <span className="absolute end-2 top-2 text-[10px] text-muted-foreground pointer-events-none">
                           d
@@ -463,7 +463,7 @@ interface EditableStage {
                       size="sm"
                       onClick={() => handleRemoveStage(idx)}
                       disabled={stages.length <= 1 || isPending}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
                       title={pDict.deleteStage}
                     >
                       <Trash2 className="size-3.5" />

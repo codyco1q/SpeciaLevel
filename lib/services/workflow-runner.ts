@@ -255,13 +255,8 @@ export async function executeSingleWorkflow(
             orgId: workflow.organization_id,
             title,
             message,
-            type: "system",
+            type: "info",
             link: payload.deal_id ? `/crm?deal=${payload.deal_id}` : "/automations",
-            metadata: {
-              workflow_id: workflow.id,
-              workflow_name: workflow.name,
-              trigger_type: workflow.trigger_type,
-            },
           });
 
           stepsExecuted.push({
