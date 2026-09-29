@@ -36,8 +36,8 @@ import {
   saveAiProvider,
   testAiProviderConnection,
   deleteAiProvider,
-  type ProviderCatalogItem,
 } from "@/lib/actions/ai-providers";
+import type { ProviderCatalogItem } from "@/lib/validations/ai-providers";
 import type { AiModelProvider } from "@/types/database";
 
 interface ProviderConfigDialogProps {
