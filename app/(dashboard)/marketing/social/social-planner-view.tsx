@@ -7,7 +7,7 @@ import {
   getSocialPosts,
   deleteSocialPost,
   getSocialPlannerStatus,
-} from "@/lib/actions/marketing";
+} from "@/lib/actions/marketing-social";
 import { SocialPostDialog } from "./social-post-dialog";
 import { SocialPaywallCard } from "./social-paywall-card";
 import { SocialCalendarGrid } from "./social-calendar-grid";

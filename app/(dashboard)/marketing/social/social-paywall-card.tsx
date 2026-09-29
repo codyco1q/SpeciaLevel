@@ -12,7 +12,7 @@ import {
   Globe2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { activateSocialPlannerAddon } from "@/lib/actions/marketing";
+import { activateSocialPlannerAddon } from "@/lib/actions/marketing-social";
 
 interface SocialPaywallCardProps {
   onActivated: () => void;

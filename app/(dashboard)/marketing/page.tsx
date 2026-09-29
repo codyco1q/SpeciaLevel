@@ -5,11 +5,13 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import {
   getCampaigns,
   getMarketingMetrics,
-  getSocialPosts,
-  getSocialPlannerStatus,
-  getEmailTemplates,
   type MarketingMetrics,
 } from "@/lib/actions/marketing";
+import {
+  getSocialPosts,
+  getSocialPlannerStatus,
+} from "@/lib/actions/marketing-social";
+import { getEmailTemplates } from "@/lib/actions/marketing-emails";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { MarketingView } from "./marketing-view";
 
