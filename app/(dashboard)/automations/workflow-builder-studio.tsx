@@ -198,6 +198,9 @@ export function WorkflowBuilderStudio({
       } else {
         setTestResult(res.result);
       }
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[92vh] max-h-[95vh] p-0 flex flex-col gap-0 overflow-hidden bg-background">
