@@ -20,6 +20,7 @@ import {
   Receipt,
   Zap,
   Puzzle,
+  Blocks,
   Settings,
   Sparkles,
   LogOut,
@@ -192,6 +193,12 @@ export default function Sidebar({
       href: "/roles",
       icon: ShieldCheck,
       permission: "roles.view",
+    },
+    {
+      label: t.integrations ?? "Integrations",
+      href: "/integrations",
+      icon: Blocks,
+      permission: "settings.view",
     },
     {
       label: t.modules,
