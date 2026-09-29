@@ -474,4 +474,35 @@ export interface CallRecording {
   created_at: string;
 }
 
+// ============================================================
+// Integrations Hub (00035_integrations_hub.sql)
+// ============================================================
+
+export type IntegrationCategory = "payment" | "social" | "telecom";
+export type IntegrationStatus = "connected" | "disconnected" | "error";
+
+export type IntegrationProvider =
+  | "stripe"
+  | "paypal"
+  | "paymob"
+  | "paytabs"
+  | "fawry"
+  | "whatsapp"
+  | "meta_messenger"
+  | "instagram";
+
+export interface OrganizationIntegration {
+  id: string;
+  organization_id: string;
+  provider: IntegrationProvider | string;
+  category: IntegrationCategory;
+  status: IntegrationStatus;
+  credentials_encrypted: Record<string, any>;
+  config: Record<string, any>;
+  last_sync_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+
 

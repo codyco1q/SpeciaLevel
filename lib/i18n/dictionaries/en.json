@@ -265,6 +265,7 @@
       "employees": "Employees",
       "departments": "Departments",
       "roles": "Roles & Permissions",
+      "integrations": "Integrations",
       "modules": "Modules",
       "settings": "Settings",
       "logout": "Sign out",
@@ -1420,6 +1421,37 @@
         "tooManyParents": "A file can belong to only one task or message."
       }
     },
+    "integrations": {
+      "title": "Integrations Hub",
+      "subtitle": "Connect payment gateways, social messaging channels, and telecommunications to streamline your business operations.",
+      "searchPlaceholder": "Search integrations by provider or feature...",
+      "tabs": {
+        "all": "All Integrations",
+        "payment": "Payment Gateways",
+        "social": "Social & Messaging"
+      },
+      "summary": {
+        "total": "Total Available",
+        "connected": "Connected",
+        "paymentGateways": "Payment Gateways",
+        "socialChannels": "Social Channels"
+      },
+      "status": {
+        "connected": "Connected",
+        "disconnected": "Not Connected",
+        "error": "Configuration Error"
+      },
+      "actions": {
+        "configure": "Configure",
+        "connect": "Connect",
+        "disconnect": "Disconnect",
+        "testConnection": "Test Connection",
+        "save": "Save Changes",
+        "saving": "Saving...",
+        "testing": "Testing Handshake...",
+        "developerPortal": "Developer Portal"
+      }
+    },
     "settings": {
       "title": "Settings",
       "subtitle": "Manage your organization branding, workspace controls, billing defaults, and personal profile.",
@@ -1996,7 +2028,9 @@
       "ai": "AI",
       "aiDescription": "AI-powered agents and business intelligence.",
       "analytics": "Analytics",
-      "analyticsDescription": "Business insights, reports, and KPIs."
+      "analyticsDescription": "Business insights, reports, and KPIs.",
+      "integrations": "Integrations Hub",
+      "integrationsDescription": "Payment gateways, social messaging, and API integrations."
     },
     "contacts": {
       "title": "Contacts",
@@ -2129,6 +2163,7 @@
         "employees": "Employees",
         "departments": "Departments",
         "roles": "Roles & Permissions",
+        "integrations": "Integrations Hub",
         "modules": "Modules & Apps",
         "messaging": "Messaging",
         "phoneNumbers": "Phone Numbers"

@@ -19,6 +19,7 @@ import {
   Receipt,
   Zap,
   Puzzle,
+  Blocks,
   Settings,
   Sparkles,
   PlusCircle,
@@ -73,6 +74,7 @@ const NAV_CONFIG: NavItemConfig[] = [
   { href: "/employees", key: "employees", icon: Users, permission: "employees.view", keywords: ["employees", "team", "staff", "directory", "الموظفون"] },
   { href: "/departments", key: "departments", icon: Building2, permission: "departments.view", keywords: ["departments", "teams", "الأقسام"] },
   { href: "/roles", key: "roles", icon: ShieldCheck, permission: "roles.view", keywords: ["roles", "permissions", "access", "الأدوار"] },
+  { href: "/integrations", key: "integrations", icon: Blocks, permission: "settings.view", keywords: ["integrations", "payments", "stripe", "paypal", "paymob", "whatsapp", "meta", "instagram", "التكاملات", "بوابات الدفع"] },
   { href: "/modules", key: "modules", icon: Puzzle, keywords: ["modules", "apps", "features", "الوحدات"] },
   { href: "/settings", key: "settings", icon: Settings, permission: "settings.view", keywords: ["settings", "preferences", "organization", "profile", "الإعدادات"] },
 ];

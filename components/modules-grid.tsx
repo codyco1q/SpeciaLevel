@@ -17,6 +17,7 @@ import {
   MessageSquare,
   CheckSquare,
   BarChart3,
+  Blocks,
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,8 @@ type ModulesKey =
   | "forms"
   | "automations"
   | "ai"
-  | "analytics";
+  | "analytics"
+  | "integrations";
 
 interface ModulesGridProps {
   /** Modules enabled for the current organization (from organization_modules). */
@@ -191,6 +193,13 @@ const ACTIVE_MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Business insights, reports, and KPIs.",
     icon: BarChart3,
     link: "/analytics",
+  },
+  {
+    key: "integrations",
+    name: "Integrations",
+    description: "Payment gateways, social messaging, and API integrations.",
+    icon: Blocks,
+    link: "/integrations",
   },
 ];
 
