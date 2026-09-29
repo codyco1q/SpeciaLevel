@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   MessageCircle,
   Bell,
+  Mail,
   Tag,
   ArrowRightCircle,
   Webhook,
@@ -97,6 +98,7 @@ export function StepConfigDialog({
             <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               {step.action_type === "send_sms" && <MessageCircle className="size-5" />}
               {step.action_type === "send_notification" && <Bell className="size-5" />}
+              {step.action_type === "send_email" && <Mail className="size-5" />}
               {step.action_type === "add_tag" && <Tag className="size-5" />}
               {step.action_type === "update_deal_stage" && <ArrowRightCircle className="size-5" />}
               {step.action_type === "webhook" && <Webhook className="size-5" />}
@@ -243,6 +245,123 @@ export function StepConfigDialog({
               </div>
             </div>
           )}
+          {step.action_type === "send_email" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Recipient</Label>
+                  <Select
+                    value={config.recipient_type || "contact"}
+                    onValueChange={(val) => setConfig({ ...config, recipient_type: val })}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contact">Contact Email ({"{{contact.email}}"})</SelectItem>
+                      <SelectItem value="custom">Custom Email Address</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Marketing Template</Label>
+                  <Select
+                    value={config.template_id || "none"}
+                    onValueChange={(val) => {
+                      if (val === "none") {
+                        setConfig({ ...config, template_id: "" });
+                      } else {
+                        const tmpl = configOptions.emailTemplates?.find((t) => t.id === val);
+                        setConfig({
+                          ...config,
+                          template_id: val,
+                          subject: tmpl?.subject || config.subject || "",
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Select Email Template (Optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Custom Email (No Template)</SelectItem>
+                      {(configOptions.emailTemplates || []).map((tmpl) => (
+                        <SelectItem key={tmpl.id} value={tmpl.id}>
+                          {tmpl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {config.recipient_type === "custom" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Custom Destination Email</Label>
+                  <Input
+                    value={config.custom_email || ""}
+                    onChange={(e) => setConfig({ ...config, custom_email: e.target.value })}
+                    placeholder="recipient@example.com"
+                    type="email"
+                    className="text-sm font-mono"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Subject Line</Label>
+                <Input
+                  value={config.subject || ""}
+                  onChange={(e) => setConfig({ ...config, subject: e.target.value })}
+                  placeholder="e.g. Special Offer for {{contact.name}}"
+                  className="text-sm"
+                />
+              </div>
+
+              {(!config.template_id || config.template_id === "") && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Email Body (Plain Text or HTML)</Label>
+                  <Textarea
+                    value={config.body || ""}
+                    onChange={(e) => setConfig({ ...config, body: e.target.value })}
+                    placeholder="Hi {{contact.name}},\n\nWe wanted to share an update with you..."
+                    className="min-h-[100px] text-sm"
+                  />
+                </div>
+              )}
+
+              {config.template_id && (
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 flex items-start gap-2.5">
+                  <Info className="size-4 text-blue-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    Using responsive email template. Body design and styles will be rendered automatically from the Marketing Email Studio.
+                  </p>
+                </div>
+              )}
+
+              <div className="rounded-lg bg-muted/40 p-3 border border-border/60">
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-2">
+                  <Sparkles className="size-3.5 text-primary" />
+                  {vb.variablesHint}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {WORKFLOW_TEMPLATE_VARIABLES.slice(0, 6).map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => handleInsertVariable(config.template_id ? "subject" : "body", v.key)}
+                      className="inline-flex items-center px-2 py-0.5 rounded bg-background border text-[11px] font-mono hover:border-primary transition-colors"
+                      title={v.label}
+                    >
+                      {v.key}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {step.action_type === "add_tag" && (
             <div className="space-y-4">

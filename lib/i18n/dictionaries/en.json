@@ -997,6 +997,7 @@
         "createTask": "Create task",
         "send_sms": "Send SMS Message",
         "send_notification": "Send In-App Notification",
+        "send_email": "Send Marketing Email",
         "add_tag": "Add Contact Tag",
         "update_deal_stage": "Move Deal Stage",
         "delay": "Delay / Wait"

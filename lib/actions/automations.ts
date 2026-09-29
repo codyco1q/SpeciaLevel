@@ -30,6 +30,7 @@ export interface AutomationConfigOptions {
   }[];
   tags: string[];
   phoneNumbers: { id: string; phoneNumber: string; label: string }[];
+  emailTemplates: { id: string; name: string; subject: string }[];
 }
 
 async function requirePermission(permission: "automations.view" | "automations.manage") {
@@ -332,12 +333,12 @@ export async function getWorkflowLogs(
 export async function getAutomationConfigOptions(): Promise<AutomationConfigOptions> {
   const auth = await requirePermission("automations.view");
   if (!auth.ok) {
-    return { forms: [], pipelines: [], tags: [], phoneNumbers: [] };
+    return { forms: [], pipelines: [], tags: [], phoneNumbers: [], emailTemplates: [] };
   }
 
   const supabase = await createServerClient();
 
-  const [formsRes, pipelinesRes, stagesRes, contactsRes, phoneRes] = await Promise.all([
+  const [formsRes, pipelinesRes, stagesRes, contactsRes, phoneRes, templatesRes] = await Promise.all([
     supabase
       .from("forms")
       .select("id, title")
@@ -360,6 +361,11 @@ export async function getAutomationConfigOptions(): Promise<AutomationConfigOpti
       .from("phone_numbers")
       .select("id, phone_number, friendly_name")
       .eq("organization_id", auth.organizationId),
+    supabase
+      .from("marketing_email_templates")
+      .select("id, name, subject")
+      .eq("organization_id", auth.organizationId)
+      .order("name", { ascending: true }),
   ]);
 
   const stages = stagesRes.data || [];
@@ -386,11 +392,18 @@ export async function getAutomationConfigOptions(): Promise<AutomationConfigOpti
     label: pn.friendly_name ? `${pn.friendly_name} (${pn.phone_number})` : pn.phone_number,
   }));
 
+  const emailTemplates = (templatesRes.data || []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    subject: t.subject,
+  }));
+
   return {
     forms: (formsRes.data || []).map((f) => ({ id: f.id, title: f.title })),
     pipelines,
     tags: Array.from(tagSet).sort(),
     phoneNumbers,
+    emailTemplates,
   };
 }
 
