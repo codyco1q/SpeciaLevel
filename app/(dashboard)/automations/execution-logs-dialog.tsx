@@ -144,7 +144,6 @@ export function ExecutionLogsDialog({
                       </div>
                     </div>
 
-              <p>{t.history.noLogsYet}</p>
                     {isExpanded && (
                       <div className="px-4 pb-4 pt-1 border-t border-border/60 bg-muted/20 space-y-3 text-xs">
                         {Array.isArray(log.steps_executed) && log.steps_executed.length > 0 && (
