@@ -9,7 +9,10 @@ import {
   deleteSocialPostSchema,
   type SaveSocialPostInput,
 } from "@/lib/validations/marketing";
-import type { MarketingSocialPost } from "@/types/database";
+import type {
+  MarketingSocialPost,
+  SocialPlannerStatusResult,
+} from "@/types/database";
 
 async function requirePermission(permission: "marketing.view" | "marketing.manage") {
   const userContext = await getCurrentUserContext();
@@ -23,11 +26,6 @@ async function requirePermission(permission: "marketing.view" | "marketing.manag
     userId: userContext.user.id,
     organizationId: userContext.organization.id,
   };
-}
-
-export interface SocialPlannerStatusResult {
-  isSubscribed: boolean;
-  subscribedAt: string | null;
 }
 
 export async function getSocialPlannerStatus(): Promise<SocialPlannerStatusResult> {

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
-import { getEmailTemplates } from "@/lib/actions/marketing";
+import { getEmailTemplates } from "@/lib/actions/marketing-emails";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { EmailTemplatesView } from "./email-templates-view";
 

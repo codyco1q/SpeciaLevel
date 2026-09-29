@@ -4,7 +4,7 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import {
   getSocialPosts,
   getSocialPlannerStatus,
-} from "@/lib/actions/marketing";
+} from "@/lib/actions/marketing-social";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { SocialPlannerView } from "./social-planner-view";
 

@@ -22,7 +22,7 @@ import { EmailBlockPalette } from "./email-block-palette";
 import { EmailPropertyInspector } from "./email-property-inspector";
 import { EmailBlockItem } from "./email-block-item";
 import { EmailTestSendDialog } from "./email-test-send-dialog";
-import { saveEmailTemplate } from "@/lib/actions/marketing";
+import { saveEmailTemplate } from "@/lib/actions/marketing-emails";
 import {
   compileEmailBlocksToHtml,
   type SaveEmailTemplateInput as SaveInput,

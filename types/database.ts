@@ -695,6 +695,11 @@ export interface EmailBlock {
   style?: EmailBlockStyle;
 }
 
+export interface SocialPlannerStatusResult {
+  isSubscribed: boolean;
+  subscribedAt: string | null;
+}
+
 export interface MarketingEmailTemplate {
   id: string;
   organization_id: string;
@@ -712,6 +717,7 @@ export interface MarketingEmailTemplate {
     email: string | null;
   } | null;
 }
+
 
 
 

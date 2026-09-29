@@ -23,7 +23,7 @@ import {
 import {
   getEmailTemplates,
   deleteEmailTemplate,
-} from "@/lib/actions/marketing";
+} from "@/lib/actions/marketing-emails";
 import { STARTER_EMAIL_TEMPLATES } from "@/lib/validations/marketing";
 import { EmailEditorStudio } from "./email-editor-studio";
 import { EmailTestSendDialog } from "./email-test-send-dialog";
