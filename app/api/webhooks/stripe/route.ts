@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { dispatchNotificationToOrgAdmins } from "@/lib/services/notifications";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,24 @@ export async function POST(req: NextRequest) {
             message: `Invoice ${invoiceNumber} (${formattedTotal}) has been paid via Stripe Checkout.`,
             type: "invoice",
             link: `/invoicing/${invoiceId}`,
+          });
+
+          // Dispatch visual automation trigger
+          await dispatchWorkflowTrigger({
+            type: "invoice_paid",
+            orgId: targetOrgId,
+            payload: {
+              invoice_id: invoiceId,
+              invoice_number: invoiceNumber,
+              amount: formattedTotal,
+              currency,
+              invoice: {
+                id: invoiceId,
+                number: invoiceNumber,
+                amount: formattedTotal,
+                currency,
+              },
+            },
           });
         }
       }

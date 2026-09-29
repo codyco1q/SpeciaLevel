@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 import {
   createContactInputSchema,
   createContactNoteSchema,
@@ -562,6 +563,30 @@ export async function updateContact(
   revalidatePath(`/contacts/${id}`);
   revalidatePath("/crm");
   revalidatePath(`/crm/contacts/${id}`);
+
+  // Dispatch visual automation trigger for tags
+  if (Array.isArray(parsed.data.tags) && parsed.data.tags.length > 0) {
+    for (const tag of parsed.data.tags) {
+      dispatchWorkflowTrigger({
+        type: "contact_tag_added",
+        orgId: auth.organizationId,
+        payload: {
+          contact_id: id,
+          tag,
+          contact: {
+            id,
+            name: parsed.data.name,
+            email: parsed.data.email,
+            phone: parsed.data.phone,
+            company: parsed.data.company,
+          },
+        },
+      }).catch((triggerErr) =>
+        console.error("[contacts] dispatchWorkflowTrigger error:", triggerErr)
+      );
+    }
+  }
+
   return { status: "success" };
 }
 

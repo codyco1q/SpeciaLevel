@@ -2,376 +2,467 @@
 
 import { useState, useTransition } from "react";
 import {
+  Plus,
+  Zap,
   History,
   MoreHorizontal,
   Pencil,
-  Plus,
   Trash2,
-  Zap,
+  FileText,
+  Calendar,
+  TrendingUp,
+  Tag,
+  MessageSquare,
+  CreditCard,
+  Search,
+  Clock,
 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
-  deleteAutomation,
-  getAutomations,
-  toggleAutomation,
-  type AutomationRow,
+  toggleWorkflowStatus,
+  deleteWorkflow,
+  type WorkflowWithMeta,
+  type AutomationConfigOptions,
 } from "@/lib/actions/automations";
+import { WorkflowBuilderStudio } from "./workflow-builder-studio";
+import { ExecutionLogsDialog } from "./execution-logs-dialog";
+import type {
+  AutomationWorkflow,
+  AutomationExecutionLog,
+} from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
-import {
-  AUTOMATION_TRIGGER_BADGE_CLASSES,
-  AUTOMATION_ACTION_BADGE_CLASSES,
-  formatActionSummary,
-} from "./automation-meta";
-import {
-  AutomationDialog,
-  type AutomationChannelOption,
-  type AutomationMemberOption,
-} from "./automation-dialog";
-import { LogsDialog } from "./logs-dialog";
 
 interface AutomationsViewProps {
-  initialAutomations: AutomationRow[];
-  /** Chat channels for the chat_message action picker (and summaries). */
-  channels: AutomationChannelOption[];
-  /** Org members for the create_task action's optional assignee. */
-  members: AutomationMemberOption[];
+  initialWorkflows: WorkflowWithMeta[];
+  configOptions: AutomationConfigOptions;
+  initialLogs: AutomationExecutionLog[];
   canManage: boolean;
-  /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
 }
 
-/** Accessible active/inactive switch styled as a sliding pill. */
-function ActiveToggle({
-  checked,
-  disabled,
-  activeLabel,
-  inactiveLabel,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  activeLabel: string;
-  inactiveLabel: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={checked ? activeLabel : inactiveLabel}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50",
-        checked ? "border-primary/60 bg-primary" : "border-border bg-muted"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform",
-          checked
-            ? "translate-x-[22px] rtl:-translate-x-[22px]"
-            : "translate-x-[3px] rtl:-translate-x-[3px]"
-        )}
-      />
-    </button>
-  );
-}
-
-/** Maps a stored trigger/action key to its localized label with a fallback. */
-function triggerLabel(
-  event: string,
-  t: Dictionary["platform"]["automations"]
-): string {
-  const label = t.triggerEvents[event as keyof typeof t.triggerEvents];
-  return typeof label === "string" ? label : event;
-}
-
-function actionLabel(
-  action: string,
-  t: Dictionary["platform"]["automations"]
-): string {
-  const label = t.actionTypes[action as keyof typeof t.actionTypes];
-  return typeof label === "string" ? label : action;
-}
-
 export function AutomationsView({
-  initialAutomations,
-  channels,
-  members,
+  initialWorkflows,
+  configOptions,
+  initialLogs,
   canManage,
   platform,
   locale,
 }: AutomationsViewProps) {
   const t = platform.automations;
-  const common = platform.common;
+  const vb = t.visualBuilder;
 
-  const [automations, setAutomations] = useState<AutomationRow[]>(
-    initialAutomations
-  );
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<AutomationRow | null>(null);
-  const [logsAutomation, setLogsAutomation] = useState<AutomationRow | null>(
-    null
-  );
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [workflows, setWorkflows] = useState<WorkflowWithMeta[]>(initialWorkflows);
+  const [logs, setLogs] = useState<AutomationExecutionLog[]>(initialLogs);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTriggerFilter, setSelectedTriggerFilter] = useState<string>("all");
 
-  /** Refetch the automations list after any mutation. */
-  async function refreshAll() {
-    const list = await getAutomations();
-    if (list) setAutomations(list);
-  }
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<AutomationWorkflow | null>(null);
 
-  function openCreate() {
-    setActionError(null);
-    setEditing(null);
-    setDialogOpen(true);
-  }
+  const [logsDialogOpen, setLogsDialogOpen] = useState(false);
+  const [selectedWorkflowForLogs, setSelectedWorkflowForLogs] = useState<WorkflowWithMeta | null>(null);
 
-  function openEdit(row: AutomationRow) {
-    setActionError(null);
-    setEditing(row);
-    setDialogOpen(true);
-  }
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, startDeleting] = useTransition();
+  const [togglePendingId, setTogglePendingId] = useState<string | null>(null);
 
-  function handleSaved() {
-    setDialogOpen(false);
-    setEditing(null);
-    setActionError(null);
-    void refreshAll();
-  }
+  const handleToggleActive = async (id: string, currentState: boolean) => {
+    setTogglePendingId(id);
+    const newState = !currentState;
+    setWorkflows((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, is_active: newState } : w))
+    );
 
-  function handleToggle(row: AutomationRow) {
-    setActionError(null);
-    startTransition(async () => {
-      const result = await toggleAutomation(row.id, !row.isActive);
-      if (result.status === "error") {
-        setActionError(result.error);
-        return;
-      }
-      setAutomations((current) =>
-        current.map((item) =>
-          item.id === row.id
-            ? { ...item, isActive: result.automation.isActive }
-            : item
-        )
+    const res = await toggleWorkflowStatus(id, newState);
+    setTogglePendingId(null);
+    if (res.status === "error") {
+      setWorkflows((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, is_active: currentState } : w))
       );
-    });
-  }
-
-  /** Row-level two-step delete: first click arms, second click deletes. */
-  function handleRowDeleteClick(row: AutomationRow) {
-    setActionError(null);
-    if (confirmDeleteId === row.id) {
-      setConfirmDeleteId(null);
-      startTransition(async () => {
-        const result = await deleteAutomation(row.id);
-        if (result.status === "error") {
-          setActionError(result.error);
-          return;
-        }
-        void refreshAll();
-      });
-    } else {
-      setConfirmDeleteId(row.id);
     }
-  }
+  };
 
-  function handleViewLogs(row: AutomationRow) {
-    setActionError(null);
-    setLogsAutomation(row);
-  }
+  const handleDelete = () => {
+    if (!deleteConfirmId) return;
+    startDeleting(async () => {
+      const idToDelete = deleteConfirmId;
+      const res = await deleteWorkflow(idToDelete);
+      if (res.status === "success") {
+        setWorkflows((prev) => prev.filter((w) => w.id !== idToDelete));
+        setDeleteConfirmId(null);
+      }
+    });
+  };
+
+  const filteredWorkflows = workflows.filter((w) => {
+    const matchesSearch =
+      w.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (w.description && w.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesTrigger =
+      selectedTriggerFilter === "all" || w.trigger_type === selectedTriggerFilter;
+    return matchesSearch && matchesTrigger;
+  });
 
   return (
-    <div>
-      {/* Page header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-6">
+      {/* Module Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Zap className="size-6 text-primary" />
+            <span>{t.title}</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {vb.subtitle}
+          </p>
         </div>
-        {canManage && (
-          <Button onClick={openCreate}>
-            <Plus className="size-4" />
-            {t.createAutomation}
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedWorkflowForLogs(null);
+              setLogsDialogOpen(true);
+            }}
+            className="gap-1.5 text-xs h-9"
+          >
+            <History className="size-3.5" />
+            <span>{vb.logsTab}</span>
           </Button>
-        )}
+
+          {canManage && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingWorkflow(null);
+                setStudioOpen(true);
+              }}
+              className="gap-1.5 text-xs h-9 font-medium shadow-sm"
+            >
+              <Plus className="size-4" />
+              <span>{vb.newWorkflow}</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      {actionError && (
-        <div
-          role="alert"
-          className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {actionError}
+      {/* Filter / Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search workflows..."
+            className="pl-9 rtl:pl-3 rtl:pr-9 text-xs h-9 bg-card"
+          />
         </div>
-      )}
 
-      {automations.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-10 text-center">
-          <Zap className="mx-auto mb-3 h-8 w-8 text-muted-foreground/60" />
-          <p className="text-sm font-medium text-muted-foreground">
-            {t.noAutomationsYet}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 sm:pb-0">
+          <Button
+            variant={selectedTriggerFilter === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedTriggerFilter("all")}
+            className="text-xs h-8 rounded-lg"
+          >
+            All Triggers ({workflows.length})
+          </Button>
+          <Button
+            variant={selectedTriggerFilter === "form_submitted" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedTriggerFilter("form_submitted")}
+            className="text-xs h-8 rounded-lg"
+          >
+            Forms
+          </Button>
+          <Button
+            variant={selectedTriggerFilter === "appointment_booked" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedTriggerFilter("appointment_booked")}
+            className="text-xs h-8 rounded-lg"
+          >
+            Appointments
+          </Button>
+          <Button
+            variant={selectedTriggerFilter === "deal_stage_changed" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedTriggerFilter("deal_stage_changed")}
+            className="text-xs h-8 rounded-lg"
+          >
+            Deals
+          </Button>
+          <Button
+            variant={selectedTriggerFilter === "invoice_paid" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSelectedTriggerFilter("invoice_paid")}
+            className="text-xs h-8 rounded-lg"
+          >
+            Invoices
+          </Button>
+        </div>
+      </div>
+
+
+      {/* Workflows List */}
+      {filteredWorkflows.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-12 text-center bg-card/50">
+          <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+            <Zap className="size-6" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground">{t.noAutomationsYet}</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
             {canManage ? t.noAutomationsHintManage : t.noAutomationsHintView}
           </p>
+          {canManage && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingWorkflow(null);
+                setStudioOpen(true);
+              }}
+              className="mt-4 gap-1.5 text-xs font-medium"
+            >
+              <Plus className="size-4" />
+              <span>{vb.newWorkflow}</span>
+            </Button>
+          )}
         </div>
       ) : (
-        <div className="grid gap-4">
-          {automations.map((automation) => (
-            <div
-              key={automation.id}
-              className="rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-foreground/20"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-3">
+          {filteredWorkflows.map((wf) => {
+            const stepsCount = Array.isArray(wf.steps) ? wf.steps.length : 0;
+            const isToggling = togglePendingId === wf.id;
+
+            return (
+              <div
+                key={wf.id}
+                className="rounded-xl border border-border bg-card p-4.5 shadow-xs hover:border-border/80 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              >
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold leading-snug">
-                      {automation.name}
-                    </h3>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "px-1.5 py-0 text-[10px] font-medium",
-                        AUTOMATION_TRIGGER_BADGE_CLASSES[automation.triggerEvent]
-                      )}
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h3
+                      className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => {
+                        setEditingWorkflow(wf);
+                        setStudioOpen(true);
+                      }}
                     >
-                      {triggerLabel(automation.triggerEvent, t)}
+                      {wf.name}
+                    </h3>
+
+                    <Badge variant="outline" className="text-[10px] font-medium capitalize bg-primary/5 text-primary border-primary/20 gap-1">
+                      {wf.trigger_type === "form_submitted" && <FileText className="size-3" />}
+                      {wf.trigger_type === "appointment_booked" && <Calendar className="size-3" />}
+                      {wf.trigger_type === "deal_stage_changed" && <TrendingUp className="size-3" />}
+                      {wf.trigger_type === "contact_tag_added" && <Tag className="size-3" />}
+                      {wf.trigger_type === "inbound_sms" && <MessageSquare className="size-3" />}
+                      {wf.trigger_type === "invoice_paid" && <CreditCard className="size-3" />}
+                      <span>{t.triggerEvents[wf.trigger_type] || wf.trigger_type}</span>
                     </Badge>
-                    {!automation.isActive && (
-                      <Badge
-                        variant="outline"
-                        className="px-1.5 py-0 text-[10px] font-medium text-muted-foreground"
-                      >
-                        {t.inactive}
-                      </Badge>
-                    )}
+
+                    <Badge variant="secondary" className="text-[10px] font-mono">
+                      {vb.stepsCount.replace("{count}", String(stepsCount))}
+                    </Badge>
                   </div>
 
-                  {automation.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {automation.description}
+                  {wf.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                      {wf.description}
                     </p>
                   )}
 
-                  <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <span
-                      className={cn(
-                        "inline-block rounded-full border px-1.5 py-0 text-[10px] font-medium",
-                        AUTOMATION_ACTION_BADGE_CLASSES[automation.actionType]
-                      )}
-                    >
-                      {actionLabel(automation.actionType, t)}
-                    </span>
-                    <span>
-                      {formatActionSummary(
-                        automation.actionType,
-                        automation.actionConfig ?? {},
-                        t,
-                        (channelId) =>
-                          channels.find((channel) => channel.id === channelId)
-                            ?.name
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-2">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="size-3" />
+                      <span>{vb.lastRun}: </span>
+                      {wf.last_run_at ? (
+                        <span className="font-medium text-foreground">
+                          {new Date(wf.last_run_at).toLocaleString(locale === "ar" ? "ar-EG" : "en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      ) : (
+                        <span>{vb.neverRun}</span>
                       )}
                     </span>
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <ActiveToggle
-                    checked={automation.isActive}
-                    disabled={!canManage || isPending}
-                    activeLabel={t.active}
-                    inactiveLabel={t.inactive}
-                    onChange={() => handleToggle(automation)}
-                  />
-                  {canManage && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          aria-label={t.actions}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>{automation.name}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => openEdit(automation)}>
-                          <Pencil />
-                          {common.edit}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => handleViewLogs(automation)}
-                        >
-                          <History />
-                          {t.viewLogs}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onSelect={() => handleRowDeleteClick(automation)}
-                        >
-                          <Trash2 />
-                          {confirmDeleteId === automation.id
-                            ? common.confirmDelete
-                            : common.delete}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                    {wf.last_status && (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[9px] px-1.5 py-0 capitalize",
+                          wf.last_status === "completed" && "text-emerald-600 bg-emerald-500/10 border-emerald-500/20",
+                          wf.last_status === "failed" && "text-destructive bg-destructive/10 border-destructive/20"
+                        )}
+                      >
+                        {wf.last_status}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={wf.is_active}
+                      disabled={!canManage || isToggling}
+                      onCheckedChange={() => handleToggleActive(wf.id, wf.is_active)}
+                      className="scale-90"
+                    />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {wf.is_active ? vb.active : vb.inactive}
+                    </span>
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground">
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setEditingWorkflow(wf);
+                          setStudioOpen(true);
+                        }}
+                        className="text-xs gap-2"
+                      >
+                        <Pencil className="size-3.5" />
+                        <span>{vb.editWorkflow}</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setSelectedWorkflowForLogs(wf);
+                          setLogsDialogOpen(true);
+                        }}
+                        className="text-xs gap-2"
+                      >
+                        <History className="size-3.5" />
+                        <span>{vb.logsTab}</span>
+                      </DropdownMenuItem>
+
+                      {canManage && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => setDeleteConfirmId(wf.id)}
+                            className="text-xs gap-2 text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>{platform.common.delete}</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
-
-              {confirmDeleteId === automation.id && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {t.errors.deleteConfirmBody}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+      {/* Visual Workflow Builder Studio Modal */}
+      {studioOpen && (
+        <WorkflowBuilderStudio
+          workflow={editingWorkflow}
+          configOptions={configOptions}
+          open={studioOpen}
+          onOpenChange={(op) => {
+            setStudioOpen(op);
+            if (!op) setEditingWorkflow(null);
+          }}
+          onSaved={(savedWf) => {
+            setWorkflows((prev) => {
+              const idx = prev.findIndex((w) => w.id === savedWf.id);
+              if (idx >= 0) {
+                const updated = [...prev];
+                updated[idx] = { ...updated[idx], ...savedWf };
+                return updated;
+              }
+              return [savedWf, ...prev];
+            });
+          }}
+          platform={platform}
+          locale={locale}
+        />
+      )}
 
-      <AutomationDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        automation={editing}
-        channels={channels}
-        members={members}
-        onCreated={handleSaved}
-        platform={platform}
-      />
-
-      <LogsDialog
-        open={Boolean(logsAutomation)}
-        onOpenChange={(open) => {
-          if (!open) setLogsAutomation(null);
+      {/* Execution History Dialog */}
+      <ExecutionLogsDialog
+        logs={
+          selectedWorkflowForLogs
+            ? logs.filter((l) => l.workflow_id === selectedWorkflowForLogs.id)
+            : logs
+        }
+        workflowName={selectedWorkflowForLogs?.name}
+        open={logsDialogOpen}
+        onOpenChange={(op) => {
+          setLogsDialogOpen(op);
+          if (!op) setSelectedWorkflowForLogs(null);
         }}
-        automation={logsAutomation}
         platform={platform}
         locale={locale}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={Boolean(deleteConfirmId)}
+        onOpenChange={(op) => !op && setDeleteConfirmId(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">
+              {t.errors.deleteConfirmTitle}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {t.errors.deleteConfirmBody}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmId(null)}
+              disabled={isDeleting}
+            >
+              {platform.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? vb.saving : platform.common.delete}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+

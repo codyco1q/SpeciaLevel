@@ -19,6 +19,7 @@ import {
 } from "@/lib/validations/calendar";
 import { z } from "zod";
 import { dispatchNotification } from "@/lib/services/notifications";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 
 /**
  * Calendar server actions.
@@ -836,8 +837,37 @@ export async function bookPublicAppointment(
         link: `/calendar?appointmentId=${data.appointment_id}`,
       });
     }
+
+    if (orgId) {
+      // Dispatch visual automation trigger
+      await dispatchWorkflowTrigger({
+        type: "appointment_booked",
+        orgId,
+        payload: {
+          appointment_id: data.appointment_id,
+          booking_profile_id: parsed.data.bookingProfileId,
+          host_user_id: data.host_user_id,
+          client_name: parsed.data.clientName,
+          client_email: parsed.data.clientEmail,
+          client_phone: parsed.data.clientPhone,
+          start_time: parsed.data.startTime,
+          notes: parsed.data.notes,
+          contact: {
+            id: data.contact_id,
+            name: parsed.data.clientName,
+            email: parsed.data.clientEmail,
+            phone: parsed.data.clientPhone,
+          },
+          appointment: {
+            time: parsed.data.startTime,
+            title: data.title,
+          },
+          deal_id: data.deal_id,
+        },
+      });
+    }
   } catch (err) {
-    console.error("[calendar] Failed to dispatch appointment notification:", err);
+    console.error("[calendar] Failed to dispatch appointment notification / workflow:", err);
   }
 
   revalidatePath("/calendar");

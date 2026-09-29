@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import { dispatchNotificationToOrgAdmins } from "@/lib/services/notifications";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 import { getDictionary, type Locale } from "@/lib/i18n/get-dictionary";
 import {
   createFormInputSchema,
@@ -481,9 +482,35 @@ export async function submitPublicForm(
         link: `/forms?formId=${result.form_id || ""}`,
         specificUserId: result.created_by,
       });
+
+      // Dispatch visual automation trigger
+      await dispatchWorkflowTrigger({
+        type: "form_submitted",
+        orgId: result.organization_id,
+        payload: {
+          form_id: result.form_id,
+          form_title: result.form_title || slug,
+          contact_id: result.contact_id,
+          deal_id: result.deal_id,
+          lead_name: result.lead_name,
+          lead_email: result.lead_email,
+          lead_phone: result.lead_phone,
+          contact: {
+            id: result.contact_id,
+            name: result.lead_name,
+            email: result.lead_email,
+            phone: result.lead_phone,
+          },
+          form: {
+            id: result.form_id,
+            title: result.form_title || slug,
+          },
+          data: parsed.data.data,
+        },
+      });
     }
   } catch (err) {
-    console.error("[forms] Failed to dispatch lead notification:", err);
+    console.error("[forms] Failed to dispatch lead notification / workflow:", err);
   }
 
   return {
