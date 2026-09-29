@@ -134,18 +134,18 @@ export function PhoneNumbersView({
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-          <TabsList className="grid grid-cols-3 w-[450px]">
-            <TabsTrigger value="inventory" className="gap-2 text-xs">
-              <Hash className="h-3.5 w-3.5" />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto max-w-full overflow-x-auto">
+          <TabsList className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-xl border border-border w-fit h-auto">
+            <TabsTrigger value="inventory" className="gap-2 text-xs px-4 py-2 shrink-0 rounded-lg">
+              <Hash className="h-3.5 w-3.5 shrink-0" />
               <span>{t.tabs.inventory}</span>
             </TabsTrigger>
-            <TabsTrigger value="carrier" className="gap-2 text-xs">
-              <Server className="h-3.5 w-3.5" />
+            <TabsTrigger value="carrier" className="gap-2 text-xs px-4 py-2 shrink-0 rounded-lg">
+              <Server className="h-3.5 w-3.5 shrink-0" />
               <span>{t.tabs.carrier}</span>
             </TabsTrigger>
-            <TabsTrigger value="auditLogs" className="gap-2 text-xs">
-              <FileText className="h-3.5 w-3.5" />
+            <TabsTrigger value="auditLogs" className="gap-2 text-xs px-4 py-2 shrink-0 rounded-lg">
+              <FileText className="h-3.5 w-3.5 shrink-0" />
               <span>{t.tabs.auditLogs}</span>
             </TabsTrigger>
           </TabsList>

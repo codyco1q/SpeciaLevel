@@ -220,7 +220,7 @@ export const workflowStepSchema = z.object({
   type: z.enum(WORKFLOW_STEP_TYPES),
   action_type: z.enum(WORKFLOW_ACTION_TYPES),
   name: z.string().optional(),
-  config: z.record(z.any()).default({}),
+  config: z.record(z.string(), z.any()).default({}),
 });
 
 export const saveWorkflowSchema = z.object({
@@ -229,7 +229,7 @@ export const saveWorkflowSchema = z.object({
   description: z.string().trim().max(500, "Description must be 500 characters or fewer.").optional().nullable(),
   isActive: z.boolean().default(false),
   triggerType: z.enum(WORKFLOW_TRIGGER_TYPES),
-  triggerConfig: z.record(z.any()).default({}),
+  triggerConfig: z.record(z.string(), z.any()).default({}),
   steps: z.array(workflowStepSchema).default([]),
 });
 
@@ -242,5 +242,5 @@ export const toggleWorkflowSchema = z.object({
 
 export const testWorkflowSchema = z.object({
   workflowId: z.string().uuid("Invalid workflow ID."),
-  mockPayload: z.record(z.any()).optional().default({}),
+  mockPayload: z.record(z.string(), z.any()).optional().default({}),
 });

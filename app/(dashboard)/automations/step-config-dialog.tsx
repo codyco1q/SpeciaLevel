@@ -365,7 +365,7 @@ export function StepConfigDialog({
             {platform.common.cancel}
           </Button>
           <Button onClick={handleSave}>
-            {platform.common.confirm}
+            {platform.common.saveChanges}
           </Button>
         </DialogFooter>
       </DialogContent>
