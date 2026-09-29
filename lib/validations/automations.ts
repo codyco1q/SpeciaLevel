@@ -244,10 +244,3 @@ export const testWorkflowSchema = z.object({
   workflowId: z.string().uuid("Invalid workflow ID."),
   mockPayload: z.record(z.any()).optional().default({}),
 });
-
-  fieldErrors?: Partial<Record<keyof AutomationFormValues, string[] | undefined>>;
-}
-
-export const initialCreateAutomationState: CreateAutomationState = {
-  status: "idle",
-};

@@ -66,6 +66,15 @@ export function ExecutionLogsDialog({
           {logs.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-xs">
               <History className="size-8 mx-auto mb-2 opacity-30" />
+              <p>{t.noLogsYet}</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {logs.map((log) => {
+                const isExpanded = expandedLogId === log.id;
+                const isSuccess = log.status === "completed";
+                const isFailed = log.status === "failed";
+
                 return (
                   <div
                     key={log.id}
@@ -208,10 +217,3 @@ export function ExecutionLogsDialog({
   );
 }
 
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {logs.map((log) => {
-                const isExpanded = expandedLogId === log.id;
-                const isSuccess = log.status === "completed";
-                const isFailed = log.status === "failed";

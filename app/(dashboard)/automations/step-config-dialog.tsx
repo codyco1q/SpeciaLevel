@@ -185,7 +185,6 @@ export function StepConfigDialog({
             </div>
           )}
 
-  };
           {step.action_type === "send_notification" && (
             <div className="space-y-4">
               <div className="space-y-1.5">
