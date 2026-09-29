@@ -5,6 +5,7 @@ import {
   Brain,
   Check,
   Copy,
+  Cpu,
   History,
   LoaderCircle,
   MoreHorizontal,
@@ -37,16 +38,20 @@ import {
 } from "@/lib/actions/ai"
 import { AI_QUICK_TOOLS, type AiQuickTool } from "@/lib/validations/ai"
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary"
+import type { AiModelProvider, AiMcpServer } from "@/types/database"
 import { AI_PROVIDER_BADGE_CLASSES } from "./ai-meta"
 import { PromptDialog } from "./prompt-dialog"
 import { RunPromptDialog } from "./run-dialog"
 import { HistoryDialog } from "./history-dialog"
+import { ProvidersMcpTab } from "./providers-mcp-tab"
 
 type AiDict = Dictionary["platform"]["ai"]
-type TabKey = "playground" | "quickTools" | "prompts"
+type TabKey = "playground" | "quickTools" | "prompts" | "providers_mcp"
 
 interface AiViewProps {
   initialPrompts: AiPromptRow[]
+  initialProviders?: AiModelProvider[]
+  initialMcpServers?: AiMcpServer[]
   canManage: boolean
   platform: Dictionary["platform"]
   locale: Locale
@@ -381,6 +386,8 @@ function QuickToolsPane({ t }: { t: AiDict }) {
 
 export function AiView({
   initialPrompts,
+  initialProviders = [],
+  initialMcpServers = [],
   canManage,
   platform,
   locale,
@@ -476,7 +483,7 @@ export function AiView({
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
-        <TabsList className="mb-6 grid w-full max-w-md grid-cols-3">
+        <TabsList className="mb-6 grid w-full max-w-2xl grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="playground">
             <Sparkles className="size-4" />
             {t.tabs.playground}
@@ -488,6 +495,10 @@ export function AiView({
           <TabsTrigger value="prompts">
             <Brain className="size-4" />
             {t.tabs.customPrompts}
+          </TabsTrigger>
+          <TabsTrigger value="providers_mcp">
+            <Cpu className="size-4" />
+            {(t.tabs as any).providersMcp ?? "Model Providers & MCP"}
           </TabsTrigger>
         </TabsList>
 
@@ -666,6 +677,16 @@ export function AiView({
             </div>
           )}
         </TabsContent>
+        <TabsContent value="providers_mcp">
+          <ProvidersMcpTab
+            initialProviders={initialProviders}
+            initialMcpServers={initialMcpServers}
+            canManage={canManage}
+            platform={platform}
+            locale={locale}
+          />
+        </TabsContent>
+
       </Tabs>
 
       <PromptDialog

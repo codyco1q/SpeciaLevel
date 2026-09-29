@@ -1691,7 +1691,8 @@
       "tabs": {
         "playground": "مساحة التجربة",
         "quickTools": "أدوات سريعة",
-        "customPrompts": "قوالب مخصصة"
+        "customPrompts": "قوالب مخصصة",
+        "providersMcp": "موفرو النماذج و MCP"
       },
       "playground": {
         "label": "التعليمات",
@@ -1775,6 +1776,71 @@
           "openai": "OpenAI",
           "openrouter": "OpenRouter",
           "custom": "مخصص"
+        }
+      },
+      "modelProviders": {
+        "title": "موفرو نماذج الذكاء الاصطناعي (BYOK)",
+        "subtitle": "استخدم مفاتيح API الخاصة بك لتشغيل النماذج مباشرة بموثوقية عالية وبدون رسوم إضافية.",
+        "configure": "تهيئة الموفّر",
+        "connect": "ربط الموفّر",
+        "connected": "متصل",
+        "inactive": "غير نشط",
+        "notConfigured": "غير مهيأ",
+        "model": "النموذج",
+        "baseUrl": "الرابط الأساسي",
+        "refresh": "تحديث",
+        "dialog": {
+          "apiKey": "مفتاح API",
+          "getApiKey": "الحصول على مفتاح API",
+          "baseUrl": "الرابط الأساسي",
+          "baseUrlOptional": "(نقطة نهاية بروكسي اختيارية)",
+          "defaultModel": "النموذج الافتراضي",
+          "enableProvider": "تفعيل الموفّر",
+          "enableHint": "السماح للوكلاء وسير العمل باستخدام هذا الموفّر.",
+          "testConnection": "اختبار الاتصال",
+          "testing": "جارٍ الاختبار…",
+          "save": "حفظ الموفّر",
+          "saving": "جارٍ الحفظ…",
+          "disconnect": "قطع الاتصال",
+          "connectionVerified": "تم التحقق من الاتصال بنجاح",
+          "connectionFailed": "فشل الاتصال"
+        }
+      },
+      "mcp": {
+        "title": "سجل خوادم بروتوكول سياق النماذج (MCP)",
+        "subtitle": "ربط خوادم الأدوات الخارجية ومصادر البيانات عبر نقاط نهاية MCP الموحدة.",
+        "connectServer": "ربط خادم MCP",
+        "editServer": "تعديل خادم MCP",
+        "noServers": "لا توجد خوادم MCP متصلة",
+        "noServersHint": "اربط موفري أدوات MCP الخارجيين (مثل قواعد البيانات ومفسري الأكواد أو خوادم SSE) لتكون متاحة للوكلاء.",
+        "addFirst": "إضافة أول خادم MCP",
+        "endpoint": "نقطة النهاية",
+        "toolsDiscovered": "الأدوات المكتشفة",
+        "manageTools": "إدارة والأدوات",
+        "active": "نشط",
+        "disabled": "معطل",
+        "dialog": {
+          "title": "ربط خادم MCP",
+          "editTitle": "تعديل خادم MCP",
+          "description": "تسجيل خادم خارجي ببروتوكول سياق النماذج (MCP) لإتاحة الأدوات ومصادر البيانات للوكلاء.",
+          "name": "اسم الخادم",
+          "namePlaceholder": "مثال: أدوات قاعدة بيانات Postgres، مساعد GitHub",
+          "transport": "نوع النقل",
+          "endpoint": "رابط نقطة النهاية",
+          "endpointPlaceholder": "https://mcp.domain.com/sse",
+          "headers": "الترويسات المخصصة / التوثيق",
+          "addHeader": "إضافة ترويسة",
+          "noHeaders": "لا توجد ترويسات إضافية مهيأة (اختياري لخوادم SSE العامة أو غير الموثقة).",
+          "headerKeyPlaceholder": "مفتاح الترويسة (مثال: Authorization)",
+          "headerValuePlaceholder": "القيمة (مثال: Bearer sk-...)",
+          "discoveredTools": "الأدوات المكتشفة",
+          "enableServer": "تفعيل الخادم",
+          "enableHint": "السماح للوكلاء باكتشاف واستدعاء الأدوات من هذا الخادم.",
+          "testAndDiscover": "اختبار واكتشاف الأدوات",
+          "discovering": "جارٍ الاكتشاف…",
+          "save": "حفظ الخادم",
+          "saving": "جارٍ الحفظ…",
+          "remove": "حذف الخادم"
         }
       },
       "history": {

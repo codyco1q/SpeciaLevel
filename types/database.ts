@@ -572,6 +572,51 @@ export interface AutomationExecutionLog {
   completed_at: string | null;
 }
 
+// ============================================================
+// AI Model Providers & MCP (00037_ai_providers_and_mcp.sql)
+// ============================================================
+
+export type AiModelProviderType =
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "openrouter"
+  | "custom_openai";
+
+export interface AiModelProvider {
+  id: string;
+  organization_id: string;
+  provider: AiModelProviderType;
+  api_key_encrypted: string;
+  base_url: string | null;
+  default_model: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type McpTransportType = "sse" | "http_stream" | "stdio";
+
+export interface McpToolDefinition {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, any>;
+}
+
+export interface AiMcpServer {
+  id: string;
+  organization_id: string;
+  name: string;
+  transport_type: McpTransportType;
+  endpoint_url: string;
+  headers_encrypted: Record<string, string>;
+  discovered_tools: McpToolDefinition[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+
 
 
 
