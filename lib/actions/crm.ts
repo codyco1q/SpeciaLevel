@@ -6,6 +6,7 @@ import { z } from "zod";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 import {
   createCrmDealInputSchema,
   crmPipelineSchema,
@@ -926,6 +927,25 @@ export async function updateDealStage(
   }
 
   revalidatePath("/crm");
+
+  // Dispatch visual automation trigger
+  dispatchWorkflowTrigger({
+    type: "deal_stage_changed",
+    orgId: auth.organizationId,
+    payload: {
+      deal_id: dealId,
+      stage_id: targetStageId,
+      stage: targetStageName,
+      deal: {
+        id: dealId,
+        stage_id: targetStageId,
+        stage: targetStageName,
+      },
+    },
+  }).catch((triggerErr) =>
+    console.error("[crm] dispatchWorkflowTrigger error:", triggerErr)
+  );
+
   return { status: "success" };
 }
 

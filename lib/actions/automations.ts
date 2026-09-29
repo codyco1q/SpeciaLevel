@@ -1,783 +1,397 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
-  createAutomationInputSchema,
-  automationToggleSchema,
-  type AutomationValidationMessages,
+  saveWorkflowSchema,
+  toggleWorkflowSchema,
+  testWorkflowSchema,
 } from "@/lib/validations/automations";
-import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { executeSingleWorkflow } from "@/lib/services/workflow-runner";
+import type {
+  AutomationWorkflow,
+  AutomationExecutionLog,
+} from "@/types/database";
 
-/**
- * Automations server actions + execution engine.
- *
- * Security model:
- *  - `organization_id` and `created_by` are NEVER read from the payload —
- *    they come exclusively from `getCurrentUserContext()`, so a caller can
- *    only touch rows inside their own organization, as themselves.
- *  - Viewing requires `automations.view`; creating/toggling/deleting
- *    requires `automations.manage` (the catalog permissions seeded by the
- *    00015 migration).
- *  - Input is re-validated with Zod server-side (schema shared with the
- *    client forms).
- *  - `triggerAutomationEvent` re-validates the caller holds `automations.view`
- *    (the same gate as the page), and every action it performs is
- *    org-scoped so a caller can never trigger work on another tenant.
- */
+export interface WorkflowWithMeta extends AutomationWorkflow {
+  last_run_at?: string | null;
+  last_status?: "running" | "completed" | "failed" | null;
+  total_runs?: number;
+}
 
-/** Public row shape for automations (joined created-by profile). */
-export interface AutomationRow {
-  id: string;
-  name: string;
-  description: string | null;
-  triggerEvent: string;
-  actionType: string;
-  actionConfig: Record<string, unknown>;
-  isActive: boolean;
-  createdBy: {
+export interface AutomationConfigOptions {
+  forms: { id: string; title: string }[];
+  pipelines: {
     id: string;
-    fullName: string | null;
-    email: string | null;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
+    name: string;
+    stages: { id: string; name: string; color: string }[];
+  }[];
+  tags: string[];
+  phoneNumbers: { id: string; phoneNumber: string; label: string }[];
 }
 
-/** Raw PostgREST join shape for an automations row. */
-interface AutomationJoinRow {
-  id: string;
-  name: string;
-  description: string | null;
-  trigger_event: string;
-  action_type: string;
-  action_config: Record<string, unknown>;
-  is_active: boolean;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  creator:
-    | { id: string; full_name: string | null; email: string | null }
-    | { id: string; full_name: string | null; email: string | null }[]
-    | null;
-}
-
-export interface AutomationLogRow {
-  id: string;
-  automationId: string;
-  status: "success" | "failed" | "running";
-  triggerPayload: Record<string, unknown>;
-  actionResult: Record<string, unknown>;
-  errorMessage: string | null;
-  executedAt: string;
-}
-
-interface AutomationLogJoinRow {
-  id: string;
-  automation_id: string;
-  status: "success" | "failed" | "running";
-  trigger_payload: Record<string, unknown>;
-  action_result: Record<string, unknown>;
-  error_message: string | null;
-  executed_at: string;
-}
-
-function toAutomationRow(row: AutomationJoinRow): AutomationRow {
-  const creator = Array.isArray(row.creator) ? row.creator[0] : row.creator;
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    triggerEvent: row.trigger_event,
-    actionType: row.action_type,
-    actionConfig: row.action_config ?? {},
-    isActive: row.is_active,
-    createdBy: creator
-      ? {
-          id: creator.id,
-          fullName: creator.full_name,
-          email: creator.email,
-        }
-      : null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function toAutomationLogRow(row: AutomationLogJoinRow): AutomationLogRow {
-  return {
-    id: row.id,
-    automationId: row.automation_id,
-    status: row.status,
-    triggerPayload: row.trigger_payload ?? {},
-    actionResult: row.action_result ?? {},
-    errorMessage: row.error_message,
-    executedAt: row.executed_at,
-  };
-}
-
-type AutomationAuthResult =
-  | { ok: true; organizationId: string; userId: string }
-  | { ok: false; error: string };
-async function requireAutomationPermission(
-  permission: "automations.view" | "automations.manage"
-): Promise<AutomationAuthResult> {
+async function requirePermission(permission: "automations.view" | "automations.manage") {
   const userContext = await getCurrentUserContext();
-  const dict = await getDictionary();
-  const err = dict.platform.automations.errors;
-
   if (!userContext) {
-    return { ok: false, error: err.signedIn };
+    return { ok: false as const, error: "Not signed in." };
   }
-
+  if (!userContext.organization) {
+    return { ok: false as const, error: "No active organization." };
+  }
   if (!hasPermission(permission, userContext.permissions)) {
-    return {
-      ok: false,
-      error:
-        permission === "automations.manage"
-          ? err.noPermissionManage
-          : err.noPermissionView,
-    };
+    return { ok: false as const, error: "Insufficient permissions." };
   }
-
-  const organizationId = userContext.organization?.id;
-  if (!organizationId) {
-    return { ok: false, error: err.noOrg };
-  }
-
   return {
-    ok: true,
-    organizationId,
+    ok: true as const,
     userId: userContext.user.id,
+    organizationId: userContext.organization.id,
   };
 }
 
-function parseFieldErrors(
-  issues: z.ZodIssue[]
-): Record<string, string[]> {
-  const fieldErrors: Record<string, string[]> = {};
-  for (const issue of issues) {
-    const key = issue.path[0];
-    if (typeof key === "string") {
-      (fieldErrors[key] ??= []).push(issue.message);
-    }
-  }
-  return fieldErrors;
-}
-
-/** English fallback for the toggle schema when no localized messages exist. */
-const fallbackToggleMessages: AutomationValidationMessages = {
-  nameRequired: "Invalid ID.",
-  nameMax: "Invalid ID.",
-  descriptionMax: "Invalid ID.",
-  triggerRequired: "Invalid ID.",
-  actionRequired: "Invalid ID.",
-  webhookUrlRequired: "Invalid ID.",
-  webhookUrlInvalid: "Invalid ID.",
-  channelRequired: "Invalid ID.",
-  messageRequired: "Invalid ID.",
-  messageMax: "Invalid ID.",
-  taskTitleRequired: "Invalid ID.",
-  taskTitleMax: "Invalid ID.",
-  assigneeInvalid: "Invalid ID.",
-  invalidConfig: "Invalid ID.",
-};
-/**
- * Lists all automations for the current organization. Requires
- * `automations.view` (the page gate); the RLS policy ALSO restricts reads
- * to the caller's organization, so a user who somehow reaches this with
- * view rights can only ever see their own tenant's rows.
- */
-export async function getAutomations(): Promise<AutomationRow[] | null> {
-  const auth = await requireAutomationPermission("automations.view");
-  if (!auth.ok) return null;
+export async function getWorkflows(): Promise<WorkflowWithMeta[]> {
+  const auth = await requirePermission("automations.view");
+  if (!auth.ok) return [];
 
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
-    .from("automations")
-    .select(
-      `
-        id,
-        name,
-        description,
-        trigger_event,
-        action_type,
-        action_config,
-        is_active,
-        created_by,
-        created_at,
-        updated_at,
-        creator:profiles!fk_automations_created_by(id, full_name, email)
-      `
-    )
+  // Fetch workflows
+  const { data: workflows, error } = await supabase
+    .from("automation_workflows")
+    .select("*")
     .eq("organization_id", auth.organizationId)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("[automations] list failed:", error.message);
-    return null;
+  if (error || !workflows) {
+    console.error("[automations] getWorkflows failed:", error?.message);
+    return [];
   }
 
-  return (data ?? []).map(
-    (row) => toAutomationRow(row as unknown as AutomationJoinRow)
-  );
-}
-
-export type CreateAutomationResult =
-  | { status: "success"; automation: AutomationRow }
-  | { status: "error"; error: string; fieldErrors?: Record<string, string[]> };
-
-/**
- * Creates an automation in the current organization. Requires
- * `automations.manage`. The trigger/action configuration is validated
- * server-side via the shared Zod schema; `organization_id` and
- * `created_by` always come from the session.
- */
-export async function createAutomation(
-  data: unknown
-): Promise<CreateAutomationResult> {
-  const auth = await requireAutomationPermission("automations.manage");
-  if (!auth.ok) return { status: "error", error: auth.error };
-
-  const dict = await getDictionary();
-  const errors = dict.platform.automations.errors;
-
-  const parsed = createAutomationInputSchema(errors).safeParse(data);
-  if (!parsed.success) {
-    return {
-      status: "error",
-      error: errors.highlightFields,
-      fieldErrors: parseFieldErrors(parsed.error.issues),
-    };
-  }
-
-  const { name, description, triggerEvent, actionConfig } = parsed.data;
-
-  const supabase = await createServerClient();
-  const insertPayload = {
-    organization_id: auth.organizationId,
-    name,
-    description: description ?? null,
-    trigger_event: triggerEvent,
-    action_type: actionConfig.actionType,
-    action_config: actionConfig,
-    created_by: auth.userId,
-  };
-
-  const { data: inserted, error } = await supabase
-    .from("automations")
-    .insert(insertPayload)
-    .select(
-      `
-        id,
-        name,
-        description,
-        trigger_event,
-        action_type,
-        action_config,
-        is_active,
-        created_by,
-        created_at,
-        updated_at,
-        creator:profiles!fk_automations_created_by(id, full_name, email)
-      `
-    )
-    .single();
-
-  if (error) {
-    console.error("[automations] create failed:", error.message);
-    return { status: "error", error: errors.createFailed };
-  }
-
-  revalidatePath("/automations");
-  return {
-    status: "success",
-    automation: toAutomationRow(inserted as unknown as AutomationJoinRow),
-  };
-}
-
-export type UpdateAutomationResult =
-  | { status: "success"; automation: AutomationRow }
-  | { status: "error"; error: string; fieldErrors?: Record<string, string[]> };
-
-/**
- * Updates an existing automation's trigger/action configuration. Requires
- * `automations.manage`. The same Zod schema as create is re-validated
- * server-side, and the update is scoped to the caller's organization.
- */
-export async function updateAutomation(
-  id: string,
-  data: unknown
-): Promise<UpdateAutomationResult> {
-  const auth = await requireAutomationPermission("automations.manage");
-  if (!auth.ok) return { status: "error", error: auth.error };
-
-  const dict = await getDictionary();
-  const errors = dict.platform.automations.errors;
-
-  const idParsed = automationToggleSchema(fallbackToggleMessages).safeParse({
-    id,
-    isActive: false,
-  });
-  if (!idParsed.success) {
-    return { status: "error", error: errors.invalidId };
-  }
-
-  const parsed = createAutomationInputSchema(errors).safeParse(data);
-  if (!parsed.success) {
-    return {
-      status: "error",
-      error: errors.highlightFields,
-      fieldErrors: parseFieldErrors(parsed.error.issues),
-    };
-  }
-
-  const { name, description, triggerEvent, actionConfig } = parsed.data;
-
-  const supabase = await createServerClient();
-  const { data: updated, error } = await supabase
-    .from("automations")
-    .update({
-      name,
-      description: description ?? null,
-      trigger_event: triggerEvent,
-      action_type: actionConfig.actionType,
-      action_config: actionConfig,
-    })
-    .eq("id", idParsed.data.id)
+  // Fetch last execution logs for each workflow
+  const { data: logs } = await supabase
+    .from("automation_execution_logs")
+    .select("workflow_id, status, started_at")
     .eq("organization_id", auth.organizationId)
-    .select(
-      `
-        id,
-        name,
-        description,
-        trigger_event,
-        action_type,
-        action_config,
-        is_active,
-        created_by,
-        created_at,
-        updated_at,
-        creator:profiles!fk_automations_created_by(id, full_name, email)
-      `
-    )
-    .maybeSingle();
+    .order("started_at", { ascending: false });
 
-  if (error || !updated) {
-    console.error("[automations] update failed:", error?.message);
-    return { status: "error", error: errors.notFound };
+  const logsByWorkflow: Record<string, { last_run_at: string; last_status: any; total_runs: number }> = {};
+  if (logs) {
+    for (const log of logs) {
+      if (!logsByWorkflow[log.workflow_id]) {
+        logsByWorkflow[log.workflow_id] = {
+          last_run_at: log.started_at,
+          last_status: log.status,
+          total_runs: 0,
+        };
+      }
+      logsByWorkflow[log.workflow_id].total_runs += 1;
+    }
   }
 
-  revalidatePath("/automations");
-  return {
-    status: "success",
-    automation: toAutomationRow(updated as unknown as AutomationJoinRow),
-  };
+  return (workflows as AutomationWorkflow[]).map((wf) => ({
+    ...wf,
+    last_run_at: logsByWorkflow[wf.id]?.last_run_at ?? null,
+    last_status: logsByWorkflow[wf.id]?.last_status ?? null,
+    total_runs: logsByWorkflow[wf.id]?.total_runs ?? 0,
+  }));
 }
-export type ToggleAutomationResult =
-  | { status: "success"; automation: AutomationRow }
-  | { status: "error"; error: string };
 
-/**
- * Toggles an automation's `is_active` flag. Requires `automations.manage`.
- * Only rows in the caller's organization are affected (the update is
- * scoped to the session's organization_id).
- */
-export async function toggleAutomation(
-  id: string,
-  isActive: boolean
-): Promise<ToggleAutomationResult> {
-  const auth = await requireAutomationPermission("automations.manage");
-  if (!auth.ok) return { status: "error", error: auth.error };
-
-  const dict = await getDictionary();
-  const errors = dict.platform.automations.errors;
-
-  const parsed = automationToggleSchema(fallbackToggleMessages).safeParse({
-    id,
-    isActive,
-  });
-  if (!parsed.success) {
-    return { status: "error", error: errors.invalidId };
-  }
+export async function getWorkflowById(id: string): Promise<AutomationWorkflow | null> {
+  const auth = await requirePermission("automations.view");
+  if (!auth.ok) return null;
 
   const supabase = await createServerClient();
   const { data, error } = await supabase
-    .from("automations")
-    .update({ is_active: parsed.data.isActive })
-    .eq("id", parsed.data.id)
+    .from("automation_workflows")
+    .select("*")
+    .eq("id", id)
     .eq("organization_id", auth.organizationId)
-    .select(
-      `
-        id,
-        name,
-        description,
-        trigger_event,
-        action_type,
-        action_config,
-        is_active,
-        created_by,
-        created_at,
-        updated_at,
-        creator:profiles!fk_automations_created_by(id, full_name, email)
-      `
-    )
-    .maybeSingle();
+    .single();
 
   if (error || !data) {
-    console.error("[automations] toggle failed:", error?.message);
-    return { status: "error", error: errors.notFound };
+    return null;
   }
 
-  revalidatePath("/automations");
-  return {
-    status: "success",
-    automation: toAutomationRow(data as unknown as AutomationJoinRow),
-  };
+  return data as AutomationWorkflow;
 }
 
-export type DeleteAutomationResult =
-  | { status: "success"; id: string }
-  | { status: "error"; error: string };
-
-/**
- * Deletes an automation (cascade removes its execution logs). Requires
- * `automations.manage`. Scoped to the caller's organization.
- */
-export async function deleteAutomation(id: string): Promise<DeleteAutomationResult> {
-  const auth = await requireAutomationPermission("automations.manage");
+export async function saveWorkflow(input: unknown): Promise<{
+  status: "success" | "error";
+  workflow?: AutomationWorkflow;
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+}> {
+  const auth = await requirePermission("automations.manage");
   if (!auth.ok) return { status: "error", error: auth.error };
 
-  const dict = await getDictionary();
-  const errors = dict.platform.automations.errors;
-
-  const parsed = automationToggleSchema(fallbackToggleMessages).safeParse({
-    id,
-    isActive: false,
-  });
+  const parsed = saveWorkflowSchema.safeParse(input);
   if (!parsed.success) {
-    return { status: "error", error: errors.invalidId };
+    return {
+      status: "error",
+      error: "Validation failed.",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+    };
+  }
+
+  const { id, name, description, isActive, triggerType, triggerConfig, steps } = parsed.data;
+  const supabase = await createServerClient();
+
+  if (id) {
+    const { data: updated, error } = await supabase
+      .from("automation_workflows")
+      .update({
+        name,
+        description: description || null,
+        is_active: isActive,
+        trigger_type: triggerType,
+        trigger_config: triggerConfig,
+        steps,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId)
+      .select("*")
+      .single();
+
+    if (error || !updated) {
+      console.error("[automations] update failed:", error?.message);
+      return { status: "error", error: error?.message || "Failed to update workflow." };
+    }
+
+    revalidatePath("/automations");
+    return { status: "success", workflow: updated as AutomationWorkflow };
+  } else {
+    const { data: created, error } = await supabase
+      .from("automation_workflows")
+      .insert({
+        organization_id: auth.organizationId,
+        name,
+        description: description || null,
+        is_active: isActive,
+        trigger_type: triggerType,
+        trigger_config: triggerConfig,
+        steps,
+      })
+      .select("*")
+      .single();
+
+    if (error || !created) {
+      console.error("[automations] create failed:", error?.message);
+      return { status: "error", error: error?.message || "Failed to create workflow." };
+    }
+
+    revalidatePath("/automations");
+    return { status: "success", workflow: created as AutomationWorkflow };
+  }
+}
+export async function toggleWorkflowStatus(
+  id: string,
+  isActive: boolean
+): Promise<{ status: "success" | "error"; error?: string }> {
+  const auth = await requirePermission("automations.manage");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const parsed = toggleWorkflowSchema.safeParse({ id, isActive });
+  if (!parsed.success) {
+    return { status: "error", error: "Invalid parameters." };
   }
 
   const supabase = await createServerClient();
   const { error } = await supabase
-    .from("automations")
-    .delete()
+    .from("automation_workflows")
+    .update({ is_active: parsed.data.isActive, updated_at: new Date().toISOString() })
     .eq("id", parsed.data.id)
     .eq("organization_id", auth.organizationId);
 
   if (error) {
-    console.error("[automations] delete failed:", error.message);
-    return { status: "error", error: errors.deleteFailed };
+    console.error("[automations] toggle status failed:", error.message);
+    return { status: "error", error: error.message };
   }
 
   revalidatePath("/automations");
-  return { status: "success", id: parsed.data.id };
+  return { status: "success" };
 }
 
-export type AutomationLogsResult =
-  | { status: "success"; logs: AutomationLogRow[] }
-  | { status: "error"; error: string };
-
-/**
- * Returns the execution history for the current organization, optionally
- * filtered to one automation. Requires `automations.view`. Logs are
- * returned newest-first, capped at 100 rows for the drawer.
- */
-export async function getAutomationLogs(
-  automationId?: string
-): Promise<AutomationLogsResult> {
-  const auth = await requireAutomationPermission("automations.view");
+export async function deleteWorkflow(
+  id: string
+): Promise<{ status: "success" | "error"; error?: string }> {
+  const auth = await requirePermission("automations.manage");
   if (!auth.ok) return { status: "error", error: auth.error };
 
-  const dict = await getDictionary();
-  const errors = dict.platform.automations.errors;
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("automation_workflows")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", auth.organizationId);
+
+  if (error) {
+    console.error("[automations] delete failed:", error.message);
+    return { status: "error", error: error.message };
+  }
+
+  revalidatePath("/automations");
+  return { status: "success" };
+}
+
+export async function testWorkflowRun(
+  workflowId: string,
+  mockPayload?: Record<string, any>
+): Promise<{
+  status: "success" | "error";
+  result?: { status: "completed" | "failed"; error?: string };
+  error?: string;
+}> {
+  const auth = await requirePermission("automations.manage");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const parsed = testWorkflowSchema.safeParse({ workflowId, mockPayload });
+  if (!parsed.success) {
+    return { status: "error", error: "Invalid test input." };
+  }
+
+  const supabase = await createServerClient();
+  const { data: wf, error: wfError } = await supabase
+    .from("automation_workflows")
+    .select("*")
+    .eq("id", workflowId)
+    .eq("organization_id", auth.organizationId)
+    .single();
+
+  if (wfError || !wf) {
+    return { status: "error", error: "Workflow not found." };
+  }
+
+  const defaultMockPayload: Record<string, any> = {
+    contact: {
+      id: "mock-contact-1",
+      name: "Alex Johnson",
+      first_name: "Alex",
+      email: "alex.johnson@example.com",
+      phone: "+15551234567",
+      company: "Acme Corp",
+    },
+    deal: {
+      id: "mock-deal-1",
+      title: "Website Redesign Deal",
+      value: "5,000 USD",
+      stage_id: "mock-stage-1",
+    },
+    form: {
+      id: "mock-form-1",
+      title: "Contact Us Form",
+    },
+    appointment: {
+      time: new Date().toLocaleString(),
+    },
+    invoice: {
+      id: "mock-invoice-1",
+      amount: "$1,250.00",
+    },
+    ...mockPayload,
+  };
+
+  const execResult = await executeSingleWorkflow(wf as AutomationWorkflow, defaultMockPayload);
+
+  revalidatePath("/automations");
+  return {
+    status: "success",
+    result: execResult,
+  };
+}
+
+export async function getWorkflowLogs(
+  workflowId?: string,
+  limit = 50
+): Promise<AutomationExecutionLog[]> {
+  const auth = await requirePermission("automations.view");
+  if (!auth.ok) return [];
 
   const supabase = await createServerClient();
   let query = supabase
-    .from("automation_logs")
-    .select(
-      `
-        id,
-        automation_id,
-        status,
-        trigger_payload,
-        action_result,
-        error_message,
-        executed_at
-      `
-    )
+    .from("automation_execution_logs")
+    .select("*")
     .eq("organization_id", auth.organizationId)
-    .order("executed_at", { ascending: false })
-    .limit(100);
+    .order("started_at", { ascending: false })
+    .limit(limit);
 
-  if (automationId) {
-    query = query.eq("automation_id", automationId);
+  if (workflowId) {
+    query = query.eq("workflow_id", workflowId);
   }
 
   const { data, error } = await query;
-
-  if (error) {
-    console.error("[automations] logs failed:", error.message);
-    return { status: "error", error: errors.logsFailed };
-  }
-
-  return {
-    status: "success",
-    logs: (data ?? []).map(
-      (row) => toAutomationLogRow(row as unknown as AutomationLogJoinRow)
-    ),
-  };
-}
-// ============================================================
-// Execution engine
-// ============================================================
-
-interface TriggerEventPayload {
-  [key: string]: unknown;
-}
-
-/** Row returned by the runner's active-automation lookup. */
-interface ActiveAutomationRow {
-  id: string;
-  name: string;
-  action_type: string;
-  action_config: Record<string, unknown>;
-}
-
-/**
- * Fetches the active automations matching an event in an organization.
- * Only rows with `is_active = true` and the requested trigger are
- * returned (the partial index `idx_automations_active_lookup` serves this).
- */
-async function fetchActiveAutomations(
-  organizationId: string,
-  eventName: string
-): Promise<ActiveAutomationRow[]> {
-  const supabase = await createServerClient();
-  const { data, error } = await supabase
-    .from("automations")
-    .select("id, name, action_type, action_config")
-    .eq("organization_id", organizationId)
-    .eq("trigger_event", eventName)
-    .eq("is_active", true);
-
-  if (error) {
-    console.error("[automations][runner] lookup failed:", error.message);
+  if (error || !data) {
+    console.error("[automations] getWorkflowLogs failed:", error?.message);
     return [];
   }
 
-  return (data ?? []) as unknown as ActiveAutomationRow[];
+  return data as AutomationExecutionLog[];
 }
 
-/**
- * Records one execution result into automation_logs via the service-role
- * client. The execution engine runs in server actions where the caller's
- * own RLS might not allow inserting logs for automations they only hold
- * view rights on; a write failure here must never break the caller's
- * event mutation, hence the fire-and-forget catch.
- */
-async function writeLog(params: {
-  organizationId: string;
-  automationId: string;
-  status: "success" | "failed" | "running";
-  triggerPayload?: TriggerEventPayload;
-  actionResult?: Record<string, unknown>;
-  errorMessage?: string | null;
-}): Promise<void> {
-  try {
-    const { createServiceRoleClient } = await import("@/lib/supabase/admin");
-    const supabase = createServiceRoleClient();
-    await supabase.from("automation_logs").insert({
-      organization_id: params.organizationId,
-      automation_id: params.automationId,
-      status: params.status,
-      trigger_payload: params.triggerPayload ?? {},
-      action_result: params.actionResult ?? {},
-      error_message: params.errorMessage ?? null,
-    });
-  } catch (error) {
-    console.error("[automations] log write failed:", error);
+export async function getAutomationConfigOptions(): Promise<AutomationConfigOptions> {
+  const auth = await requirePermission("automations.view");
+  if (!auth.ok) {
+    return { forms: [], pipelines: [], tags: [], phoneNumbers: [] };
   }
-}
-/**
- * Runs a single automation's action. Throws on failure so the runner can
- * record a `failed` log; the message is stored as the human-readable
- * error (`error_message`) and surfaced in the execution-history drawer.
- */
-async function runAutomationAction(
-  organizationId: string,
-  actionType: string,
-  config: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  switch (actionType) {
-    case "webhook": {
-      const url = typeof config.url === "string" ? config.url : "";
-      if (!url) throw new Error("webhook_url_required");
 
-      const payload = {
-        event: `uplevel_automation.${config.eventName ?? "trigger"}`,
-        ...(config.payload ?? {}),
-      };
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!response.ok) {
-        throw new Error(`webhook_status_${response.status}`);
+  const supabase = await createServerClient();
+
+  const [formsRes, pipelinesRes, stagesRes, contactsRes, phoneRes] = await Promise.all([
+    supabase
+      .from("forms")
+      .select("id, title")
+      .eq("organization_id", auth.organizationId)
+      .order("title", { ascending: true }),
+    supabase
+      .from("crm_pipelines")
+      .select("id, name")
+      .eq("organization_id", auth.organizationId)
+      .order("name", { ascending: true }),
+    supabase
+      .from("crm_pipeline_stages")
+      .select("id, name, color, pipeline_id, position")
+      .order("position", { ascending: true }),
+    supabase
+      .from("crm_contacts")
+      .select("tags")
+      .eq("organization_id", auth.organizationId),
+    supabase
+      .from("phone_numbers")
+      .select("id, phone_number, friendly_name")
+      .eq("organization_id", auth.organizationId),
+  ]);
+
+  const stages = stagesRes.data || [];
+  const pipelines = (pipelinesRes.data || []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    stages: stages
+      .filter((s) => s.pipeline_id === p.id)
+      .map((s) => ({ id: s.id, name: s.name, color: s.color || "#3b82f6" })),
+  }));
+
+  const tagSet = new Set<string>();
+  if (contactsRes.data) {
+    for (const c of contactsRes.data) {
+      if (Array.isArray(c.tags)) {
+        c.tags.forEach((t: string) => tagSet.add(t));
       }
-      return { webhookStatus: response.status };
-    }
-
-    case "chat_message": {
-      const channelId = typeof config.channelId === "string" ? config.channelId : "";
-      const message = typeof config.message === "string" ? config.message : "";
-      if (!channelId || !message) throw new Error("chat_config_required");
-
-      const supabase = await createServerClient();
-      const { data: channel } = await supabase
-        .from("chat_channels")
-        .select("id")
-        .eq("id", channelId)
-        .eq("organization_id", organizationId)
-        .maybeSingle();
-
-      if (!channel) throw new Error("chat_channel_not_found");
-
-      const { data: systemUser } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .is("is_active", true)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      const senderId = systemUser?.id ?? "00000000-0000-0000-0000-000000000000";
-      const { error: insertError } = await supabase.from("chat_messages").insert({
-        organization_id: organizationId,
-        channel_id: channelId,
-        user_id: senderId,
-        content: message,
-      });
-      if (insertError) throw new Error("chat_send_failed");
-      return { channelId };
-    }
-
-    case "create_task": {
-      const taskTitle = typeof config.taskTitle === "string" ? config.taskTitle : "";
-      if (!taskTitle) throw new Error("task_title_required");
-
-      const supabase = await createServerClient();
-      const { data: systemUser } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .is("is_active", true)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      const createdBy = systemUser?.id ?? "00000000-0000-0000-0000-000000000000";
-      const { data: task, error: insertError } = await supabase
-        .from("tasks")
-        .insert({
-          organization_id: organizationId,
-          title: taskTitle,
-          description:
-            typeof config.description === "string" ? config.description : null,
-          status: "todo",
-          priority: "medium",
-          created_by: createdBy,
-          assigned_to:
-            typeof config.assigneeId === "string" && config.assigneeId
-              ? config.assigneeId
-              : null,
-        })
-        .select("id, title, status")
-        .single();
-
-      if (insertError) throw new Error("task_create_failed");
-      return { taskId: task?.id ?? null, title: task?.title ?? taskTitle };
-    }
-
-    default:
-      throw new Error("unsupported_action");
-  }
-}
-/**
- * Core automation runner: given an organization (from the session) and an
- * event name, dispatches every _active_ automation configured for that
- * event and records each execution into `automation_logs`.
- *
- * Runs synchronously inside the calling server action so failures are
- * observable; individual action failures never throw to the caller — each
- * failing automation is recorded as a `failed` log and the runner returns
- * a per-automation summary.
- */
-export async function triggerAutomationEvent(
-  organizationId: string,
-  eventName: string,
-  payload?: TriggerEventPayload
-): Promise<
-  {
-    automationId: string;
-    status: "success" | "failed";
-    errorMessage: string | null;
-  }[]
-> {
-  const automationRows = await fetchActiveAutomations(organizationId, eventName);
-
-  const results: {
-    automationId: string;
-    status: "success" | "failed";
-    errorMessage: string | null;
-  }[] = [];
-
-  for (const automation of automationRows) {
-    const payloadWithEvent = { ...(payload ?? {}), eventName };
-    try {
-      const actionResult = await runAutomationAction(
-        organizationId,
-        automation.action_type,
-        { ...automation.action_config, payload: payloadWithEvent }
-      );
-      await writeLog({
-        organizationId,
-        automationId: automation.id,
-        status: "success",
-        triggerPayload: payloadWithEvent,
-        actionResult,
-      });
-      results.push({
-        automationId: automation.id,
-        status: "success",
-        errorMessage: null,
-      });
-    } catch (actionError) {
-      const message =
-        actionError instanceof Error ? actionError.message : "unknown_error";
-      await writeLog({
-        organizationId,
-        automationId: automation.id,
-        status: "failed",
-        triggerPayload: payloadWithEvent,
-        errorMessage: message,
-      });
-      results.push({
-        automationId: automation.id,
-        status: "failed",
-        errorMessage: message,
-      });
     }
   }
 
-  return results;
+  const phoneNumbers = (phoneRes.data || []).map((pn) => ({
+    id: pn.id,
+    phoneNumber: pn.phone_number,
+    label: pn.friendly_name ? `${pn.friendly_name} (${pn.phone_number})` : pn.phone_number,
+  }));
+
+  return {
+    forms: (formsRes.data || []).map((f) => ({ id: f.id, title: f.title })),
+    pipelines,
+    tags: Array.from(tagSet).sort(),
+    phoneNumbers,
+  };
 }
+
+

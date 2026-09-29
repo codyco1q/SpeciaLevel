@@ -504,5 +504,74 @@ export interface OrganizationIntegration {
   updated_at: string;
 }
 
+// ============================================================
+// Visual Automations Engine (00036_visual_automations_engine.sql)
+// ============================================================
+
+export type WorkflowTriggerType =
+  | "form_submitted"
+  | "appointment_booked"
+  | "deal_stage_changed"
+  | "contact_tag_added"
+  | "inbound_sms"
+  | "invoice_paid";
+
+export type WorkflowStepType = "action" | "condition" | "delay";
+
+export type WorkflowActionType =
+  | "send_sms"
+  | "send_notification"
+  | "add_tag"
+  | "update_deal_stage"
+  | "webhook"
+  | "delay";
+
+export interface WorkflowStep {
+  id: string;
+  type: WorkflowStepType;
+  action_type: WorkflowActionType;
+  name?: string;
+  config: Record<string, any>;
+}
+
+export interface AutomationWorkflow {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  trigger_type: WorkflowTriggerType;
+  trigger_config: Record<string, any>;
+  steps: WorkflowStep[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type AutomationExecutionStatus = "running" | "completed" | "failed";
+
+export interface AutomationStepExecutionResult {
+  step_id: string;
+  type: WorkflowStepType;
+  action_type: WorkflowActionType;
+  name?: string;
+  status: "success" | "failed" | "skipped";
+  output?: Record<string, any>;
+  error?: string;
+  executed_at: string;
+}
+
+export interface AutomationExecutionLog {
+  id: string;
+  workflow_id: string;
+  organization_id: string;
+  status: AutomationExecutionStatus;
+  trigger_payload: Record<string, any>;
+  steps_executed: AutomationStepExecutionResult[];
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+
 
 

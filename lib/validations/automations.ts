@@ -1,174 +1,250 @@
 import { z } from "zod";
+import type {
+  WorkflowTriggerType,
+  WorkflowStepType,
+  WorkflowActionType,
+  WorkflowStep,
+} from "@/types/database";
 
-/**
- * Shared Zod schemas for the Automations module (create + toggle).
- * Used client-side (creation dialog) and re-validated server-side in
- * lib/actions/automations.ts.
- *
- * i18n: validation messages are parameterized through the
- * `createAutomationInputSchema(messages)` factory so the client forms
- * and the server actions can pass localized messages from the active
- * dictionary. The exported `automationInputSchema` keeps the English
- * defaults as a fallback.
- *
- * Field names are camelCase over the wire; they are mapped to the
- * snake_case DB columns inside the server actions. `actionConfig` is
- * a discriminated config object per action type:
- *
- *   webhook       -> { url: string }
- *   chat_message  -> { channelId: string; message: string }
- *   create_task   -> { taskTitle: string; assigneeId?: string }
- */
-
-/** Localized string messages consumed by the automation schemas. */
-export interface AutomationValidationMessages {
-  nameRequired: string;
-  nameMax: string;
-  descriptionMax: string;
-  triggerRequired: string;
-  actionRequired: string;
-  webhookUrlRequired: string;
-  webhookUrlInvalid: string;
-  channelRequired: string;
-  messageRequired: string;
-  messageMax: string;
-  taskTitleRequired: string;
-  taskTitleMax: string;
-  assigneeInvalid: string;
-  invalidConfig: string;
-}
-
-export const DEFAULT_AUTOMATION_VALIDATION_MESSAGES: AutomationValidationMessages =
-  {
-    nameRequired: "Automation name is required.",
-    nameMax: "Automation name must be 100 characters or fewer.",
-    descriptionMax: "Description must be 400 characters or fewer.",
-    triggerRequired: "Select a trigger event.",
-    actionRequired: "Select an action type.",
-    webhookUrlRequired: "Webhook URL is required.",
-    webhookUrlInvalid: "Enter a valid HTTPS URL.",
-    channelRequired: "Select a channel.",
-    messageRequired: "Message can't be empty.",
-    messageMax: "Messages must be 500 characters or fewer.",
-    taskTitleRequired: "Task title is required.",
-    taskTitleMax: "Task titles must be 100 characters or fewer.",
-    assigneeInvalid: "Select a valid team member.",
-    invalidConfig: "Invalid configuration for this action.",
-  };
-
-/** All trigger events supported by the execution runner. */
-export const AUTOMATION_TRIGGER_EVENTS = [
-  "lead.created",
-  "deal.stage_changed",
-  "invoice.paid",
-  "task.completed",
+export const WORKFLOW_TRIGGER_TYPES = [
+  "form_submitted",
+  "appointment_booked",
+  "deal_stage_changed",
+  "contact_tag_added",
+  "inbound_sms",
+  "invoice_paid",
 ] as const;
 
-export type AutomationTriggerEvent = (typeof AUTOMATION_TRIGGER_EVENTS)[number];
+export const WORKFLOW_STEP_TYPES = ["action", "condition", "delay"] as const;
 
-/** All action types supported by the execution runner. */
-export const AUTOMATION_ACTION_TYPES = [
+export const WORKFLOW_ACTION_TYPES = [
+  "send_sms",
+  "send_notification",
+  "add_tag",
+  "update_deal_stage",
   "webhook",
-  "chat_message",
-  "create_task",
+  "delay",
 ] as const;
 
-export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
-
-const getUrlError = (messages: AutomationValidationMessages) =>
-  messages.webhookUrlInvalid;
-
-/** A webhook URL must be an absolute http(s) URL (harmless for local hooks). */
-export function webhookUrlSchema(
-  messages: AutomationValidationMessages = DEFAULT_AUTOMATION_VALIDATION_MESSAGES
-) {
-  return z
-    .string()
-    .trim()
-    .min(1, messages.webhookUrlRequired)
-    .url(getUrlError(messages))
-    .refine((value) => /^https?:\/\//i.test(value), {
-      message: messages.webhookUrlInvalid,
-    });
+export interface WorkflowTriggerDefinition {
+  type: WorkflowTriggerType;
+  name: string;
+  description: string;
+  icon: string;
+  badge: string;
+  configFields: {
+    name: string;
+    label: string;
+    type: "select" | "text";
+    optionsSource?: "forms" | "pipelines" | "stages" | "tags" | "phone_numbers";
+    placeholder?: string;
+  }[];
 }
 
-/** Discriminated action config per action type. */
-export function automationActionConfigSchema(
-  messages: AutomationValidationMessages = DEFAULT_AUTOMATION_VALIDATION_MESSAGES
-) {
-  return z.discriminatedUnion("actionType", [
-    z.object({
-      actionType: z.literal("webhook"),
-      url: webhookUrlSchema(messages),
-    }),
-    z.object({
-      actionType: z.literal("chat_message"),
-      channelId: z.string().min(1, messages.channelRequired),
-      message: z
-        .string()
-        .trim()
-        .min(1, messages.messageRequired)
-        .max(500, messages.messageMax),
-    }),
-    z.object({
-      actionType: z.literal("create_task"),
-      taskTitle: z
-        .string()
-        .trim()
-        .min(1, messages.taskTitleRequired)
-        .max(100, messages.taskTitleMax),
-      assigneeId: z
-        .string()
-        .optional()
-        .or(z.literal(""))
-        .transform((value) => (value ? value : undefined)),
-    }),
-  ]);
+export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
+  {
+    type: "form_submitted",
+    name: "Form Submitted",
+    description: "Triggers when a lead or contact submits a public or internal form.",
+    icon: "FileText",
+    badge: "Lead Gen",
+    configFields: [
+      {
+        name: "form_id",
+        label: "Form",
+        type: "select",
+        optionsSource: "forms",
+        placeholder: "Any Form (or select specific form)",
+      },
+    ],
+  },
+  {
+    type: "appointment_booked",
+    name: "Appointment Booked",
+    description: "Triggers when a client or lead schedules a calendar appointment.",
+    icon: "Calendar",
+    badge: "Scheduling",
+    configFields: [],
+  },
+  {
+    type: "deal_stage_changed",
+    name: "Deal Stage Changed",
+    description: "Triggers when a CRM deal is moved to a target pipeline stage.",
+    icon: "TrendingUp",
+    badge: "CRM Pipeline",
+    configFields: [
+      {
+        name: "stage_id",
+        label: "Target Stage",
+        type: "select",
+        optionsSource: "stages",
+        placeholder: "Any Stage (or select target stage)",
+      },
+    ],
+  },
+  {
+    type: "contact_tag_added",
+    name: "Contact Tag Added",
+    description: "Triggers when a specific tag is applied to a contact profile.",
+    icon: "Tag",
+    badge: "CRM Contacts",
+    configFields: [
+      {
+        name: "tag",
+        label: "Target Tag",
+        type: "select",
+        optionsSource: "tags",
+        placeholder: "Any Tag (or select tag)",
+      },
+    ],
+  },
+  {
+    type: "inbound_sms",
+    name: "Inbound SMS Received",
+    description: "Triggers when an incoming text message arrives on a telephony number.",
+    icon: "MessageSquare",
+    badge: "Telecom",
+    configFields: [
+      {
+        name: "phone_number",
+        label: "Phone Number",
+        type: "select",
+        optionsSource: "phone_numbers",
+        placeholder: "Any Number (or select number)",
+      },
+    ],
+  },
+  {
+    type: "invoice_paid",
+    name: "Invoice Paid",
+    description: "Triggers when an invoice is fully paid via online gateway or manual receipt.",
+    icon: "CreditCard",
+    badge: "Billing",
+    configFields: [],
+  },
+];
+
+export interface WorkflowActionDefinition {
+  type: WorkflowActionType;
+  name: string;
+  description: string;
+  icon: string;
+  badge: string;
+  defaultConfig: Record<string, any>;
 }
 
-export function createAutomationInputSchema(
-  messages: AutomationValidationMessages = DEFAULT_AUTOMATION_VALIDATION_MESSAGES
-) {
-  return z.object({
-    name: z
-      .string()
-      .trim()
-      .min(1, messages.nameRequired)
-      .max(100, messages.nameMax),
-    description: z
-      .string()
-      .trim()
-      .max(400, messages.descriptionMax)
-      .optional()
-      .or(z.literal(""))
-      .transform((value) => (value ? value : undefined)),
-    triggerEvent: z.enum(AUTOMATION_TRIGGER_EVENTS, {
-      message: messages.triggerRequired,
-    }),
-    actionConfig: automationActionConfigSchema(messages),
-  });
-}
+export const WORKFLOW_ACTION_DEFINITIONS: WorkflowActionDefinition[] = [
+  {
+    type: "send_sms",
+    name: "Send SMS Message",
+    description: "Dispatches an automated SMS text message to the contact or custom number.",
+    icon: "MessageCircle",
+    badge: "Telecom",
+    defaultConfig: {
+      recipient: "contact",
+      custom_number: "",
+      body: "Hi {{contact.name}}, thanks for reaching out! We received your request.",
+    },
+  },
+  {
+    type: "send_notification",
+    name: "Send In-App Notification",
+    description: "Sends real-time internal notification to team members or admins.",
+    icon: "Bell",
+    badge: "Internal",
+    defaultConfig: {
+      target: "admins",
+      title: "New Workflow Alert: {{contact.name}}",
+      message: "Automated event triggered for {{contact.name}} ({{contact.email}}).",
+    },
+  },
+  {
+    type: "add_tag",
+    name: "Add Contact Tag",
+    description: "Appends one or more tags to the contact profile in the CRM.",
+    icon: "Tag",
+    badge: "CRM",
+    defaultConfig: {
+      tag: "VIP Lead",
+    },
+  },
+  {
+    type: "update_deal_stage",
+    name: "Move Deal Stage",
+    description: "Automatically advances the associated deal to a designated stage.",
+    icon: "ArrowRightCircle",
+    badge: "CRM",
+    defaultConfig: {
+      stage_id: "",
+    },
+  },
+  {
+    type: "webhook",
+    name: "Outbound Webhook",
+    description: "Sends an HTTP POST payload to an external endpoint or Zapier/Make.",
+    icon: "Webhook",
+    badge: "API / Webhook",
+    defaultConfig: {
+      url: "https://api.example.com/webhook",
+      method: "POST",
+    },
+  },
+  {
+    type: "delay",
+    name: "Delay / Wait",
+    description: "Pauses execution for a specified duration before the next step.",
+    icon: "Clock",
+    badge: "Logic",
+    defaultConfig: {
+      duration_minutes: 5,
+    },
+  },
+];
 
-export function automationToggleSchema(messages?: AutomationValidationMessages) {
-  return z.object({
-    id: z.string().min(1, messages?.nameRequired ?? "Invalid ID."),
-    isActive: z.boolean(),
-  });
-}
+export const WORKFLOW_TEMPLATE_VARIABLES = [
+  { key: "{{contact.name}}", label: "Contact Full Name" },
+  { key: "{{contact.first_name}}", label: "Contact First Name" },
+  { key: "{{contact.email}}", label: "Contact Email" },
+  { key: "{{contact.phone}}", label: "Contact Phone" },
+  { key: "{{contact.company}}", label: "Contact Company" },
+  { key: "{{deal.title}}", label: "Deal Title" },
+  { key: "{{deal.value}}", label: "Deal Value" },
+  { key: "{{form.title}}", label: "Form Title" },
+  { key: "{{appointment.time}}", label: "Appointment Time" },
+  { key: "{{invoice.amount}}", label: "Invoice Amount" },
+  { key: "{{organization.name}}", label: "Organization Name" },
+];
 
-export const automationInputSchema = createAutomationInputSchema(
-  DEFAULT_AUTOMATION_VALIDATION_MESSAGES
-);
+export const workflowStepSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(WORKFLOW_STEP_TYPES),
+  action_type: z.enum(WORKFLOW_ACTION_TYPES),
+  name: z.string().optional(),
+  config: z.record(z.any()).default({}),
+});
 
-/** Client-facing form values for the creation dialog (step 2 output). */
-export type AutomationFormValues = z.infer<
-  ReturnType<typeof createAutomationInputSchema>
->;
+export const saveWorkflowSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Workflow name is required.").max(120, "Name must be 120 characters or fewer."),
+  description: z.string().trim().max(500, "Description must be 500 characters or fewer.").optional().nullable(),
+  isActive: z.boolean().default(false),
+  triggerType: z.enum(WORKFLOW_TRIGGER_TYPES),
+  triggerConfig: z.record(z.any()).default({}),
+  steps: z.array(workflowStepSchema).default([]),
+});
 
-/** State returned by the createAutomation server action. */
-export interface CreateAutomationState {
-  status: "idle" | "success" | "error";
-  error?: string | null;
+export type SaveWorkflowInput = z.infer<typeof saveWorkflowSchema>;
+
+export const toggleWorkflowSchema = z.object({
+  id: z.string().uuid("Invalid workflow ID."),
+  isActive: z.boolean(),
+});
+
+export const testWorkflowSchema = z.object({
+  workflowId: z.string().uuid("Invalid workflow ID."),
+  mockPayload: z.record(z.any()).optional().default({}),
+});
+
   fieldErrors?: Partial<Record<keyof AutomationFormValues, string[] | undefined>>;
 }
 

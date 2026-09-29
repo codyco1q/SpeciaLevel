@@ -13,6 +13,7 @@ import {
   type InvoiceInput,
 } from "@/lib/validations/invoicing";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 import type { InvoiceStatus, PaymentProvider } from "@/types/database";
 
 /**
@@ -457,6 +458,22 @@ export async function updateInvoiceStatus(
   }
 
   revalidatePath("/invoicing");
+
+  if (parsed.data === "paid") {
+    dispatchWorkflowTrigger({
+      type: "invoice_paid",
+      orgId: auth.organizationId,
+      payload: {
+        invoice_id: id,
+        invoice: {
+          id,
+        },
+      },
+    }).catch((triggerErr) =>
+      console.error("[invoicing] dispatchWorkflowTrigger error:", triggerErr)
+    );
+  }
+
   return { status: "success" };
 }
 

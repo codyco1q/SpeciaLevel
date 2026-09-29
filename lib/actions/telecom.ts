@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
 import {
   TELECOM_DIRECTIONS,
   createCallLogInputSchema,
@@ -475,6 +476,23 @@ export async function sendSms(data: unknown): Promise<SendSmsResult> {
   revalidatePath("/telecom");
   revalidatePath("/phone-numbers");
   revalidatePath("/messaging");
+
+  if (direction === "inbound") {
+    dispatchWorkflowTrigger({
+      type: "inbound_sms",
+      orgId: auth.organizationId,
+      payload: {
+        to_number: toNumber,
+        from_number: fromNumber,
+        body,
+        contact_id: contactId || null,
+        sms_id: inserted.id,
+      },
+    }).catch((triggerErr) =>
+      console.error("[telecom] dispatchWorkflowTrigger error:", triggerErr)
+    );
+  }
+
   return {
     status: "success",
     sms: toTelecomSmsRow(inserted as unknown as TelecomSmsJoinRow),
