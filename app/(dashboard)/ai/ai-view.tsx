@@ -483,22 +483,34 @@ export function AiView({
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
-        <TabsList className="mb-6 grid w-full max-w-2xl grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="playground">
-            <Sparkles className="size-4" />
-            {t.tabs.playground}
+        <TabsList className="mb-6 inline-flex h-auto w-auto flex-wrap items-center gap-1.5 sm:gap-2 rounded-xl bg-muted/60 p-1.5 border border-border/60">
+          <TabsTrigger
+            value="playground"
+            className="gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg shrink-0 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <Sparkles className="size-4 shrink-0" />
+            <span>{t.tabs.playground}</span>
           </TabsTrigger>
-          <TabsTrigger value="quickTools">
-            <Wand2 className="size-4" />
-            {t.tabs.quickTools}
+          <TabsTrigger
+            value="quickTools"
+            className="gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg shrink-0 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <Wand2 className="size-4 shrink-0" />
+            <span>{t.tabs.quickTools}</span>
           </TabsTrigger>
-          <TabsTrigger value="prompts">
-            <Brain className="size-4" />
-            {t.tabs.customPrompts}
+          <TabsTrigger
+            value="prompts"
+            className="gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg shrink-0 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <Brain className="size-4 shrink-0" />
+            <span>{t.tabs.customPrompts}</span>
           </TabsTrigger>
-          <TabsTrigger value="providers_mcp">
-            <Cpu className="size-4" />
-            {(t.tabs as any).providersMcp ?? "Model Providers & MCP"}
+          <TabsTrigger
+            value="providers_mcp"
+            className="gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg shrink-0 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <Cpu className="size-4 shrink-0" />
+            <span>{(t.tabs as any).providersMcp ?? "Model Providers & MCP"}</span>
           </TabsTrigger>
         </TabsList>
 

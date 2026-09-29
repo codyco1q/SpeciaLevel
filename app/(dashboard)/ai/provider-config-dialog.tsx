@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,7 +77,9 @@ export function ProviderConfigDialog({
 }: ProviderConfigDialogProps) {
   const [apiKey, setApiKey] = React.useState("");
   const [baseUrl, setBaseUrl] = React.useState("");
-  const [defaultModel, setDefaultModel] = React.useState("");
+  const [modelMode, setModelMode] = React.useState<"preset" | "custom">("preset");
+  const [selectedPresetModel, setSelectedPresetModel] = React.useState("");
+  const [customModelId, setCustomModelId] = React.useState("");
   const [isActive, setIsActive] = React.useState(true);
   const [showKey, setShowKey] = React.useState(false);
 
@@ -96,14 +99,24 @@ export function ProviderConfigDialog({
       if (existingProvider) {
         setApiKey(existingProvider.api_key_encrypted || "");
         setBaseUrl(existingProvider.base_url || "");
-        setDefaultModel(
-          existingProvider.default_model || catalogItem.defaultModels[0] || ""
-        );
+        const currentModel = existingProvider.default_model || "";
+        const isPreset = catalogItem.defaultModels.includes(currentModel);
+        if (isPreset) {
+          setModelMode("preset");
+          setSelectedPresetModel(currentModel);
+          setCustomModelId("");
+        } else {
+          setModelMode("custom");
+          setSelectedPresetModel("__custom__");
+          setCustomModelId(currentModel);
+        }
         setIsActive(existingProvider.is_active);
       } else {
         setApiKey("");
         setBaseUrl("");
-        setDefaultModel(catalogItem.defaultModels[0] || "");
+        setModelMode("preset");
+        setSelectedPresetModel(catalogItem.defaultModels[0] || "");
+        setCustomModelId("");
         setIsActive(true);
       }
       setShowKey(false);
@@ -114,6 +127,9 @@ export function ProviderConfigDialog({
 
   if (!catalogItem) return null;
 
+  const effectiveDefaultModel =
+    modelMode === "custom" ? customModelId.trim() : selectedPresetModel.trim();
+
   const handleTestConnection = async () => {
     if (!apiKey) {
       setErrorMessage("Please enter an API Key to test connection.");
@@ -121,6 +137,10 @@ export function ProviderConfigDialog({
     }
     if (catalogItem.requiresBaseUrl && !baseUrl) {
       setErrorMessage("Base URL is required for this provider.");
+      return;
+    }
+    if (modelMode === "custom" && !customModelId.trim()) {
+      setErrorMessage("Please enter a custom model identifier.");
       return;
     }
 
@@ -132,7 +152,7 @@ export function ProviderConfigDialog({
       provider: catalogItem.id,
       apiKey,
       baseUrl: baseUrl || undefined,
-      defaultModel: defaultModel || undefined,
+      defaultModel: effectiveDefaultModel || undefined,
     });
 
     setIsTesting(false);
@@ -162,8 +182,12 @@ export function ProviderConfigDialog({
       setErrorMessage("Base URL is required for this provider.");
       return;
     }
-    if (!defaultModel) {
-      setErrorMessage("Default model is required.");
+    if (!effectiveDefaultModel) {
+      setErrorMessage(
+        modelMode === "custom"
+          ? "Please enter a custom model identifier."
+          : "Default model is required."
+      );
       return;
     }
 
@@ -174,7 +198,7 @@ export function ProviderConfigDialog({
       id: existingProvider?.id,
       provider: catalogItem.id,
       apiKey,
-      defaultModel,
+      defaultModel: effectiveDefaultModel,
       baseUrl: baseUrl || null,
       isActive,
     });
@@ -327,35 +351,100 @@ export function ProviderConfigDialog({
             )}
 
             {/* Default Model */}
-            <div className="space-y-2">
-              <Label htmlFor="defaultModel" className="text-sm font-medium">
-                {labels?.defaultModelLabel ?? "Default Model"}
-              </Label>
-              <div className="flex gap-2">
-                <Select
-                  value={defaultModel}
-                  onValueChange={setDefaultModel}
-                  disabled={!canManage}
-                >
-                  <SelectTrigger className="w-full font-mono text-sm">
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {catalogItem.defaultModels.map((m) => (
-                      <SelectItem key={m} value={m} className="font-mono text-xs">
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={defaultModel}
-                  onChange={(e) => setDefaultModel(e.target.value)}
-                  placeholder="Custom model id"
-                  className="font-mono text-sm max-w-[180px]"
-                  disabled={!canManage}
-                />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="defaultModelSelect" className="text-sm font-medium">
+                  {labels?.defaultModelLabel ?? "Default Model"}
+                </Label>
+                {modelMode === "custom" ? (
+                  <Badge variant="secondary" className="text-[10px] font-mono">
+                    Custom Model Active
+                  </Badge>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">
+                    {catalogItem.defaultModels.length} preset models available
+                  </span>
+                )}
               </div>
+
+              {/* Preset Selector */}
+              <Select
+                value={modelMode === "custom" ? "__custom__" : selectedPresetModel}
+                onValueChange={(val) => {
+                  if (val === "__custom__") {
+                    setModelMode("custom");
+                    if (!customModelId && selectedPresetModel) {
+                      setCustomModelId(selectedPresetModel);
+                    }
+                  } else {
+                    setModelMode("preset");
+                    setSelectedPresetModel(val);
+                  }
+                }}
+                disabled={!canManage}
+              >
+                <SelectTrigger id="defaultModelSelect" className="w-full font-mono text-sm">
+                  <SelectValue placeholder="Select a default model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogItem.defaultModels.map((m) => (
+                    <SelectItem key={m} value={m} className="font-mono text-xs">
+                      {m}
+                    </SelectItem>
+                  ))}
+                  <SelectItem
+                    value="__custom__"
+                    className="font-sans text-xs font-semibold text-primary border-t mt-1 pt-1.5"
+                  >
+                    ✨ Custom Model ID (specify your own)...
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Custom Model Input - Rendered on its own line when Custom is selected */}
+              {modelMode === "custom" && (
+                <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3.5 animate-in fade-in-50 duration-200">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="customModelInput" className="text-xs font-semibold text-foreground">
+                      {labels?.defaultModelPlaceholder ?? "Custom Model Identifier"}
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setModelMode("preset");
+                        setSelectedPresetModel(catalogItem.defaultModels[0] || "");
+                      }}
+                    >
+                      Switch back to presets
+                    </Button>
+                  </div>
+                  <Input
+                    id="customModelInput"
+                    value={customModelId}
+                    onChange={(e) => setCustomModelId(e.target.value)}
+                    placeholder={
+                      catalogItem.id === "openai"
+                        ? "e.g. gpt-4o-2024-11-20, o3-mini, ft:gpt-4o:org:id"
+                        : catalogItem.id === "anthropic"
+                        ? "e.g. claude-3-5-sonnet-20241022, claude-3-haiku-20240307"
+                        : catalogItem.id === "gemini"
+                        ? "e.g. gemini-2.0-flash, gemini-1.5-pro-latest"
+                        : catalogItem.id === "openrouter"
+                        ? "e.g. meta-llama/llama-3.3-70b-instruct, deepseek/deepseek-r1"
+                        : "e.g. llama3.3:70b, mistral-large-latest, local-model"
+                    }
+                    className="font-mono text-sm bg-background w-full"
+                    disabled={!canManage}
+                    autoFocus
+                  />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Enter any model identifier or fine-tuned model ID supported by your {catalogItem.name} endpoint.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Active Toggle */}
