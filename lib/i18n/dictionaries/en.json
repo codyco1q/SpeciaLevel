@@ -1691,7 +1691,8 @@
       "tabs": {
         "playground": "Playground",
         "quickTools": "Quick tools",
-        "customPrompts": "Custom prompts"
+        "customPrompts": "Custom prompts",
+        "providersMcp": "Model Providers & MCP"
       },
       "playground": {
         "label": "Instructions",
@@ -1775,6 +1776,71 @@
           "openai": "OpenAI",
           "openrouter": "OpenRouter",
           "custom": "Custom"
+        }
+      },
+      "modelProviders": {
+        "title": "LLM Model Providers (BYOK)",
+        "subtitle": "Bring Your Own Keys for direct provider inference with high reliability and zero markup.",
+        "configure": "Configure Provider",
+        "connect": "Connect Provider",
+        "connected": "Connected",
+        "inactive": "Inactive",
+        "notConfigured": "Not Configured",
+        "model": "Model",
+        "baseUrl": "Base URL",
+        "refresh": "Refresh",
+        "dialog": {
+          "apiKey": "API Key",
+          "getApiKey": "Get API Key",
+          "baseUrl": "Base URL",
+          "baseUrlOptional": "(Optional custom proxy endpoint)",
+          "defaultModel": "Default Model",
+          "enableProvider": "Enable Provider",
+          "enableHint": "Allow agents and workflows to invoke this provider.",
+          "testConnection": "Test Connection",
+          "testing": "Testing...",
+          "save": "Save Provider",
+          "saving": "Saving...",
+          "disconnect": "Disconnect",
+          "connectionVerified": "Connection Verified",
+          "connectionFailed": "Connection Failed"
+        }
+      },
+      "mcp": {
+        "title": "MCP Server Registry",
+        "subtitle": "Attach external tool servers and enterprise data sources via standardized MCP endpoints.",
+        "connectServer": "Connect MCP Server",
+        "editServer": "Edit MCP Server",
+        "noServers": "No MCP Servers Connected",
+        "noServersHint": "Connect external MCP tool providers (such as databases, code interpreters, or custom SSE servers) to make their tools available across workflows and agents.",
+        "addFirst": "Add Your First MCP Server",
+        "endpoint": "Endpoint",
+        "toolsDiscovered": "Tools Discovered",
+        "manageTools": "Manage & Tools",
+        "active": "Active",
+        "disabled": "Disabled",
+        "dialog": {
+          "title": "Connect MCP Server",
+          "editTitle": "Edit MCP Server",
+          "description": "Register an external Model Context Protocol server to expose tools and data sources to your agents.",
+          "name": "Server Name",
+          "namePlaceholder": "e.g. Postgres DB Tools, GitHub Assistant",
+          "transport": "Transport",
+          "endpoint": "Endpoint URL",
+          "endpointPlaceholder": "https://mcp.domain.com/sse",
+          "headers": "Custom Headers / Authorization",
+          "addHeader": "Add Header",
+          "noHeaders": "No extra headers configured (optional for public / unauthenticated SSE servers).",
+          "headerKeyPlaceholder": "Header Key (e.g. Authorization)",
+          "headerValuePlaceholder": "Value (e.g. Bearer sk-...)",
+          "discoveredTools": "Discovered Tools",
+          "enableServer": "Enable Server",
+          "enableHint": "Allow agents to discover and invoke tools from this server.",
+          "testAndDiscover": "Test & Discover",
+          "discovering": "Discovering...",
+          "save": "Save Server",
+          "saving": "Saving...",
+          "remove": "Remove"
         }
       },
       "history": {

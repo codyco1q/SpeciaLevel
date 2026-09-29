@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { hasPermission } from "@/lib/auth/rbac"
 import { getCurrentUserContext } from "@/lib/auth/session"
 import { getAiPrompts } from "@/lib/actions/ai"
+import { getAiProviders, getMcpServers } from "@/lib/actions/ai-providers"
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary"
 import { AiView } from "./ai-view"
 
@@ -36,12 +37,19 @@ export default async function AiPage() {
     )
   }
 
-  const initialPrompts = await getAiPrompts()
+  const [initialPrompts, initialProviders, initialMcpServers] =
+    await Promise.all([
+      getAiPrompts(),
+      getAiProviders(),
+      getMcpServers(),
+    ])
 
   return (
     <div className="p-8">
       <AiView
         initialPrompts={initialPrompts ?? []}
+        initialProviders={initialProviders ?? []}
+        initialMcpServers={initialMcpServers ?? []}
         canManage={hasPermission("ai.manage", userContext.permissions)}
         platform={platform}
         locale={locale}

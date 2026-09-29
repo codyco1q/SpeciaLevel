@@ -60,14 +60,15 @@ const QUICK_TOOL_SYSTEM_PROMPTS: Record<AiQuickTool, string> = {
 const PROVIDER_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   openrouter: "https://openrouter.ai/api/v1",
+  custom_openai: "http://localhost:11434/v1",
 }
 
 function resolveBaseUrl(provider: string): string | null {
-  if (provider === "custom") {
+  if (provider === "custom" || provider === "custom_openai") {
     const customBase = process.env.AI_CUSTOM_API_BASE
     return customBase && customBase.trim()
       ? customBase.trim().replace(/\/+$/, "")
-      : null
+      : (PROVIDER_BASE_URLS[provider] ?? null)
   }
   return PROVIDER_BASE_URLS[provider] ?? null
 }
@@ -202,8 +203,30 @@ export async function runPromptExecution(
     input,
   })
 
-  const apiKey = process.env.AI_API_KEY
-  const baseUrl = resolveBaseUrl(modelProvider)
+  let apiKey = process.env.AI_API_KEY
+  let baseUrl = resolveBaseUrl(modelProvider)
+
+  // Look up tenant's BYOK provider credentials if available
+  if (request.organizationId && request.organizationId !== "__api__") {
+    const { data: orgProvider } = await supabase
+      .from("ai_model_providers")
+      .select("api_key_encrypted, base_url, default_model, is_active")
+      .eq("organization_id", request.organizationId)
+      .eq("provider", modelProvider)
+      .eq("is_active", true)
+      .maybeSingle()
+
+    if (orgProvider?.api_key_encrypted) {
+      apiKey = orgProvider.api_key_encrypted
+      if (orgProvider.base_url) {
+        baseUrl = orgProvider.base_url.replace(/\/+$/, "")
+      }
+      if (!promptId && orgProvider.default_model) {
+        modelName = orgProvider.default_model
+      }
+    }
+  }
+
   if (!apiKey || !baseUrl) {
     console.error("[ai] provider not configured for", modelProvider)
     return { status: "error", error: errors.providerNotConfigured }
