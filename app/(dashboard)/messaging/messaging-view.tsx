@@ -43,7 +43,7 @@ export function MessagingView({
   platform,
   locale,
 }: MessagingViewProps) {
-  const [activeTab, setActiveTab] = useState<string>("internal");
+  const [activeTab, setActiveTab] = useState<string>("external");
   const t = platform.messaging;
 
   return (
@@ -59,17 +59,31 @@ export function MessagingView({
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
           <TabsList className="grid grid-cols-2 w-[340px]">
-            <TabsTrigger value="internal" className="gap-2 text-xs">
-              <Users className="h-3.5 w-3.5" />
-              <span>{t.tabs.internal}</span>
-            </TabsTrigger>
             <TabsTrigger value="external" className="gap-2 text-xs">
               <MessagesSquare className="h-3.5 w-3.5" />
               <span>{t.tabs.external}</span>
             </TabsTrigger>
+            <TabsTrigger value="internal" className="gap-2 text-xs">
+              <Users className="h-3.5 w-3.5" />
+              <span>{t.tabs.internal}</span>
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
+
+      {/* External Conversations Content */}
+      {activeTab === "external" && (
+        <div>
+          <ExternalInboxView
+            initialThreads={initialThreads}
+            phoneNumbers={phoneNumbers}
+            carrierSettings={carrierSettings}
+            organizationId={organizationId}
+            platform={platform}
+            locale={locale}
+          />
+        </div>
+      )}
 
       {/* Internal Channels Content */}
       {activeTab === "internal" && (
@@ -81,20 +95,6 @@ export function MessagingView({
             canManage={canManageChat}
             currentUser={currentUser}
             orgMembers={orgMembers}
-            organizationId={organizationId}
-            platform={platform}
-            locale={locale}
-          />
-        </div>
-      )}
-
-      {/* External Conversations Content */}
-      {activeTab === "external" && (
-        <div>
-          <ExternalInboxView
-            initialThreads={initialThreads}
-            phoneNumbers={phoneNumbers}
-            carrierSettings={carrierSettings}
             organizationId={organizationId}
             platform={platform}
             locale={locale}
