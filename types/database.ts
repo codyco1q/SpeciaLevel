@@ -42,6 +42,8 @@ export interface Organization {
   date_format?: string;
   security_settings?: OrganizationSecuritySettings;
   billing_defaults?: OrganizationBillingDefaults;
+  has_social_planner_addon?: boolean;
+  social_planner_subscribed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -521,6 +523,7 @@ export type WorkflowStepType = "action" | "condition" | "delay";
 export type WorkflowActionType =
   | "send_sms"
   | "send_notification"
+  | "send_email"
   | "add_tag"
   | "update_deal_stage"
   | "webhook"
@@ -615,6 +618,101 @@ export interface AiMcpServer {
   created_at: string;
   updated_at: string;
 }
+// ============================================================
+// Marketing Social Planner & Email Templates (00038_marketing_social_and_emails.sql)
+// ============================================================
+
+export type MarketingSocialPlatform =
+  | "facebook"
+  | "instagram"
+  | "twitter"
+  | "linkedin";
+
+export type MarketingSocialPostStatus =
+  | "draft"
+  | "scheduled"
+  | "published"
+  | "failed";
+
+export interface MarketingSocialPost {
+  id: string;
+  organization_id: string;
+  content: string;
+  media_urls: string[];
+  platforms: MarketingSocialPlatform[];
+  status: MarketingSocialPostStatus;
+  scheduled_for: string | null;
+  published_at: string | null;
+  error_message: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  creator?: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+  } | null;
+}
+
+export type EmailBlockType =
+  | "header"
+  | "text"
+  | "button"
+  | "divider"
+  | "spacer"
+  | "image";
+
+export interface EmailBlockStyle {
+  textColor?: string;
+  backgroundColor?: string;
+  fontSize?: number;
+  textAlign?: "left" | "center" | "right";
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  borderRadius?: number;
+  buttonColor?: string;
+  buttonTextColor?: string;
+  lineHeight?: number;
+  fontWeight?: string;
+}
+
+export interface EmailBlock {
+  id: string;
+  type: EmailBlockType;
+  content: {
+    text?: string;
+    level?: 1 | 2 | 3;
+    buttonText?: string;
+    buttonUrl?: string;
+    imageUrl?: string;
+    imageAlt?: string;
+    imageWidth?: number;
+    spacerHeight?: number;
+    dividerColor?: string;
+  };
+  style?: EmailBlockStyle;
+}
+
+export interface MarketingEmailTemplate {
+  id: string;
+  organization_id: string;
+  name: string;
+  subject: string;
+  preview_text: string | null;
+  body_json: EmailBlock[];
+  body_html: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  creator?: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+  } | null;
+}
+
 
 
 

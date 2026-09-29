@@ -10,8 +10,20 @@ import {
   MARKETING_STATUSES,
   campaignIdSchema,
   createCampaignInputSchema,
+  saveSocialPostSchema,
+  deleteSocialPostSchema,
+  saveEmailTemplateSchema,
+  deleteEmailTemplateSchema,
+  sendTestEmailSchema,
+  compileEmailBlocksToHtml,
   type MarketingStatus,
+  type SaveSocialPostInput,
+  type SaveEmailTemplateInput,
 } from "@/lib/validations/marketing";
+import type {
+  MarketingSocialPost,
+  MarketingEmailTemplate,
+} from "@/types/database";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 /**
@@ -474,3 +486,10 @@ export async function getMarketingMetrics(): Promise<MarketingMetrics | null> {
     ),
   };
 }
+
+// ============================================================
+// Re-exports for Social Media Planner & Email Template Studio
+// ============================================================
+
+export * from "./marketing-social";
+export * from "./marketing-emails";

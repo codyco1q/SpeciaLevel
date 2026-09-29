@@ -18,6 +18,7 @@ import {
   CreditCard,
   MessageCircle,
   Bell,
+  Mail,
   ArrowRightCircle,
   Webhook,
   Clock,
@@ -457,6 +458,7 @@ export function WorkflowBuilderStudio({
                           <div className="size-8 rounded-lg bg-muted text-foreground flex items-center justify-center shrink-0">
                             {step.action_type === "send_sms" && <MessageCircle className="size-4 text-emerald-500" />}
                             {step.action_type === "send_notification" && <Bell className="size-4 text-amber-500" />}
+                            {step.action_type === "send_email" && <Mail className="size-4 text-blue-500" />}
                             {step.action_type === "add_tag" && <Tag className="size-4 text-sky-500" />}
                             {step.action_type === "update_deal_stage" && <ArrowRightCircle className="size-4 text-indigo-500" />}
                             {step.action_type === "webhook" && <Webhook className="size-4 text-purple-500" />}
@@ -554,6 +556,7 @@ export function WorkflowBuilderStudio({
                     <div className="size-7 rounded-md bg-muted flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
                       {act.type === "send_sms" && <MessageCircle className="size-3.5 text-emerald-500 group-hover:text-inherit" />}
                       {act.type === "send_notification" && <Bell className="size-3.5 text-amber-500 group-hover:text-inherit" />}
+                      {act.type === "send_email" && <Mail className="size-3.5 text-blue-500 group-hover:text-inherit" />}
                       {act.type === "add_tag" && <Tag className="size-3.5 text-sky-500 group-hover:text-inherit" />}
                       {act.type === "update_deal_stage" && <ArrowRightCircle className="size-3.5 text-indigo-500 group-hover:text-inherit" />}
                       {act.type === "webhook" && <Webhook className="size-3.5 text-purple-500 group-hover:text-inherit" />}

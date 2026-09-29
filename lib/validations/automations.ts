@@ -20,6 +20,7 @@ export const WORKFLOW_STEP_TYPES = ["action", "condition", "delay"] as const;
 export const WORKFLOW_ACTION_TYPES = [
   "send_sms",
   "send_notification",
+  "send_email",
   "add_tag",
   "update_deal_stage",
   "webhook",
@@ -156,6 +157,20 @@ export const WORKFLOW_ACTION_DEFINITIONS: WorkflowActionDefinition[] = [
       target: "admins",
       title: "New Workflow Alert: {{contact.name}}",
       message: "Automated event triggered for {{contact.name}} ({{contact.email}}).",
+    },
+  },
+  {
+    type: "send_email",
+    name: "Send Marketing Email",
+    description: "Dispatches a styled marketing email template or custom message to the contact.",
+    icon: "Mail",
+    badge: "Marketing",
+    defaultConfig: {
+      recipient_type: "contact",
+      custom_email: "",
+      template_id: "",
+      subject: "Important update from {{organization.name}}",
+      body: "Hi {{contact.name}},\n\nWe wanted to follow up regarding your recent request.",
     },
   },
   {

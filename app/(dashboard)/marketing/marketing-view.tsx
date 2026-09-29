@@ -9,8 +9,16 @@ import {
   Trash2,
   TrendingUp,
   Wallet,
+  Share2,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
+import { SocialPlannerView } from "./social/social-planner-view";
+import { EmailTemplatesView } from "./emails/email-templates-view";
+import type {
+  MarketingSocialPost,
+  MarketingEmailTemplate,
+} from "@/types/database";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,26 +91,25 @@ const STATUS_FILTERS: ("all" | MarketingStatus)[] = [
 interface MarketingViewProps {
   initialCampaigns: MarketingCampaignRow[];
   initialMetrics: MarketingMetrics;
+  initialSocialPosts?: MarketingSocialPost[];
+  isSocialSubscribed?: boolean;
+  initialEmailTemplates?: MarketingEmailTemplate[];
   canManage: boolean;
-  /** Localized copy for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
 }
 
-/**
- * Marketing orchestrator: KPI cards, channel distribution strip, status
- * filter, the campaigns table (channel badge + status pill + budget-vs-spend
- * progress bar + actions menu), and the create/edit dialog. Mutations run
- * through the server actions and the list + metrics are refetched
- * afterwards — the same "revalidate + refetch" pattern as the other modules.
- */
 export function MarketingView({
   initialCampaigns,
   initialMetrics,
+  initialSocialPosts = [],
+  isSocialSubscribed = false,
+  initialEmailTemplates = [],
   canManage,
   platform,
   locale,
 }: MarketingViewProps) {
+  const [activeTab, setActiveTab] = useState<"campaigns" | "social" | "emails">("campaigns");
   const t = platform.marketing;
   const common = platform.common;
 
@@ -202,11 +209,79 @@ export function MarketingView({
         </div>
       )}
 
-      {/* KPI summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard
-          icon={Megaphone}
-          label={t.metrics.activeCampaigns}
+      {/* Top Marketing Hub Navigation */}
+      <div className="flex flex-wrap items-center gap-2 border-b pb-4">
+        <button
+          type="button"
+          onClick={() => setActiveTab("campaigns")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            activeTab === "campaigns"
+              ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+              : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          <Megaphone className="size-4" />
+          <span>Campaigns & Ad Spend</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("social")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            activeTab === "social"
+              ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+              : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          <Share2 className="size-4" />
+          <span>Social Media Planner</span>
+          {!isSocialSubscribed && (
+            <Badge variant="outline" className="text-[10px] bg-primary/10 border-primary/20 text-primary">
+              $15/mo
+            </Badge>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("emails")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            activeTab === "emails"
+              ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+              : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          <Mail className="size-4" />
+          <span>Email Template Studio</span>
+        </button>
+      </div>
+
+      {activeTab === "social" && (
+        <SocialPlannerView
+          initialPosts={initialSocialPosts}
+          isSubscribed={isSocialSubscribed}
+          canManage={canManage}
+          platform={platform}
+          locale={locale}
+        />
+      )}
+
+      {activeTab === "emails" && (
+        <EmailTemplatesView
+          initialTemplates={initialEmailTemplates}
+          canManage={canManage}
+          platform={platform}
+          locale={locale}
+        />
+      )}
+
+      {activeTab === "campaigns" && (
+        <>
+          {/* KPI summary cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard
+              icon={Megaphone}
+              label={t.metrics.activeCampaigns}
           value={String(metrics.activeCampaigns)}
           hint={t.metrics.activeCampaignsHint}
         />
@@ -435,6 +510,8 @@ export function MarketingView({
         <p className="mt-3 text-xs text-muted-foreground">
           {t.errors.deleteConfirmBody}
         </p>
+      )}
+        </>
       )}
 
       <MarketingDialog

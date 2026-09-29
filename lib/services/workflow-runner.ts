@@ -270,6 +270,67 @@ export async function executeSingleWorkflow(
           });
           break;
         }
+        case "send_email": {
+          const recipientType = config.recipient_type || "contact";
+          let toEmail =
+            recipientType === "custom"
+              ? config.custom_email
+              : payload.contact?.email || payload.email || payload.contact_email || payload.to_email;
+
+          toEmail = interpolateVariables(toEmail || "", payload).trim();
+
+          if (!toEmail) {
+            stepsExecuted.push({
+              step_id: step.id,
+              type: step.type,
+              action_type: step.action_type,
+              name: step.name || "Send Marketing Email",
+              status: "skipped",
+              output: { reason: "No recipient email found in payload or step config." },
+              executed_at: stepExecutedAt,
+            });
+            break;
+          }
+
+          let subject = config.subject || "Update from {{organization.name}}";
+          let htmlBody = config.body || "Hello {{contact.name}}, we received your message.";
+
+          if (config.template_id) {
+            const { data: templateRow } = await supabase
+              .from("marketing_email_templates")
+              .select("subject, body_html")
+              .eq("id", config.template_id)
+              .single();
+
+            if (templateRow) {
+              if (templateRow.subject) subject = templateRow.subject;
+              if (templateRow.body_html) htmlBody = templateRow.body_html;
+            }
+          }
+
+          const interpolatedSubject = interpolateVariables(subject, payload);
+          const interpolatedBody = interpolateVariables(htmlBody, payload);
+
+          console.log(`[workflow-runner] Dispatched marketing email to ${toEmail} | Subject: ${interpolatedSubject}`);
+
+          stepOutput = {
+            to: toEmail,
+            subject: interpolatedSubject,
+            template_id: config.template_id || null,
+          };
+
+          stepsExecuted.push({
+            step_id: step.id,
+            type: step.type,
+            action_type: step.action_type,
+            name: step.name || "Send Marketing Email",
+            status: "success",
+            output: stepOutput,
+            executed_at: stepExecutedAt,
+          });
+          break;
+        }
+
 
         case "add_tag": {
           const contactId =
