@@ -134,24 +134,73 @@ export interface CalendarEvent {
   updated_at: string;
 }
 
-export type TaskStatus = "todo" | "in_progress" | "review" | "done";
+export type TaskStatus = "todo" | "in_progress" | "in_review" | "blocked" | "done";
 
-export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type TaskPriority = "urgent" | "high" | "medium" | "low" | "none";
+
+export type RichTextBlockType =
+  | "paragraph"
+  | "heading1"
+  | "heading2"
+  | "heading3"
+  | "bulletList"
+  | "numberedList"
+  | "todoList"
+  | "quote"
+  | "code"
+  | "callout"
+  | "divider"
+  | "p"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "todo"
+  | "bullet";
+
+export interface RichTextBlock {
+  id: string;
+  type: RichTextBlockType;
+  content?: string;
+  checked?: boolean;
+  language?: string;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  organization_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user?: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+  } | null;
+}
 
 export interface Task {
   id: string;
   organization_id: string;
+  parent_id?: string | null;
   title: string;
-  description: string | null;
+  description_json: RichTextBlock[];
+  description_text: string;
   status: TaskStatus;
   priority: TaskPriority;
   assigned_to: string | null;
-  created_by: string;
+  created_by: string | null;
   due_date: string | null;
+  start_date: string | null;
+  estimated_hours: number | null;
+  tags: string[];
+  is_doc: boolean;
+  order_index: number;
   /** CRM contact this deliverable is for (client portal scoping). */
-  contact_id: string | null;
+  contact_id?: string | null;
   /** When true, the linked client (or any client) can see this task. */
-  is_client_visible: boolean;
+  is_client_visible?: boolean;
   created_at: string;
   updated_at: string;
 }

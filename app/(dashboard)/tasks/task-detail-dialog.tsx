@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
@@ -27,14 +27,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { deleteTask, type TaskRow } from "@/lib/actions/tasks";
-import type { TaskStatus } from "@/types/database";
+import { deleteTask, updateTask, type TaskRow } from "@/lib/actions/tasks";
+import type { RichTextBlock, TaskStatus } from "@/types/database";
 import {
+  blocksToPlainText,
   formatDueDate,
   TASK_PRIORITY_BADGE_CLASSES,
   TASK_STATUSES,
 } from "./task-meta";
 import { AttachmentPanel } from "./attachment-panel";
+import { BlockEditor } from "./block-editor";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface TaskDetailDialogProps {
@@ -78,10 +80,31 @@ export function TaskDetailDialog({
   const [deleting, setDeleting] = useState(false);
   const [statusPending, setStatusPending] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [descriptionBlocks, setDescriptionBlocks] = useState<RichTextBlock[]>(
+    task?.descriptionJson ?? []
+  );
+
+  useEffect(() => {
+    setDescriptionBlocks(task?.descriptionJson ?? []);
+  }, [task?.descriptionJson]);
 
   if (!task) return null;
 
   const canChangeStatus = canManage || task.assignedTo?.id === currentUserId;
+
+  const handleBlocksChange = async (updatedBlocks: RichTextBlock[]) => {
+    setDescriptionBlocks(updatedBlocks);
+    if (task && (canManage || task.assignedTo?.id === currentUserId)) {
+      try {
+        await updateTask(task.id, {
+          descriptionJson: updatedBlocks,
+          descriptionText: blocksToPlainText(updatedBlocks),
+        });
+      } catch (err) {
+        console.error("Failed to persist task block updates:", err);
+      }
+    }
+  };
 
   async function handleStatusSelect(value: string) {
     if (!task || task.status === value) return;
@@ -203,7 +226,20 @@ export function TaskDetailDialog({
             </div>
           </div>
 
-          {task.description ? (
+          {descriptionBlocks && descriptionBlocks.length > 0 ? (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t.descriptionLabel}
+              </h4>
+              <div className="rounded-md border border-border/50 bg-muted/10 p-3">
+                <BlockEditor
+                  blocks={descriptionBlocks}
+                  onChange={handleBlocksChange}
+                  readOnly={true}
+                />
+              </div>
+            </div>
+          ) : task.description ? (
             <div>
               <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {t.descriptionLabel}

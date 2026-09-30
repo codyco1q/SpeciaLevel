@@ -1,22 +1,54 @@
 import { z } from "zod";
+import type { RichTextBlock } from "@/types/database";
 
 /**
- * Shared Zod schema for tasks (create + update).
+ * Shared Zod schema for tasks & docs (create + update).
  * Used client-side (react-hook-form resolver) and re-validated
  * server-side in lib/actions/tasks.ts.
- *
- * i18n: validation messages are parameterized through
- * `createTaskInputSchema(messages)` so the client forms and the server
- * action can pass localized messages from the active dictionary. The
- * exported `taskInputSchema` keeps the English defaults for callers that
- * need the schema without a locale.
- *
- * Field names are camelCase over the wire; they are mapped to the
- * snake_case DB columns inside the server actions.
  */
-export const taskStatusSchema = z.enum(["todo", "in_progress", "review", "done"]);
+export const taskStatusSchema = z.enum([
+  "todo",
+  "in_progress",
+  "in_review",
+  "blocked",
+  "done",
+]);
 
-export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+export const taskPrioritySchema = z.enum([
+  "urgent",
+  "high",
+  "medium",
+  "low",
+  "none",
+]);
+
+export const richTextBlockTypeSchema = z.enum([
+  "paragraph",
+  "heading1",
+  "heading2",
+  "heading3",
+  "bulletList",
+  "numberedList",
+  "todoList",
+  "quote",
+  "code",
+  "callout",
+  "divider",
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "todo",
+  "bullet",
+]);
+
+export const richTextBlockSchema = z.object({
+  id: z.string(),
+  type: richTextBlockTypeSchema,
+  content: z.string().optional(),
+  checked: z.boolean().optional(),
+  language: z.string().optional(),
+});
 
 /** Localized string messages consumed by the task schema. */
 export interface TaskValidationMessages {
@@ -25,14 +57,18 @@ export interface TaskValidationMessages {
   descriptionMax: string;
   invalidAssignee: string;
   invalidDueDate: string;
+  invalidStartDate?: string;
+  invalidHours?: string;
 }
 
 export const DEFAULT_TASK_VALIDATION_MESSAGES: TaskValidationMessages = {
-  titleMin: "Title must be at least 2 characters.",
-  titleMax: "Title must be 100 characters or fewer.",
-  descriptionMax: "Description must be 4000 characters or fewer.",
+  titleMin: "Title must be at least 1 character.",
+  titleMax: "Title must be 200 characters or fewer.",
+  descriptionMax: "Description must be 50000 characters or fewer.",
   invalidAssignee: "Select a valid team member.",
   invalidDueDate: "Enter a valid due date.",
+  invalidStartDate: "Enter a valid start date.",
+  invalidHours: "Estimated hours must be a positive number.",
 };
 
 export function createTaskInputSchema(
@@ -42,32 +78,56 @@ export function createTaskInputSchema(
     title: z
       .string()
       .trim()
-      .min(2, messages.titleMin)
-      .max(100, messages.titleMax),
-    description: z
-      .string()
-      .trim()
-      .max(4000, messages.descriptionMax)
-      .optional()
-      .or(z.literal("")),
-    status: taskStatusSchema,
-    priority: taskPrioritySchema,
+      .min(1, messages.titleMin)
+      .max(200, messages.titleMax),
+    description: z.string().optional().or(z.literal("")),
+    descriptionText: z.string().optional().or(z.literal("")),
+    descriptionJson: z.array(richTextBlockSchema).optional(),
+    status: taskStatusSchema.default("todo"),
+    priority: taskPrioritySchema.default("medium"),
     assignedTo: z
       .string()
       .uuid(messages.invalidAssignee)
       .optional()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .nullable(),
     dueDate: z
       .string()
       .optional()
       .or(z.literal(""))
+      .nullable()
       .refine(
         (value) => {
-          if (!value) return true; // empty = no due date
+          if (!value) return true;
           return !Number.isNaN(Date.parse(value));
         },
         { message: messages.invalidDueDate }
       ),
+    startDate: z
+      .string()
+      .optional()
+      .or(z.literal(""))
+      .nullable()
+      .refine(
+        (value) => {
+          if (!value) return true;
+          return !Number.isNaN(Date.parse(value));
+        },
+        { message: messages.invalidStartDate || messages.invalidDueDate }
+      ),
+    estimatedHours: z
+      .union([z.number(), z.string()])
+      .optional()
+      .nullable()
+      .transform((val) => {
+        if (val === undefined || val === null || val === "") return null;
+        const num = typeof val === "number" ? val : parseFloat(val);
+        return isNaN(num) ? null : Math.max(0, Math.round(num * 100) / 100);
+      }),
+    tags: z.array(z.string()).default([]),
+    isDoc: z.boolean().default(false),
+    parentId: z.string().uuid().optional().or(z.literal("")).nullable(),
+    orderIndex: z.number().int().default(0),
   });
 }
 
@@ -75,10 +135,18 @@ export const taskInputSchema = createTaskInputSchema();
 
 export type TaskInput = z.infer<typeof taskInputSchema>;
 
+export const taskCommentInputSchema = z.object({
+  taskId: z.string().uuid(),
+  content: z.string().trim().min(1, "Comment cannot be empty").max(4000),
+});
+
+export type TaskCommentInput = z.infer<typeof taskCommentInputSchema>;
+
 /** State returned by task server actions. */
 export interface TaskActionState {
   status: "idle" | "success" | "error";
   error?: string | null;
+  taskId?: string;
   fieldErrors?: Partial<Record<keyof TaskInput, string[] | undefined>>;
 }
 
