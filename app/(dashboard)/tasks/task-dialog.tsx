@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckSquare, LoaderCircle } from "lucide-react";
+import { CheckSquare, LoaderCircle, Sparkles, Text } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,10 @@ import { createTask, updateTask, type TaskRow } from "@/lib/actions/tasks";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
+  blocksToPlainText,
 } from "./task-meta";
+import { BlockEditor } from "./block-editor";
+import type { RichTextBlock } from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 export interface TaskMemberOption {
@@ -52,8 +55,7 @@ interface TaskDialogProps {
 
 /**
  * Create / edit task dialog backed by react-hook-form + the shared Zod
- * schema. Submits to the `createTask` / `updateTask` server actions,
- * which re-validate everything server-side and revalidate /tasks.
+ * schema. Submits to the `createTask` / `updateTask` server actions.
  */
 export function TaskDialog({
   open,
@@ -68,6 +70,8 @@ export function TaskDialog({
   const common = platform.common;
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [useRichEditor, setUseRichEditor] = useState(true);
+  const [richBlocks, setRichBlocks] = useState<RichTextBlock[]>([]);
 
   const {
     register,
@@ -88,17 +92,22 @@ export function TaskDialog({
     },
   });
 
-  // Re-seed the form every time the dialog opens so it always reflects the
-  // task being edited or a pristine create form.
+  // Re-seed the form every time the dialog opens
   useEffect(() => {
     if (!open) return;
+    const initialDesc = isEdit ? task.description ?? "" : "";
+    const blocks: RichTextBlock[] =
+      isEdit && task.descriptionJson && task.descriptionJson.length > 0
+        ? task.descriptionJson
+        : [{ id: "b_1", type: "paragraph", content: initialDesc }];
+    setRichBlocks(blocks);
+
     reset({
       title: isEdit ? task.title : "",
-      description: isEdit ? task.description ?? "" : "",
+      description: initialDesc,
       status: isEdit ? task.status : "todo",
       priority: isEdit ? task.priority : "medium",
       assignedTo: isEdit ? task.assignedTo?.id ?? "" : "",
-      // <input type="date"> expects YYYY-MM-DD; stored ISO includes time.
       dueDate: isEdit && task.dueDate ? task.dueDate.slice(0, 10) : "",
     });
   }, [open, isEdit, task, reset]);
@@ -112,11 +121,22 @@ export function TaskDialog({
 
   const onSubmit = handleSubmit((values) => {
     setServerError(null);
+    const finalBlocks = useRichEditor ? richBlocks : undefined;
+    const plainText = useRichEditor
+      ? blocksToPlainText(richBlocks)
+      : (values.description ?? "");
+
+    const payload: TaskInput = {
+      ...values,
+      description: plainText,
+      descriptionText: plainText,
+      descriptionJson: finalBlocks,
+    };
 
     startTransition(async () => {
       const result = isEdit
-        ? await updateTask(task.id, values)
-        : await createTask(values);
+        ? await updateTask(task.id, payload)
+        : await createTask(payload);
 
       if (result.status === "error") {
         setServerError(
@@ -267,14 +287,53 @@ export function TaskDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="task-description">{t.descriptionLabel}</Label>
-            <Textarea
-              id="task-description"
-              placeholder={t.descriptionPlaceholder}
-              rows={3}
-              {...register("description")}
-              aria-invalid={Boolean(errors.description)}
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="task-description">{t.descriptionLabel}</Label>
+              <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setUseRichEditor(true)}
+                  className={`flex items-center gap-1 rounded px-2 py-0.5 font-medium transition-colors ${
+                    useRichEditor
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Rich Editor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseRichEditor(false)}
+                  className={`flex items-center gap-1 rounded px-2 py-0.5 font-medium transition-colors ${
+                    !useRichEditor
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Text className="h-3 w-3" />
+                  Plain
+                </button>
+              </div>
+            </div>
+
+            {useRichEditor ? (
+              <div className="min-h-[140px] rounded-lg border border-border bg-background p-3 focus-within:ring-1 focus-within:ring-primary">
+                <BlockEditor
+                  blocks={richBlocks}
+                  onChange={setRichBlocks}
+                  placeholder={t.descriptionPlaceholder}
+                />
+              </div>
+            ) : (
+              <Textarea
+                id="task-description"
+                placeholder={t.descriptionPlaceholder}
+                rows={4}
+                {...register("description")}
+                aria-invalid={Boolean(errors.description)}
+              />
+            )}
             {errors.description && (
               <p role="alert" className="text-sm text-destructive">
                 {errors.description.message}
