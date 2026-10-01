@@ -31,10 +31,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   createPipeline,
   updatePipeline,
@@ -562,11 +562,11 @@ export function PipelineManagerDialog({
                 <div className="md:col-span-3 space-y-1.5">
                   <Label className="text-xs font-semibold">{pDict.pipelineColor}</Label>
                   <div className="flex items-center gap-1.5">
-                    <Popover>
-                      <PopoverTrigger asChild>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="h-9 px-2.5 rounded-md border border-border bg-background flex items-center gap-2 hover:bg-muted/50 transition-colors w-full"
+                          className="h-9 px-2.5 rounded-md border border-border bg-background flex items-center gap-2 hover:bg-muted/50 transition-colors w-full cursor-pointer"
                         >
                           <span
                             className="size-4 rounded-full border border-black/10 shrink-0"
@@ -575,9 +575,9 @@ export function PipelineManagerDialog({
                           <span className="text-xs font-mono truncate">{pipelineColor}</span>
                           <Palette className="size-3.5 text-muted-foreground ms-auto shrink-0" />
                         </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-56 p-2.5 space-y-2" align="start">
-                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56 p-2.5 space-y-2" align="start">
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                           {pDict.colorPalette}
                         </span>
                         <div className="grid grid-cols-7 gap-1.5">
@@ -586,7 +586,7 @@ export function PipelineManagerDialog({
                               key={c}
                               type="button"
                               onClick={() => setPipelineColor(c)}
-                              className="size-6 rounded-full border border-black/15 transition hover:scale-110 flex items-center justify-center"
+                              className="size-6 rounded-full border border-black/15 transition hover:scale-110 flex items-center justify-center cursor-pointer"
                               style={{ backgroundColor: c }}
                             >
                               {pipelineColor === c && <Check className="size-3 text-white" />}
@@ -602,8 +602,8 @@ export function PipelineManagerDialog({
                             className="size-7 rounded-md cursor-pointer border-0 bg-transparent p-0"
                           />
                         </div>
-                      </PopoverContent>
-                    </Popover>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 
@@ -737,19 +737,19 @@ export function PipelineManagerDialog({
 
                     {/* Color Swatch Picker */}
                     <div className="w-10 flex justify-center shrink-0">
-                      <Popover>
-                        <PopoverTrigger asChild>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            className="size-7 rounded-full border border-black/20 shadow-2xs transition hover:scale-110 flex items-center justify-center shrink-0"
+                            className="size-7 rounded-full border border-black/20 shadow-2xs transition hover:scale-110 flex items-center justify-center shrink-0 cursor-pointer"
                             style={{ backgroundColor: stage.color }}
                             title={pDict.stageColor}
                           >
                             <span className="size-1.5 rounded-full bg-white/70" />
                           </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-56 p-2.5 space-y-2" align="start">
-                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56 p-2.5 space-y-2" align="start">
+                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
                             {pDict.stageColor}
                           </span>
                           <div className="grid grid-cols-7 gap-1.5">
@@ -758,7 +758,7 @@ export function PipelineManagerDialog({
                                 key={c}
                                 type="button"
                                 onClick={() => handleStageChange(idx, "color", c)}
-                                className="size-6 rounded-full border border-black/15 transition hover:scale-110 flex items-center justify-center"
+                                className="size-6 rounded-full border border-black/15 transition hover:scale-110 flex items-center justify-center cursor-pointer"
                                 style={{ backgroundColor: c }}
                               >
                                 {stage.color === c && <Check className="size-3 text-white" />}
@@ -774,8 +774,8 @@ export function PipelineManagerDialog({
                               className="size-7 rounded-md cursor-pointer border-0 bg-transparent p-0"
                             />
                           </div>
-                        </PopoverContent>
-                      </Popover>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     {/* Stage Name */}
