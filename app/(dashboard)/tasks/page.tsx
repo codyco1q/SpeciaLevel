@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getTasks } from "@/lib/actions/tasks";
+import {
+  getTaskStages,
+  getWorkspaceDocs,
+  getWhiteboards,
+} from "@/lib/actions/tasks-powerhouse";
 import { createServerClient } from "@/lib/supabase/server";
 import { TasksView } from "./tasks-view";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
@@ -47,7 +52,12 @@ export default async function TasksPage() {
     email: profile.email ?? null,
   }));
 
-  const initialTasks = await getTasks();
+  const [initialTasks, initialStages, initialDocs, initialWhiteboards] = await Promise.all([
+    getTasks(),
+    getTaskStages(),
+    getWorkspaceDocs(),
+    getWhiteboards(),
+  ]);
 
   // Attachments: internal members holding tasks.view may upload; a Client
   // role holds tasks.view too, so it is excluded explicitly here.
@@ -58,6 +68,9 @@ export default async function TasksPage() {
     <div className="p-8">
       <TasksView
         initialTasks={initialTasks ?? []}
+        initialStages={initialStages ?? []}
+        initialDocs={initialDocs ?? []}
+        initialWhiteboards={initialWhiteboards ?? []}
         members={members}
         canManage={hasPermission("tasks.manage", userContext.permissions)}
         canUpload={canUpload}

@@ -180,9 +180,75 @@ export interface TaskComment {
   } | null;
 }
 
+export interface TaskStage {
+  id: string;
+  organization_id: string;
+  name: string;
+  color: string;
+  order_index: number;
+  is_done_stage: boolean;
+  created_at: string;
+}
+
+export interface WorkspaceDoc {
+  id: string;
+  organization_id: string;
+  title: string;
+  icon: string;
+  blocks_json: RichTextBlock[];
+  plain_text: string;
+  parent_id: string | null;
+  order_index: number;
+  created_by: string | null;
+  updated_at: string;
+  children?: WorkspaceDoc[];
+}
+
+export type WhiteboardTool =
+  | "select"
+  | "sticky"
+  | "text"
+  | "rectangle"
+  | "circle"
+  | "arrow"
+  | "pen";
+
+export interface WhiteboardElement {
+  id: string;
+  type: "sticky" | "text" | "rectangle" | "circle" | "arrow" | "pen";
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  text?: string;
+  color?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  points?: { x: number; y: number }[];
+  endX?: number;
+  endY?: number;
+}
+
+export interface WhiteboardViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export interface WorkspaceWhiteboard {
+  id: string;
+  organization_id: string;
+  name: string;
+  elements_json: WhiteboardElement[];
+  viewport: WhiteboardViewport;
+  created_by: string | null;
+  updated_at: string;
+}
+
 export interface Task {
   id: string;
   organization_id: string;
+  stage_id?: string | null;
   parent_id?: string | null;
   title: string;
   description_json: RichTextBlock[];

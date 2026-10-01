@@ -136,7 +136,7 @@ export function BlockEditor({
 
   const handleChangeType = (index: number, type: RichTextBlock["type"]) => {
     const next = [...internalBlocks];
-    let content = next[index].content;
+    let content = next[index].content ?? "";
     if (content.startsWith("/")) content = "";
     next[index] = {
       ...next[index],

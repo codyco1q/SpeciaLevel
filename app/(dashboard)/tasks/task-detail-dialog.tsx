@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { deleteTask, updateTask, type TaskRow } from "@/lib/actions/tasks";
-import type { RichTextBlock, TaskStatus } from "@/types/database";
+import type { RichTextBlock, TaskStage, TaskStatus } from "@/types/database";
 import {
   blocksToPlainText,
   formatDueDate,
@@ -48,6 +48,8 @@ interface TaskDetailDialogProps {
   canUpload: boolean;
   currentUserId: string;
   organizationId: string;
+  stages?: TaskStage[];
+  onStageChange?: (taskId: string, stageId: string) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onEditRequest: (task: TaskRow) => void;
   onDeleted: () => void;
@@ -68,6 +70,8 @@ export function TaskDetailDialog({
   canUpload,
   currentUserId,
   organizationId,
+  stages = [],
+  onStageChange,
   onStatusChange,
   onEditRequest,
   onDeleted,
@@ -156,7 +160,7 @@ export function TaskDetailDialog({
               .replace("{date}", formatDueDate(task.createdAt, locale))
               .replace(
                 "{name}",
-                task.createdBy.fullName ?? task.createdBy.email ?? t.member
+                task.createdBy?.fullName ?? task.createdBy?.email ?? t.member
               )}
           </DialogDescription>
         </DialogHeader>
@@ -169,7 +173,32 @@ export function TaskDetailDialog({
                 {statusPending && (
                   <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
-                {canChangeStatus ? (
+                {stages.length > 0 && onStageChange ? (
+                  <Select
+                    value={task.stageId ?? stages[0]?.id ?? ""}
+                    onValueChange={(stageId) => {
+                      if (onStageChange) onStageChange(task.id, stageId);
+                    }}
+                    disabled={statusPending || !canManage}
+                  >
+                    <SelectTrigger size="sm" className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stages.map((st) => (
+                        <SelectItem key={st.id} value={st.id}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{ backgroundColor: st.color }}
+                            />
+                            <span>{st.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : canChangeStatus ? (
                   <Select
                     value={task.status}
                     onValueChange={handleStatusSelect}

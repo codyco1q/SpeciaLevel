@@ -462,6 +462,52 @@
         "deleteFailed": "Could not delete the task. Please try again.",
         "notFound": "Task not found, or you don't have access to it.",
         "missingId": "Missing task ID."
+      },
+      "whiteboard": "Whiteboard",
+      "stages": {
+        "manageStages": "Manage Stages",
+        "addStage": "Add Stage",
+        "stageName": "Stage Name",
+        "stageColor": "Stage Color",
+        "isDoneStage": "Mark as Completed Stage",
+        "deleteStage": "Delete Stage",
+        "deleteStageConfirm": "Are you sure you want to delete this stage? Tasks in this stage will be moved to another stage.",
+        "saveStages": "Save Stages",
+        "order": "Order",
+        "noStages": "No custom stages defined.",
+        "newStagePlaceholder": "Stage Name (e.g. Quality Assurance)"
+      },
+      "docsWorkspace": {
+        "allDocs": "Notes & Docs",
+        "newPage": "New Page",
+        "addSubpage": "Add Subpage",
+        "searchDocs": "Search notes & docs...",
+        "untitled": "Untitled Document",
+        "deleteDoc": "Delete Page",
+        "deleteDocConfirm": "Are you sure you want to delete this document and all subpages?",
+        "lastUpdated": "Last edited",
+        "emptyWorkspace": "No documents yet. Create your first page to start taking rich notes."
+      },
+      "whiteboardWorkspace": {
+        "title": "Whiteboards",
+        "newBoard": "New Whiteboard",
+        "searchBoards": "Search whiteboards...",
+        "deleteBoard": "Delete Whiteboard",
+        "deleteBoardConfirm": "Are you sure you want to delete this whiteboard?",
+        "toolSelect": "Select / Move",
+        "toolSticky": "Sticky Note",
+        "toolText": "Text Box",
+        "toolRectangle": "Rectangle",
+        "toolCircle": "Circle",
+        "toolArrow": "Arrow",
+        "toolPen": "Freehand Pen",
+        "clearCanvas": "Clear Canvas",
+        "zoomIn": "Zoom In",
+        "zoomOut": "Zoom Out",
+        "resetZoom": "Reset View",
+        "saved": "All changes saved",
+        "saving": "Saving...",
+        "emptyWorkspace": "No whiteboards found. Create a new canvas to start brainstorming."
       }
     },
     "chat": {

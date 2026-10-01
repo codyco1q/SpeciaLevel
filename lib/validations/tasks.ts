@@ -126,6 +126,7 @@ export function createTaskInputSchema(
       }),
     tags: z.array(z.string()).default([]),
     isDoc: z.boolean().default(false),
+    stageId: z.string().uuid().optional().or(z.literal("")).nullable(),
     parentId: z.string().uuid().optional().or(z.literal("")).nullable(),
     orderIndex: z.number().int().default(0),
   });
