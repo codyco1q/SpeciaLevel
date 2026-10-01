@@ -270,7 +270,11 @@ export async function getPipelines(): Promise<PipelineRow[]> {
 
   const supabase = await createServerClient();
 
-  const { data: pipelineRows, error } = await supabase
+  // Try querying with full enhanced columns first
+  let pipelineRows: any[] | null = null;
+  let hasEnhancedColumns = true;
+
+  const { data: fullData, error: fullError } = await supabase
     .from("crm_pipelines")
     .select(`
       id,
@@ -296,26 +300,80 @@ export async function getPipelines(): Promise<PipelineRow[]> {
     .eq("organization_id", auth.organizationId)
     .order("order_index", { ascending: true });
 
-  if (error) {
-    console.error("[crm] getPipelines failed:", error.message);
-    return [];
+  if (fullError) {
+    // If enhanced columns don't exist yet in remote DB, fall back to base columns
+    hasEnhancedColumns = false;
+    const { data: fallbackData, error: fallbackErr } = await supabase
+      .from("crm_pipelines")
+      .select(`
+        id,
+        name,
+        is_default,
+        order_index,
+        created_at,
+        stages:crm_pipeline_stages(
+          id,
+          pipeline_id,
+          name,
+          order_index,
+          probability,
+          stale_days,
+          created_at
+        )
+      `)
+      .eq("organization_id", auth.organizationId)
+      .order("order_index", { ascending: true });
+
+    if (fallbackErr) {
+      console.error("[crm] getPipelines fallback failed:", fallbackErr.message);
+      return [];
+    }
+    pipelineRows = fallbackData;
+  } else {
+    pipelineRows = fullData;
   }
 
   if (!pipelineRows || pipelineRows.length === 0) {
-    const { data: newPipeline } = await supabase
-      .from("crm_pipelines")
-      .insert({
-        organization_id: auth.organizationId,
-        name: "Sales Pipeline",
-        color: "#6366f1",
-        description: "Primary sales funnel for converting leads to deals.",
-        is_default: true,
-        order_index: 0,
-      })
-      .select("id, name, color, description, target_amount, is_default, order_index, created_at")
-      .single();
+    let newPipeId: string | null = null;
+    let newPipeCreated: any = null;
 
-    if (newPipeline) {
+    if (hasEnhancedColumns) {
+      const { data: newPipe, error: errNew } = await supabase
+        .from("crm_pipelines")
+        .insert({
+          organization_id: auth.organizationId,
+          name: "Sales Pipeline",
+          color: "#6366f1",
+          description: "Primary sales funnel for converting leads to deals.",
+          is_default: true,
+          order_index: 0,
+        })
+        .select("id, name, color, description, target_amount, is_default, order_index, created_at")
+        .single();
+      if (!errNew && newPipe) {
+        newPipeId = newPipe.id;
+        newPipeCreated = newPipe;
+      }
+    }
+
+    if (!newPipeId) {
+      const { data: newPipeBase } = await supabase
+        .from("crm_pipelines")
+        .insert({
+          organization_id: auth.organizationId,
+          name: "Sales Pipeline",
+          is_default: true,
+          order_index: 0,
+        })
+        .select("id, name, is_default, order_index, created_at")
+        .single();
+      if (newPipeBase) {
+        newPipeId = newPipeBase.id;
+        newPipeCreated = newPipeBase;
+      }
+    }
+
+    if (newPipeCreated && newPipeId) {
       const defaultStages = [
         { name: "Lead", color: "#6366f1", stage_type: "open", order_index: 0, probability: 10, stale_days: 14 },
         { name: "Qualified", color: "#0ea5e9", stage_type: "open", order_index: 1, probability: 30, stale_days: 14 },
@@ -325,17 +383,32 @@ export async function getPipelines(): Promise<PipelineRow[]> {
         { name: "Lost", color: "#ef4444", stage_type: "lost", order_index: 5, probability: 0, stale_days: 30 },
       ];
 
-      const { data: stages } = await supabase
-        .from("crm_pipeline_stages")
-        .insert(
-          defaultStages.map((s) => ({
-            pipeline_id: newPipeline.id,
-            ...s,
-          }))
-        )
-        .select("id, pipeline_id, name, color, stage_type, order_index, probability, stale_days, created_at");
+      let insertedStages: any[] | null = null;
+      if (hasEnhancedColumns) {
+        const { data: stagesFull } = await supabase
+          .from("crm_pipeline_stages")
+          .insert(defaultStages.map((s) => ({ pipeline_id: newPipeId, ...s })))
+          .select("id, pipeline_id, name, color, stage_type, order_index, probability, stale_days, created_at");
+        insertedStages = stagesFull;
+      }
 
-      const mappedStages: PipelineStageRow[] = ((stages as Array<{
+      if (!insertedStages) {
+        const { data: stagesBase } = await supabase
+          .from("crm_pipeline_stages")
+          .insert(
+            defaultStages.map((s) => ({
+              pipeline_id: newPipeId,
+              name: s.name,
+              order_index: s.order_index,
+              probability: s.probability,
+              stale_days: s.stale_days,
+            }))
+          )
+          .select("id, pipeline_id, name, order_index, probability, stale_days, created_at");
+        insertedStages = stagesBase;
+      }
+
+      const mappedStages: PipelineStageRow[] = ((insertedStages as Array<{
         id: string;
         pipeline_id: string;
         name: string;
@@ -361,14 +434,14 @@ export async function getPipelines(): Promise<PipelineRow[]> {
 
       return [
         {
-          id: newPipeline.id,
-          name: newPipeline.name,
-          color: newPipeline.color || "#6366f1",
-          description: newPipeline.description ?? null,
-          targetAmount: newPipeline.target_amount ? Number(newPipeline.target_amount) : null,
-          isDefault: newPipeline.is_default,
-          orderIndex: newPipeline.order_index,
-          createdAt: newPipeline.created_at,
+          id: newPipeCreated.id,
+          name: newPipeCreated.name,
+          color: newPipeCreated.color || "#6366f1",
+          description: newPipeCreated.description ?? null,
+          targetAmount: newPipeCreated.target_amount ? Number(newPipeCreated.target_amount) : null,
+          isDefault: newPipeCreated.is_default,
+          orderIndex: newPipeCreated.order_index,
+          createdAt: newPipeCreated.created_at,
           stages: mappedStages.sort((a, b) => a.orderIndex - b.orderIndex),
         },
       ];
@@ -446,7 +519,11 @@ export async function createPipeline(
       .eq("organization_id", auth.organizationId);
   }
 
-  const { data: pipeline, error: pipeErr } = await supabase
+  // 1. Try inserting with enhanced columns
+  let pipeline: { id: string } | null = null;
+  let pipelineInsertError: string | null = null;
+
+  const fullInsertRes = await supabase
     .from("crm_pipelines")
     .insert({
       organization_id: auth.organizationId,
@@ -460,13 +537,39 @@ export async function createPipeline(
     .select("id")
     .single();
 
-  if (pipeErr || !pipeline) {
-    console.error("[crm] createPipeline failed:", pipeErr?.message);
-    return { status: "error", error: "Failed to create pipeline" };
+  if (fullInsertRes.data) {
+    pipeline = fullInsertRes.data;
+  } else {
+    // Schema fallback if enhanced columns do not exist in DB yet
+    const baseInsertRes = await supabase
+      .from("crm_pipelines")
+      .insert({
+        organization_id: auth.organizationId,
+        name: parsed.data.name,
+        is_default: Boolean(parsed.data.isDefault),
+        order_index: parsed.data.orderIndex ?? 0,
+      })
+      .select("id")
+      .single();
+
+    if (baseInsertRes.data) {
+      pipeline = baseInsertRes.data;
+    } else {
+      pipelineInsertError =
+        baseInsertRes.error?.message ||
+        fullInsertRes.error?.message ||
+        "Failed to create pipeline";
+    }
   }
 
-  const stagesToInsert = parsed.data.stages.map((stage, idx) => ({
-    pipeline_id: pipeline.id,
+  if (!pipeline) {
+    console.error("[crm] createPipeline failed:", pipelineInsertError);
+    return { status: "error", error: pipelineInsertError || "Failed to create pipeline" };
+  }
+
+  // 2. Insert pipeline stages
+  const stagesToInsertFull = parsed.data.stages.map((stage, idx) => ({
+    pipeline_id: pipeline!.id,
     name: stage.name,
     color: stage.color || "#3b82f6",
     stage_type: stage.stageType || "open",
@@ -477,10 +580,25 @@ export async function createPipeline(
 
   const { error: stageErr } = await supabase
     .from("crm_pipeline_stages")
-    .insert(stagesToInsert);
+    .insert(stagesToInsertFull);
 
   if (stageErr) {
-    console.error("[crm] createPipeline stages failed:", stageErr.message);
+    // Fallback without enhanced stage columns
+    const stagesToInsertBase = parsed.data.stages.map((stage, idx) => ({
+      pipeline_id: pipeline!.id,
+      name: stage.name,
+      order_index: stage.orderIndex ?? idx,
+      probability: stage.probability,
+      stale_days: stage.staleDays,
+    }));
+    const { error: baseStageErr } = await supabase
+      .from("crm_pipeline_stages")
+      .insert(stagesToInsertBase);
+
+    if (baseStageErr) {
+      console.error("[crm] createPipeline stages failed:", baseStageErr.message);
+      return { status: "error", error: baseStageErr.message };
+    }
   }
 
   revalidatePath("/crm");
@@ -512,9 +630,11 @@ export async function updatePipeline(
     await supabase
       .from("crm_pipelines")
       .update({ is_default: false })
-      .eq("organization_id", auth.organizationId);
+      .eq("organization_id", auth.organizationId)
+      .neq("id", pipelineId);
   }
 
+  // 1. Try updating pipeline with enhanced columns
   const { error: updateErr } = await supabase
     .from("crm_pipelines")
     .update({
@@ -530,10 +650,25 @@ export async function updatePipeline(
     .eq("organization_id", auth.organizationId);
 
   if (updateErr) {
-    console.error("[crm] updatePipeline failed:", updateErr.message);
-    return { status: "error", error: "Failed to update pipeline" };
+    // Fallback to base columns
+    const { error: baseUpdateErr } = await supabase
+      .from("crm_pipelines")
+      .update({
+        name: parsed.data.name,
+        is_default: Boolean(parsed.data.isDefault),
+        order_index: parsed.data.orderIndex ?? 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", pipelineId)
+      .eq("organization_id", auth.organizationId);
+
+    if (baseUpdateErr) {
+      console.error("[crm] updatePipeline failed:", baseUpdateErr.message);
+      return { status: "error", error: baseUpdateErr.message || "Failed to update pipeline" };
+    }
   }
 
+  // 2. Sync stages
   const { data: existingStages } = await supabase
     .from("crm_pipeline_stages")
     .select("id")
@@ -546,7 +681,7 @@ export async function updatePipeline(
     const stage = parsed.data.stages[i];
     if (stage.id && existingIds.has(stage.id)) {
       keepIds.add(stage.id);
-      await supabase
+      const { error: stageUpdErr } = await supabase
         .from("crm_pipeline_stages")
         .update({
           name: stage.name,
@@ -558,8 +693,21 @@ export async function updatePipeline(
           updated_at: new Date().toISOString(),
         })
         .eq("id", stage.id);
+
+      if (stageUpdErr) {
+        await supabase
+          .from("crm_pipeline_stages")
+          .update({
+            name: stage.name,
+            order_index: i,
+            probability: stage.probability,
+            stale_days: stage.staleDays,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", stage.id);
+      }
     } else {
-      const { data: newStage } = await supabase
+      const { data: newStage, error: insertStageErr } = await supabase
         .from("crm_pipeline_stages")
         .insert({
           pipeline_id: pipelineId,
@@ -573,12 +721,35 @@ export async function updatePipeline(
         .select("id")
         .single();
 
-      if (newStage) keepIds.add(newStage.id);
+      if (insertStageErr) {
+        const { data: baseStage } = await supabase
+          .from("crm_pipeline_stages")
+          .insert({
+            pipeline_id: pipelineId,
+            name: stage.name,
+            order_index: i,
+            probability: stage.probability,
+            stale_days: stage.staleDays,
+          })
+          .select("id")
+          .single();
+
+        if (baseStage) keepIds.add(baseStage.id);
+      } else if (newStage) {
+        keepIds.add(newStage.id);
+      }
     }
   }
 
   const toDelete = Array.from(existingIds).filter((id) => !keepIds.has(id));
   if (toDelete.length > 0) {
+    const fallbackStageId = Array.from(keepIds)[0];
+    if (fallbackStageId) {
+      await supabase
+        .from("crm_deals")
+        .update({ stage_id: fallbackStageId })
+        .in("stage_id", toDelete);
+    }
     await supabase
       .from("crm_pipeline_stages")
       .delete()
@@ -600,7 +771,8 @@ export async function duplicatePipeline(
 
   const supabase = await createServerClient();
 
-  const { data: pipe, error: pipeErr } = await supabase
+  let pipe: any = null;
+  const { data: fullPipe, error: pipeErr } = await supabase
     .from("crm_pipelines")
     .select(`
       id,
@@ -621,8 +793,29 @@ export async function duplicatePipeline(
     .eq("organization_id", auth.organizationId)
     .single();
 
-  if (pipeErr || !pipe) {
-    return { status: "error", error: "Pipeline not found" };
+  if (pipeErr || !fullPipe) {
+    const { data: basePipe, error: basePipeErr } = await supabase
+      .from("crm_pipelines")
+      .select(`
+        id,
+        name,
+        stages:crm_pipeline_stages(
+          name,
+          order_index,
+          probability,
+          stale_days
+        )
+      `)
+      .eq("id", pipelineId)
+      .eq("organization_id", auth.organizationId)
+      .single();
+
+    if (basePipeErr || !basePipe) {
+      return { status: "error", error: basePipeErr?.message || "Pipeline not found" };
+    }
+    pipe = basePipe;
+  } else {
+    pipe = fullPipe;
   }
 
   const { count } = await supabase

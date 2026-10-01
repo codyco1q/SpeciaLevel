@@ -276,7 +276,7 @@ export function PipelineManagerDialog({
           isDefault,
           orderIndex: isCreatingNew ? pipelines.length : (selectedPipe?.orderIndex ?? 0),
           stages: stages.map((s, idx) => ({
-            id: s.id,
+            id: isCreatingNew ? undefined : s.id,
             name: s.name.trim(),
             color: s.color,
             stageType: s.stageType,
