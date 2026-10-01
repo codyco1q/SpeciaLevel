@@ -42,13 +42,13 @@ export const DEFAULT_CRM_VALIDATION_MESSAGES: CrmValidationMessages = {
 };
 
 export const crmPipelineStageSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().uuid().optional().or(z.literal("")).nullable(),
   name: z.string().trim().min(1, "Stage name is required").max(60, "Stage name is too long"),
-  color: z.string().trim().default("#3b82f6"),
-  stageType: z.enum(["open", "won", "lost"]).default("open"),
-  orderIndex: z.number().int().min(0).default(0),
-  probability: z.number().min(0).max(100).default(100),
-  staleDays: z.number().int().min(1).max(365).default(14),
+  color: z.string().trim().optional().default("#3b82f6"),
+  stageType: z.enum(["open", "won", "lost"]).optional().default("open"),
+  orderIndex: z.number().int().min(0).optional().default(0),
+  probability: z.number().min(0).max(100).optional().default(100),
+  staleDays: z.number().int().min(1).max(365).optional().default(14),
 });
 
 export type CrmPipelineStageInput = z.infer<typeof crmPipelineStageSchema>;
