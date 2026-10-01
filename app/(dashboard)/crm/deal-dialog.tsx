@@ -322,7 +322,18 @@ export function DealDialog({
                     <SelectContent>
                       {currentStages.map((stage) => (
                         <SelectItem key={stage.id} value={stage.id}>
-                          {getStageName(stage.name, t.stages as Record<string, string>)}
+                          <div className="flex items-center justify-between gap-3 w-full">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="size-2 rounded-full shrink-0"
+                                style={{ backgroundColor: stage.color || "#3b82f6" }}
+                              />
+                              <span>{getStageName(stage.name, t.stages as Record<string, string>)}</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-muted-foreground ms-2">
+                              {stage.stageType === "won" ? "🏆 100%" : stage.stageType === "lost" ? "❌ 0%" : `${stage.probability}%`}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>

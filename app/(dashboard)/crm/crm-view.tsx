@@ -55,6 +55,8 @@ import {
 import {
   getStageDotClass,
   getStageName,
+  getStageColor,
+  getStageBadgeStyle,
   LEAD_STATUS_BADGE_CLASSES,
   formatCurrency,
   formatLeadDate,
@@ -131,6 +133,14 @@ function DealCard({
             <XCircle className="size-2.5 me-0.5" />
             {t.stages.lost}
           </Badge>
+        )}
+        {!isWon && !isLost && (stageObj || deal.stageObj) && (
+          <span
+            className="text-[10px] px-1.5 py-0.2 rounded font-semibold border shrink-0"
+            style={getStageBadgeStyle((stageObj || deal.stageObj)?.color)}
+          >
+            {getStageName((stageObj || deal.stageObj)!.name, t.stages as Record<string, string>)}
+          </span>
         )}
       </div>
 
@@ -411,6 +421,10 @@ export function CrmView({
                 {pipelines.map((pipe) => (
                   <SelectItem key={pipe.id} value={pipe.id} className="text-xs">
                     <div className="flex items-center gap-2">
+                      <span
+                        className="size-2 rounded-full shrink-0"
+                        style={{ backgroundColor: pipe.color || "#6366f1" }}
+                      />
                       <span className="font-medium">{pipe.name}</span>
                       {pipe.isDefault && (
                         <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
@@ -527,29 +541,36 @@ export function CrmView({
 
                 return (
                   <div key={stage.id} className="w-72 shrink-0 flex flex-col">
-                    {/* Column Header */}
-                    <div className="mb-2 flex items-center justify-between px-1">
+                    {/* Column Header with Custom Stage Accent */}
+                    <div
+                      className="mb-2 flex items-center justify-between px-2.5 py-2 rounded-lg border bg-card/70 shadow-2xs"
+                      style={{
+                        borderTopColor: stage.color || undefined,
+                        borderTopWidth: "3px",
+                      }}
+                    >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span
-                          className={cn(
-                            "size-2.5 shrink-0 rounded-full",
-                            getStageDotClass(stage.name, stage.probability)
-                          )}
+                          className="size-2 rounded-full shrink-0 shadow-2xs"
+                          style={{ backgroundColor: stage.color || undefined }}
                         />
-                        <p className="text-sm font-bold truncate">
+                        <p className="text-xs sm:text-sm font-bold truncate">
                           {getStageName(stage.name, t.stages as Record<string, string>)}
                         </p>
-                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 font-mono text-muted-foreground">
-                          {stage.probability}%
-                        </Badge>
+                        <span
+                          className="text-[10px] px-1.5 py-0.2 rounded font-mono font-semibold border"
+                          style={getStageBadgeStyle(stage.color)}
+                        >
+                          {stage.stageType === "won" ? "🏆" : stage.stageType === "lost" ? "❌" : `${stage.probability}%`}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
                         <span className="font-semibold tabular-nums">
                           {stageDeals.length}
                         </span>
                         <span>•</span>
-                        <span className="tabular-nums">
+                        <span className="tabular-nums font-medium">
                           {formatCurrency(stageTotalVal, activeCurrency, locale)}
                         </span>
                       </div>
