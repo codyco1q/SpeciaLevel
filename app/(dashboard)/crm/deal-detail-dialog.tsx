@@ -46,6 +46,7 @@ import {
 import {
   getStageDotClass,
   getStageName,
+  getStageBadgeStyle,
   formatCurrency,
   formatLeadDate,
 } from "./crm-meta";
@@ -184,20 +185,24 @@ export function DealDetailDialog({
         <DialogHeader>
           <div className="flex flex-wrap items-center justify-between gap-2 pe-6">
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={cn(
-                  "size-2.5 shrink-0 rounded-full",
-                  getStageDotClass(deal.stage, activeStage?.probability)
-                )}
-                aria-hidden="true"
-              />
-              <Badge variant="outline" className="text-xs font-semibold">
-                {getStageName(activeStage?.name || deal.stage, t.stages as Record<string, string>)}
-              </Badge>
-              {activeStage && (
-                <span className="text-[11px] text-muted-foreground font-mono">
-                  {activeStage.probability}%
+              {activeStage ? (
+                <span
+                  className="text-xs px-2.5 py-0.5 rounded-md font-semibold border flex items-center gap-1.5 shadow-2xs"
+                  style={getStageBadgeStyle(activeStage.color)}
+                >
+                  <span
+                    className="size-2 rounded-full shrink-0"
+                    style={{ backgroundColor: activeStage.color || "#3b82f6" }}
+                  />
+                  <span>{getStageName(activeStage.name, t.stages as Record<string, string>)}</span>
+                  <span className="font-mono text-[11px] opacity-80">
+                    {activeStage.stageType === "won" ? "🏆" : activeStage.stageType === "lost" ? "❌" : `${activeStage.probability}%`}
+                  </span>
                 </span>
+              ) : (
+                <Badge variant="outline" className="text-xs font-semibold">
+                  {getStageName(deal.stage, t.stages as Record<string, string>)}
+                </Badge>
               )}
               {isStale && (
                 <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1 text-[10px] px-1.5 py-0">
@@ -295,15 +300,13 @@ export function DealDetailDialog({
                         <div className="flex items-center justify-between w-full gap-3">
                           <div className="flex items-center gap-2">
                             <span
-                              className={cn(
-                                "size-2 rounded-full",
-                                getStageDotClass(stage.name, stage.probability)
-                              )}
+                              className="size-2 rounded-full shrink-0"
+                              style={{ backgroundColor: stage.color || "#3b82f6" }}
                             />
                             <span>{getStageName(stage.name, t.stages as Record<string, string>)}</span>
                           </div>
                           <span className="text-[10px] text-muted-foreground font-mono">
-                            {stage.probability}%
+                            {stage.stageType === "won" ? "🏆 100%" : stage.stageType === "lost" ? "❌ 0%" : `${stage.probability}%`}
                           </span>
                         </div>
                       </SelectItem>

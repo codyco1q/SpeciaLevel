@@ -356,6 +356,9 @@ export interface CrmPipeline {
   id: string;
   organization_id: string;
   name: string;
+  color?: string | null;
+  description?: string | null;
+  target_amount?: number | string | null;
   is_default: boolean;
   order_index: number;
   created_at: string;
@@ -366,6 +369,8 @@ export interface CrmPipelineStage {
   id: string;
   pipeline_id: string;
   name: string;
+  color?: string | null;
+  stage_type?: "open" | "won" | "lost" | string;
   order_index: number;
   probability: number;
   stale_days: number;

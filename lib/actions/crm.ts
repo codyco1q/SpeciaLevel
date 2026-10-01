@@ -38,6 +38,8 @@ export interface PipelineStageRow {
   id: string;
   pipelineId: string;
   name: string;
+  color: string;
+  stageType: "open" | "won" | "lost";
   orderIndex: number;
   probability: number;
   staleDays: number;
@@ -47,6 +49,9 @@ export interface PipelineStageRow {
 export interface PipelineRow {
   id: string;
   name: string;
+  color: string;
+  description?: string | null;
+  targetAmount?: number | null;
   isDefault: boolean;
   orderIndex: number;
   stages: PipelineStageRow[];
@@ -170,6 +175,8 @@ interface RawDealRow {
         id: string;
         pipeline_id: string;
         name: string;
+        color?: string | null;
+        stage_type?: string | null;
         order_index: number;
         probability: number;
         stale_days: number;
@@ -179,12 +186,25 @@ interface RawDealRow {
         id: string;
         pipeline_id: string;
         name: string;
+        color?: string | null;
+        stage_type?: string | null;
         order_index: number;
         probability: number;
         stale_days: number;
         created_at: string;
       }>
     | null;
+}
+
+function resolveFallbackStageColor(name: string, probability?: number): string {
+  const n = name.toLowerCase().trim();
+  if (n.includes("won") || n.includes("signed") || probability === 100) return "#10b981";
+  if (n.includes("lost") || n.includes("churn") || probability === 0) return "#ef4444";
+  if (n.includes("negotiat") || n.includes("contract") || n.includes("review")) return "#f59e0b";
+  if (n.includes("proposal") || n.includes("demo") || n.includes("pitch")) return "#8b5cf6";
+  if (n.includes("contact") || n.includes("qualif") || n.includes("discover")) return "#0ea5e9";
+  if (n.includes("lead") || n.includes("inbound")) return "#6366f1";
+  return "#3b82f6";
 }
 
 function mapDealRow(row: RawDealRow): DealRow {
@@ -227,6 +247,10 @@ function mapDealRow(row: RawDealRow): DealRow {
           id: stageRel.id,
           pipelineId: stageRel.pipeline_id,
           name: stageRel.name,
+          color: stageRel.color || resolveFallbackStageColor(stageRel.name, stageRel.probability),
+          stageType:
+            (stageRel.stage_type as "open" | "won" | "lost") ||
+            (stageRel.probability === 100 ? "won" : stageRel.probability === 0 ? "lost" : "open"),
           orderIndex: stageRel.order_index,
           probability: stageRel.probability,
           staleDays: stageRel.stale_days,
@@ -251,6 +275,9 @@ export async function getPipelines(): Promise<PipelineRow[]> {
     .select(`
       id,
       name,
+      color,
+      description,
+      target_amount,
       is_default,
       order_index,
       created_at,
@@ -258,6 +285,8 @@ export async function getPipelines(): Promise<PipelineRow[]> {
         id,
         pipeline_id,
         name,
+        color,
+        stage_type,
         order_index,
         probability,
         stale_days,
@@ -278,20 +307,22 @@ export async function getPipelines(): Promise<PipelineRow[]> {
       .insert({
         organization_id: auth.organizationId,
         name: "Sales Pipeline",
+        color: "#6366f1",
+        description: "Primary sales funnel for converting leads to deals.",
         is_default: true,
         order_index: 0,
       })
-      .select("id, name, is_default, order_index, created_at")
+      .select("id, name, color, description, target_amount, is_default, order_index, created_at")
       .single();
 
     if (newPipeline) {
       const defaultStages = [
-        { name: "Lead", order_index: 0, probability: 10, stale_days: 14 },
-        { name: "Qualified", order_index: 1, probability: 30, stale_days: 14 },
-        { name: "Proposal", order_index: 2, probability: 60, stale_days: 14 },
-        { name: "Negotiation", order_index: 3, probability: 80, stale_days: 14 },
-        { name: "Won", order_index: 4, probability: 100, stale_days: 30 },
-        { name: "Lost", order_index: 5, probability: 0, stale_days: 30 },
+        { name: "Lead", color: "#6366f1", stage_type: "open", order_index: 0, probability: 10, stale_days: 14 },
+        { name: "Qualified", color: "#0ea5e9", stage_type: "open", order_index: 1, probability: 30, stale_days: 14 },
+        { name: "Proposal", color: "#8b5cf6", stage_type: "open", order_index: 2, probability: 60, stale_days: 14 },
+        { name: "Negotiation", color: "#f59e0b", stage_type: "open", order_index: 3, probability: 80, stale_days: 14 },
+        { name: "Won", color: "#10b981", stage_type: "won", order_index: 4, probability: 100, stale_days: 30 },
+        { name: "Lost", color: "#ef4444", stage_type: "lost", order_index: 5, probability: 0, stale_days: 30 },
       ];
 
       const { data: stages } = await supabase
@@ -302,12 +333,14 @@ export async function getPipelines(): Promise<PipelineRow[]> {
             ...s,
           }))
         )
-        .select("id, pipeline_id, name, order_index, probability, stale_days, created_at");
+        .select("id, pipeline_id, name, color, stage_type, order_index, probability, stale_days, created_at");
 
       const mappedStages: PipelineStageRow[] = ((stages as Array<{
         id: string;
         pipeline_id: string;
         name: string;
+        color?: string | null;
+        stage_type?: string | null;
         order_index: number;
         probability: number;
         stale_days: number;
@@ -316,6 +349,10 @@ export async function getPipelines(): Promise<PipelineRow[]> {
         id: s.id,
         pipelineId: s.pipeline_id,
         name: s.name,
+        color: s.color || resolveFallbackStageColor(s.name, s.probability),
+        stageType:
+          (s.stage_type as "open" | "won" | "lost") ||
+          (s.probability === 100 ? "won" : s.probability === 0 ? "lost" : "open"),
         orderIndex: s.order_index,
         probability: s.probability,
         staleDays: s.stale_days,
@@ -326,6 +363,9 @@ export async function getPipelines(): Promise<PipelineRow[]> {
         {
           id: newPipeline.id,
           name: newPipeline.name,
+          color: newPipeline.color || "#6366f1",
+          description: newPipeline.description ?? null,
+          targetAmount: newPipeline.target_amount ? Number(newPipeline.target_amount) : null,
           isDefault: newPipeline.is_default,
           orderIndex: newPipeline.order_index,
           createdAt: newPipeline.created_at,
@@ -341,6 +381,8 @@ export async function getPipelines(): Promise<PipelineRow[]> {
       id: string;
       pipeline_id: string;
       name: string;
+      color?: string | null;
+      stage_type?: string | null;
       order_index: number;
       probability: number;
       stale_days: number;
@@ -352,6 +394,10 @@ export async function getPipelines(): Promise<PipelineRow[]> {
         id: s.id,
         pipelineId: s.pipeline_id,
         name: s.name,
+        color: s.color || resolveFallbackStageColor(s.name, s.probability),
+        stageType:
+          (s.stage_type as "open" | "won" | "lost") ||
+          (s.probability === 100 ? "won" : s.probability === 0 ? "lost" : "open"),
         orderIndex: s.order_index,
         probability: s.probability,
         staleDays: s.stale_days,
@@ -362,6 +408,9 @@ export async function getPipelines(): Promise<PipelineRow[]> {
     return {
       id: p.id,
       name: p.name,
+      color: p.color || "#6366f1",
+      description: p.description ?? null,
+      targetAmount: p.target_amount ? Number(p.target_amount) : null,
       isDefault: p.is_default,
       orderIndex: p.order_index,
       createdAt: p.created_at,
@@ -402,6 +451,9 @@ export async function createPipeline(
     .insert({
       organization_id: auth.organizationId,
       name: parsed.data.name,
+      color: parsed.data.color || "#6366f1",
+      description: parsed.data.description || null,
+      target_amount: parsed.data.targetAmount ?? null,
       is_default: Boolean(parsed.data.isDefault),
       order_index: parsed.data.orderIndex ?? 0,
     })
@@ -416,6 +468,8 @@ export async function createPipeline(
   const stagesToInsert = parsed.data.stages.map((stage, idx) => ({
     pipeline_id: pipeline.id,
     name: stage.name,
+    color: stage.color || "#3b82f6",
+    stage_type: stage.stageType || "open",
     order_index: stage.orderIndex ?? idx,
     probability: stage.probability,
     stale_days: stage.staleDays,
@@ -465,6 +519,9 @@ export async function updatePipeline(
     .from("crm_pipelines")
     .update({
       name: parsed.data.name,
+      color: parsed.data.color || "#6366f1",
+      description: parsed.data.description || null,
+      target_amount: parsed.data.targetAmount ?? null,
       is_default: Boolean(parsed.data.isDefault),
       order_index: parsed.data.orderIndex ?? 0,
       updated_at: new Date().toISOString(),
@@ -493,6 +550,8 @@ export async function updatePipeline(
         .from("crm_pipeline_stages")
         .update({
           name: stage.name,
+          color: stage.color || "#3b82f6",
+          stage_type: stage.stageType || "open",
           order_index: i,
           probability: stage.probability,
           stale_days: stage.staleDays,
@@ -505,6 +564,8 @@ export async function updatePipeline(
         .insert({
           pipeline_id: pipelineId,
           name: stage.name,
+          color: stage.color || "#3b82f6",
+          stage_type: stage.stageType || "open",
           order_index: i,
           probability: stage.probability,
           stale_days: stage.staleDays,
@@ -526,6 +587,79 @@ export async function updatePipeline(
 
   revalidatePath("/crm");
   return { status: "success" };
+}
+
+/**
+ * Duplicates a pipeline and all its customized stages. Requires `crm.manage`.
+ */
+export async function duplicatePipeline(
+  pipelineId: string
+): Promise<CrmActionState> {
+  const auth = await requireCrmPermission("crm.manage");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+
+  const { data: pipe, error: pipeErr } = await supabase
+    .from("crm_pipelines")
+    .select(`
+      id,
+      name,
+      color,
+      description,
+      target_amount,
+      stages:crm_pipeline_stages(
+        name,
+        color,
+        stage_type,
+        order_index,
+        probability,
+        stale_days
+      )
+    `)
+    .eq("id", pipelineId)
+    .eq("organization_id", auth.organizationId)
+    .single();
+
+  if (pipeErr || !pipe) {
+    return { status: "error", error: "Pipeline not found" };
+  }
+
+  const { count } = await supabase
+    .from("crm_pipelines")
+    .select("*", { count: "exact", head: true })
+    .eq("organization_id", auth.organizationId);
+
+  const newName = `${pipe.name} (Copy)`;
+  const rawStages = (pipe.stages as Array<{
+    name: string;
+    color?: string | null;
+    stage_type?: string | null;
+    order_index: number;
+    probability: number;
+    stale_days: number;
+  }>) || [];
+
+  return createPipeline({
+    name: newName,
+    color: pipe.color || "#6366f1",
+    description: pipe.description || undefined,
+    targetAmount: pipe.target_amount ? Number(pipe.target_amount) : undefined,
+    isDefault: false,
+    orderIndex: count ?? 0,
+    stages: rawStages
+      .sort((a, b) => a.order_index - b.order_index)
+      .map((s, idx) => ({
+        name: s.name,
+        color: s.color || resolveFallbackStageColor(s.name, s.probability),
+        stageType:
+          (s.stage_type as "open" | "won" | "lost") ||
+          (s.probability === 100 ? "won" : s.probability === 0 ? "lost" : "open"),
+        orderIndex: idx,
+        probability: s.probability,
+        staleDays: s.stale_days,
+      })),
+  });
 }
 
 /**
@@ -632,6 +766,8 @@ export async function getDeals(pipelineId?: string): Promise<DealRow[] | null> {
           id,
           pipeline_id,
           name,
+          color,
+          stage_type,
           order_index,
           probability,
           stale_days,

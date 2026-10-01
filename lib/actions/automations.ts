@@ -351,8 +351,8 @@ export async function getAutomationConfigOptions(): Promise<AutomationConfigOpti
       .order("name", { ascending: true }),
     supabase
       .from("crm_pipeline_stages")
-      .select("id, name, color, pipeline_id, position")
-      .order("position", { ascending: true }),
+      .select("id, name, color, pipeline_id, order_index")
+      .order("order_index", { ascending: true }),
     supabase
       .from("crm_contacts")
       .select("tags")
