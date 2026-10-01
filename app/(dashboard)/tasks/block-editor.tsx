@@ -63,8 +63,13 @@ export function BlockEditor({
   const [slashMenuIndex, setSlashMenuIndex] = useState<number | null>(null);
   const [slashFilter, setSlashFilter] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  const isInternalUpdateRef = useRef(false);
 
   useEffect(() => {
+    if (isInternalUpdateRef.current) {
+      isInternalUpdateRef.current = false;
+      return;
+    }
     if (blocks && blocks.length > 0) {
       setInternalBlocks(blocks);
     }
@@ -84,6 +89,7 @@ export function BlockEditor({
   }, [slashMenuIndex]);
 
   const updateParent = (next: RichTextBlock[]) => {
+    isInternalUpdateRef.current = true;
     setInternalBlocks(next);
     onChange(next);
   };
