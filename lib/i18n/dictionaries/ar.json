@@ -462,6 +462,52 @@
         "deleteFailed": "تعذّر حذف المهمة. حاول مرة أخرى.",
         "notFound": "المهمة غير موجودة، أو لا تملك وصولًا إليها.",
         "missingId": "معرّف المهمة مفقود."
+      },
+      "whiteboard": "اللوحة البيضاء",
+      "stages": {
+        "manageStages": "إدارة المراحل",
+        "addStage": "إضافة مرحلة",
+        "stageName": "اسم المرحلة",
+        "stageColor": "لون المرحلة",
+        "isDoneStage": "تحديد كمرحلة مكتملة",
+        "deleteStage": "حذف المرحلة",
+        "deleteStageConfirm": "هل أنت متأكد من حذف هذه المرحلة؟ سيتم نقل المهام الموجودة فيها إلى مرحلة أخرى.",
+        "saveStages": "حفظ المراحل",
+        "order": "الترتيب",
+        "noStages": "لا توجد مراحل مخصصة محددة.",
+        "newStagePlaceholder": "اسم المرحلة (مثال: ضمان الجودة)"
+      },
+      "docsWorkspace": {
+        "allDocs": "الملاحظات والمستندات",
+        "newPage": "صفحة جديدة",
+        "addSubpage": "إضافة صفحة فرعية",
+        "searchDocs": "البحث في الملاحظات والمستندات...",
+        "untitled": "مستند بدون عنوان",
+        "deleteDoc": "حذف الصفحة",
+        "deleteDocConfirm": "هل أنت متأكد من حذف هذا المستند وجميع الصفحات الفرعية؟",
+        "lastUpdated": "آخر تعديل",
+        "emptyWorkspace": "لا توجد مستندات بعد. أنشئ صفحتك الأولى لبدء كتابة الملاحظات الغنية."
+      },
+      "whiteboardWorkspace": {
+        "title": "اللوحات البيضاء",
+        "newBoard": "لوحة جديدة",
+        "searchBoards": "البحث في اللوحات البيضاء...",
+        "deleteBoard": "حذف اللوحة البيضاء",
+        "deleteBoardConfirm": "هل أنت متأكد من حذف هذه اللوحة البيضاء؟",
+        "toolSelect": "تحديد / تحريك",
+        "toolSticky": "ملاحظة لاصقة",
+        "toolText": "مربع نص",
+        "toolRectangle": "مستطيل",
+        "toolCircle": "دائرة",
+        "toolArrow": "سهم",
+        "toolPen": "قلم حر",
+        "clearCanvas": "مسح اللوحة",
+        "zoomIn": "تكبير",
+        "zoomOut": "تصغير",
+        "resetZoom": "إعادة ضبط العرض",
+        "saved": "تم حفظ التغييرات",
+        "saving": "جاري الحفظ...",
+        "emptyWorkspace": "لا توجد لوحات بيضاء. أنشئ لوحة جديدة لبدء العصف الذهني التفاعلي."
       }
     },
     "chat": {

@@ -14,7 +14,7 @@ import {
   type TaskInput,
 } from "@/lib/validations/tasks";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
-import type { RichTextBlock, TaskPriority, TaskStatus } from "@/types/database";
+import type { RichTextBlock, TaskPriority, TaskStage, TaskStatus } from "@/types/database";
 
 export interface TaskPerson {
   id: string;
@@ -35,6 +35,8 @@ export interface TaskCommentRow {
 
 export interface TaskRow {
   id: string;
+  stageId?: string | null;
+  stage?: TaskStage | null;
   parentId: string | null;
   title: string;
   description: string | null;
@@ -59,6 +61,7 @@ export interface TaskRow {
 
 export interface TaskFilter {
   isDoc?: boolean;
+  stageId?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
   assignedTo?: string;
@@ -67,6 +70,8 @@ export interface TaskFilter {
 
 interface RawTaskJoinRow {
   id: string;
+  stage_id?: string | null;
+  stage?: TaskStage | TaskStage[] | null;
   parent_id: string | null;
   title: string;
   description?: string | null;
@@ -147,6 +152,21 @@ function parseFieldErrors(
   return fieldErrors;
 }
 
+function normalizeStage(raw: RawTaskJoinRow["stage"]): TaskStage | null {
+  if (!raw) return null;
+  const item = Array.isArray(raw) ? raw[0] : raw;
+  if (!item || !item.id) return null;
+  return {
+    id: item.id,
+    organization_id: item.organization_id,
+    name: item.name,
+    color: item.color,
+    order_index: item.order_index,
+    is_done_stage: Boolean(item.is_done_stage),
+    created_at: item.created_at,
+  };
+}
+
 function normalizePerson(
   raw: RawTaskJoinRow["created_by"] | RawTaskJoinRow["assigned_to"]
 ): TaskPerson | null {
@@ -169,6 +189,8 @@ function toTaskRow(row: RawTaskJoinRow): TaskRow {
 
   return {
     id: row.id,
+    stageId: row.stage_id ?? null,
+    stage: normalizeStage(row.stage),
     parentId: row.parent_id ?? null,
     title: row.title,
     description: descText || null,
@@ -204,6 +226,7 @@ export async function getTasks(filter?: TaskFilter): Promise<TaskRow[]> {
     .select(
       `
       id,
+      stage_id,
       parent_id,
       title,
       description,
@@ -220,6 +243,7 @@ export async function getTasks(filter?: TaskFilter): Promise<TaskRow[]> {
       created_at,
       updated_at,
       is_client_visible,
+      stage:task_stages(id, organization_id, name, color, order_index, is_done_stage, created_at),
       created_by:profiles!fk_tasks_created_by(id, full_name, email, avatar_url),
       assigned_to:profiles!fk_tasks_assigned_to(id, full_name, email, avatar_url)
     `
@@ -230,6 +254,9 @@ export async function getTasks(filter?: TaskFilter): Promise<TaskRow[]> {
 
   if (filter?.isDoc !== undefined) {
     query = query.eq("is_doc", filter.isDoc);
+  }
+  if (filter?.stageId) {
+    query = query.eq("stage_id", filter.stageId);
   }
   if (filter?.status) {
     query = query.eq("status", filter.status);
@@ -301,6 +328,7 @@ export async function getTaskById(taskId: string): Promise<TaskRow | null> {
     .select(
       `
       id,
+      stage_id,
       parent_id,
       title,
       description,
@@ -317,6 +345,7 @@ export async function getTaskById(taskId: string): Promise<TaskRow | null> {
       created_at,
       updated_at,
       is_client_visible,
+      stage:task_stages(id, organization_id, name, color, order_index, is_done_stage, created_at),
       created_by:profiles!fk_tasks_created_by(id, full_name, email, avatar_url),
       assigned_to:profiles!fk_tasks_assigned_to(id, full_name, email, avatar_url)
     `
@@ -334,6 +363,7 @@ export async function getTaskById(taskId: string): Promise<TaskRow | null> {
     .select(
       `
       id,
+      stage_id,
       parent_id,
       title,
       description_text,
@@ -348,6 +378,7 @@ export async function getTaskById(taskId: string): Promise<TaskRow | null> {
       order_index,
       created_at,
       updated_at,
+      stage:task_stages(id, organization_id, name, color, order_index, is_done_stage, created_at),
       created_by:profiles!fk_tasks_created_by(id, full_name, email, avatar_url),
       assigned_to:profiles!fk_tasks_assigned_to(id, full_name, email, avatar_url)
     `
@@ -392,6 +423,7 @@ export async function createTask(
   const payload: Record<string, unknown> = {
     organization_id: auth.organizationId,
     created_by: auth.userId,
+    stage_id: parsed.data.stageId || null,
     title: parsed.data.title,
     description: descText,
     description_text: descText,
@@ -566,6 +598,7 @@ export async function updateTask(
     updates.description_json = parsed.data.descriptionJson;
   }
   if (parsed.data.status !== undefined) updates.status = parsed.data.status;
+  if (parsed.data.stageId !== undefined) updates.stage_id = parsed.data.stageId || null;
   if (parsed.data.priority !== undefined) updates.priority = parsed.data.priority;
   if (parsed.data.assignedTo !== undefined) updates.assigned_to = parsed.data.assignedTo || null;
   if (parsed.data.parentId !== undefined) updates.parent_id = parsed.data.parentId || null;

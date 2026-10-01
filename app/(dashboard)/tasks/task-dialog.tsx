@@ -31,7 +31,7 @@ import {
   blocksToPlainText,
 } from "./task-meta";
 import { BlockEditor } from "./block-editor";
-import type { RichTextBlock } from "@/types/database";
+import type { RichTextBlock, TaskStage } from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 export interface TaskMemberOption {
@@ -47,6 +47,10 @@ interface TaskDialogProps {
   task: TaskRow | null;
   /** Active organization members available for assignment. */
   members: TaskMemberOption[];
+  /** Custom workflow stages for this organization. */
+  stages?: TaskStage[];
+  /** Default stage to assign when creating from a specific column. */
+  initialStageId?: string | null;
   onSaved: () => void;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
@@ -62,6 +66,8 @@ export function TaskDialog({
   onOpenChange,
   task,
   members,
+  stages = [],
+  initialStageId = null,
   onSaved,
   platform,
 }: TaskDialogProps) {
@@ -78,14 +84,16 @@ export function TaskDialog({
     handleSubmit,
     reset,
     control,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<TaskInput>({
-    resolver: zodResolver(taskInputSchema),
+    resolver: zodResolver(taskInputSchema) as any,
     defaultValues: {
       title: "",
       description: "",
       status: "todo",
+      stageId: "",
       priority: "medium",
       assignedTo: "",
       dueDate: "",
@@ -102,15 +110,20 @@ export function TaskDialog({
         : [{ id: "b_1", type: "paragraph", content: initialDesc }];
     setRichBlocks(blocks);
 
+    const defaultStageId = isEdit
+      ? task.stageId ?? (stages[0]?.id ?? "")
+      : (initialStageId ?? (stages[0]?.id ?? ""));
+
     reset({
       title: isEdit ? task.title : "",
       description: initialDesc,
       status: isEdit ? task.status : "todo",
+      stageId: defaultStageId,
       priority: isEdit ? task.priority : "medium",
       assignedTo: isEdit ? task.assignedTo?.id ?? "" : "",
       dueDate: isEdit && task.dueDate ? task.dueDate.slice(0, 10) : "",
     });
-  }, [open, isEdit, task, reset]);
+  }, [open, isEdit, task, stages, initialStageId, reset]);
 
   // Clear any leftover server error the moment the dialog closes, so the
   // next open always starts clean.
@@ -119,14 +132,14 @@ export function TaskDialog({
     onOpenChange(next);
   };
 
-  const onSubmit = handleSubmit((values) => {
+  const onSubmit = handleSubmit((values: any) => {
     setServerError(null);
     const finalBlocks = useRichEditor ? richBlocks : undefined;
     const plainText = useRichEditor
       ? blocksToPlainText(richBlocks)
       : (values.description ?? "");
 
-    const payload: TaskInput = {
+    const payload: Partial<TaskInput> = {
       ...values,
       description: plainText,
       descriptionText: plainText,
@@ -187,32 +200,76 @@ export function TaskDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="task-status">{t.tableStatus}</Label>
-              <Controller
-                name="status"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) =>
-                      field.onChange(value as TaskInput["status"])
-                    }
-                  >
-                    <SelectTrigger id="task-status" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TASK_STATUSES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {t.status[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
+            {stages && stages.length > 0 ? (
+              <div className="grid gap-2">
+                <Label htmlFor="task-stage">{t.tableStatus || "Stage"}</Label>
+                <Controller
+                  name="stageId"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        const sel = stages.find((s) => s.id === value);
+                        if (sel?.is_done_stage) {
+                          setValue("status", "done");
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="task-stage" className="w-full">
+                        <SelectValue placeholder="Select Stage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stages.map((stage) => (
+                          <SelectItem key={stage.id} value={stage.id}>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: stage.color }}
+                              />
+                              <span>{stage.name}</span>
+                              {stage.is_done_stage && (
+                                <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">
+                                  Done
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label htmlFor="task-status">{t.tableStatus}</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) =>
+                        field.onChange(value as TaskInput["status"])
+                      }
+                    >
+                      <SelectTrigger id="task-status" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TASK_STATUSES.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {t.status[status]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="task-priority">{t.tablePriority}</Label>
