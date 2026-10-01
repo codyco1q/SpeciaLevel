@@ -108,45 +108,104 @@ export function WhiteboardWorkspace({
   const dragStartRef = useRef({ x: 0, y: 0 });
   const elementStartRef = useRef({ x: 0, y: 0 });
   const currentDrawingRef = useRef<WhiteboardElement | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync state when active board changes
+  const currentBoardIdRef = useRef<string | null>(activeBoardId);
+  const pendingBoardSaveRef = useRef<{
+    id: string;
+    elements: WhiteboardElement[];
+    viewport: WhiteboardViewport;
+    name: string;
+  } | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const savedStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync state only when switching to a different whiteboard
   useEffect(() => {
-    if (activeBoard) {
-      setElements(activeBoard.elements_json || []);
-      setViewport(activeBoard.viewport || { x: 0, y: 0, zoom: 1 });
-      setBoardName(activeBoard.name || "Whiteboard");
-      setSelectedElementId(null);
-      setEditingElementId(null);
+    if (!activeBoardId) {
+      currentBoardIdRef.current = null;
+      return;
+    }
+
+    if (activeBoardId !== currentBoardIdRef.current) {
+      // Flush previous pending save immediately before switching
+      if (pendingBoardSaveRef.current && saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        const { id, elements: el, viewport: vp, name: nm } = pendingBoardSaveRef.current;
+        pendingBoardSaveRef.current = null;
+        void saveWhiteboard(id, el, vp, nm);
+      }
+
+      currentBoardIdRef.current = activeBoardId;
+      if (activeBoard) {
+        setElements(activeBoard.elements_json || []);
+        setViewport(activeBoard.viewport || { x: 0, y: 0, zoom: 1 });
+        setBoardName(activeBoard.name || "Whiteboard");
+        setSelectedElementId(null);
+        setEditingElementId(null);
+      }
+      setSaveStatus("idle");
     }
   }, [activeBoardId, activeBoard]);
 
-  // Debounced auto-save
+  // Clean up timers on unmount and flush pending save
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
+      if (pendingBoardSaveRef.current) {
+        const { id, elements: el, viewport: vp, name: nm } = pendingBoardSaveRef.current;
+        void saveWhiteboard(id, el, vp, nm);
+      }
+    };
+  }, []);
+
+  // Smooth debounced auto-save (2500ms)
   const triggerSave = (
     newElements: WhiteboardElement[],
     newViewport: WhiteboardViewport,
     newName: string
   ) => {
     if (!activeBoardId) return;
-    setSaveStatus("saving");
+
+    pendingBoardSaveRef.current = {
+      id: activeBoardId,
+      elements: newElements,
+      viewport: newViewport,
+      name: newName,
+    };
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
-      const res = await saveWhiteboard(activeBoardId, newElements, newViewport, newName);
+      if (!pendingBoardSaveRef.current) return;
+      const targetId = pendingBoardSaveRef.current.id;
+      const saveElements = pendingBoardSaveRef.current.elements;
+      const saveViewport = pendingBoardSaveRef.current.viewport;
+      const saveName = pendingBoardSaveRef.current.name;
+      pendingBoardSaveRef.current = null;
+
+      setSaveStatus("saving");
+      const res = await saveWhiteboard(targetId, saveElements, saveViewport, saveName);
+
       if (res.status === "success") {
         setSaveStatus("saved");
+        // Update local boards list silently without resetting active canvas selection
         setBoards((prev) =>
           prev.map((b) =>
-            b.id === activeBoardId
-              ? { ...b, name: newName, elements_json: newElements, viewport: newViewport }
+            b.id === targetId
+              ? { ...b, name: saveName, elements_json: saveElements, viewport: saveViewport }
               : b
           )
         );
+
+        savedStatusTimeoutRef.current = setTimeout(() => {
+          setSaveStatus("idle");
+        }, 2500);
       } else {
         setSaveStatus("idle");
       }
-    }, 1000);
+    }, 2500);
   };
   const getCanvasCoords = (e: React.MouseEvent) => {
     if (!svgRef.current) return { x: 0, y: 0 };

@@ -78,49 +78,111 @@ export function DocsWorkspace({
   const [icon, setIcon] = useState(activeDoc?.icon ?? "📄");
   const [blocks, setBlocks] = useState<RichTextBlock[]>(activeDoc?.blocks_json ?? []);
 
-  // Update local edit state when activeDocId switches
+  const currentDocIdRef = useRef<string | null>(activeDocId);
+  const pendingSaveRef = useRef<{
+    id: string;
+    title: string;
+    icon: string;
+    blocks: RichTextBlock[];
+  } | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const savedStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync state only when actively switching to a different document
   useEffect(() => {
-    if (activeDoc) {
-      setTitle(activeDoc.title || dw.untitled);
-      setIcon(activeDoc.icon || "📄");
-      setBlocks(
-        activeDoc.blocks_json && activeDoc.blocks_json.length > 0
-          ? activeDoc.blocks_json
-          : [{ id: "b_1", type: "paragraph", content: "" }]
-      );
+    if (!activeDocId) {
+      currentDocIdRef.current = null;
+      return;
+    }
+
+    if (activeDocId !== currentDocIdRef.current) {
+      // Flush previous pending save immediately before switching
+      if (pendingSaveRef.current && saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        const { id, title: t, icon: ic, blocks: bl } = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        void updateDoc(id, {
+          title: t.trim() || dw.untitled,
+          icon: ic,
+          blocksJson: bl,
+          plainText: blocksToPlainText(bl),
+        });
+      }
+
+      currentDocIdRef.current = activeDocId;
+      if (activeDoc) {
+        setTitle(activeDoc.title || dw.untitled);
+        setIcon(activeDoc.icon || "📄");
+        setBlocks(
+          activeDoc.blocks_json && activeDoc.blocks_json.length > 0
+            ? activeDoc.blocks_json
+            : [{ id: "b_1", type: "paragraph", content: "" }]
+        );
+      }
+      setSaveStatus("idle");
     }
   }, [activeDocId, activeDoc, dw.untitled]);
 
-  // Debounced auto-save
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Clean up timers on unmount and flush pending save
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
+      if (pendingSaveRef.current) {
+        const { id, title: t, icon: ic, blocks: bl } = pendingSaveRef.current;
+        void updateDoc(id, {
+          title: t.trim() || dw.untitled,
+          icon: ic,
+          blocksJson: bl,
+          plainText: blocksToPlainText(bl),
+        });
+      }
+    };
+  }, [dw.untitled]);
 
+  // Smooth, relaxed debounced auto-save (2500ms)
   const triggerSave = (newTitle: string, newIcon: string, newBlocks: RichTextBlock[]) => {
     if (!activeDocId) return;
-    setSaveStatus("saving");
+
+    pendingSaveRef.current = {
+      id: activeDocId,
+      title: newTitle,
+      icon: newIcon,
+      blocks: newBlocks,
+    };
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
-      const plainText = blocksToPlainText(newBlocks);
-      const res = await updateDoc(activeDocId, {
-        title: newTitle.trim() || dw.untitled,
-        icon: newIcon,
-        blocksJson: newBlocks,
+      if (!pendingSaveRef.current) return;
+      const targetDocId = pendingSaveRef.current.id;
+      const saveTitle = pendingSaveRef.current.title;
+      const saveIcon = pendingSaveRef.current.icon;
+      const saveBlocks = pendingSaveRef.current.blocks;
+      pendingSaveRef.current = null;
+
+      setSaveStatus("saving");
+      const plainText = blocksToPlainText(saveBlocks);
+      const res = await updateDoc(targetDocId, {
+        title: saveTitle.trim() || dw.untitled,
+        icon: saveIcon,
+        blocksJson: saveBlocks,
         plainText,
       });
 
       if (res.status === "success") {
         setSaveStatus("saved");
-        // Update local state in tree
+        // Update local metadata in the tree silently without resetting active editor state
         setDocs((prev) => {
           function updateInTree(list: WorkspaceDoc[]): WorkspaceDoc[] {
             return list.map((doc) => {
-              if (doc.id === activeDocId) {
+              if (doc.id === targetDocId) {
                 return {
                   ...doc,
-                  title: newTitle.trim() || dw.untitled,
-                  icon: newIcon,
-                  blocks_json: newBlocks,
+                  title: saveTitle.trim() || dw.untitled,
+                  icon: saveIcon,
+                  blocks_json: saveBlocks,
                   plain_text: plainText,
                   updated_at: new Date().toISOString(),
                 };
@@ -133,10 +195,14 @@ export function DocsWorkspace({
           }
           return updateInTree(prev);
         });
+
+        savedStatusTimeoutRef.current = setTimeout(() => {
+          setSaveStatus("idle");
+        }, 2500);
       } else {
         setSaveStatus("idle");
       }
-    }, 800);
+    }, 2500);
   };
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
@@ -415,6 +481,7 @@ export function DocsWorkspace({
 
               <div className="pt-2">
                 <BlockEditor
+                  key={activeDocId}
                   blocks={blocks}
                   onChange={handleBlocksChange}
                   readOnly={false}
