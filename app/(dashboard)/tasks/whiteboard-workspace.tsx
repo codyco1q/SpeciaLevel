@@ -104,6 +104,7 @@ export function WhiteboardWorkspace({
   const activeBoard = useMemo(() => boards.find((b) => b.id === activeBoardId), [boards, activeBoardId]);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -144,6 +145,8 @@ export function WhiteboardWorkspace({
   // Refs
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const currentBoardIdRef = useRef<string | null>(activeBoardId);
+  const pendingSaveRef = useRef<{ id: string; elements: WhiteboardElement[]; viewport: WhiteboardViewport } | null>(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
   const isMarqueeRef = useRef(false);
@@ -167,28 +170,49 @@ export function WhiteboardWorkspace({
     return map;
   }, [elements]);
 
-  // Sync when active board changes
+  // Sync when active board changes from prop
   useEffect(() => {
-    if (activeBoardIdProp) {
+    if (activeBoardIdProp && activeBoardIdProp !== activeBoardId) {
       setActiveBoardId(activeBoardIdProp);
     }
-  }, [activeBoardIdProp]);
+  }, [activeBoardIdProp, activeBoardId]);
 
   useEffect(() => {
     setBoards(initialWhiteboards);
-  }, [initialWhiteboards]);
+    if (!activeBoardId && initialWhiteboards.length > 0) {
+      setActiveBoardId(initialWhiteboards[0].id);
+    }
+  }, [initialWhiteboards, activeBoardId]);
 
+  // Sync when switching active board
   useEffect(() => {
+    if (currentBoardIdRef.current && currentBoardIdRef.current !== activeBoardId) {
+      // Flush pending save for previous board
+      if (pendingSaveRef.current && saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        const { id, elements: els, viewport: vp } = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        void saveWhiteboard(id, els, vp);
+      }
+    }
+
+    currentBoardIdRef.current = activeBoardId;
+
     if (activeBoard) {
-      setElements(activeBoard.elements_json || []);
-      setViewport(activeBoard.viewport || { x: 0, y: 0, zoom: 1 });
+      const boardElements = Array.isArray(activeBoard.elements_json) ? activeBoard.elements_json : [];
+      const boardViewport = activeBoard.viewport || { x: 0, y: 0, zoom: 1 };
+      setElements(boardElements);
+      setViewport(boardViewport);
       setBoardName(activeBoard.name || "Whiteboard");
       setSelectedElementIds([]);
       setEditingElementId(null);
-      setHistory([activeBoard.elements_json || []]);
+      setHistory([boardElements]);
       setHistoryIndex(0);
+      setSaveStatus("idle");
+    } else if (!activeBoardId && boards.length > 0) {
+      setActiveBoardId(boards[0].id);
     }
-  }, [activeBoardId]);
+  }, [activeBoardId, activeBoard, boards]);
 
   // Push to history
   const pushHistory = useCallback((newElements: WhiteboardElement[]) => {
@@ -221,26 +245,39 @@ export function WhiteboardWorkspace({
   const triggerAutoSave = useCallback(
     (currentElements: WhiteboardElement[], currentViewport: WhiteboardViewport) => {
       if (!activeBoardId) return;
+
+      pendingSaveRef.current = {
+        id: activeBoardId,
+        elements: currentElements,
+        viewport: currentViewport,
+      };
+
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       setSaveStatus("saving");
 
       saveTimeoutRef.current = setTimeout(async () => {
-        const res = await saveWhiteboard(activeBoardId, currentElements, currentViewport);
+        if (!pendingSaveRef.current) return;
+        const targetId = pendingSaveRef.current.id;
+        const targetElements = pendingSaveRef.current.elements;
+        const targetVp = pendingSaveRef.current.viewport;
+        pendingSaveRef.current = null;
+
+        const res = await saveWhiteboard(targetId, targetElements, targetVp);
         if (res.status === "success") {
           setSaveStatus("saved");
           if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
           savedStatusTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2500);
           setBoards((prev) =>
             prev.map((b) =>
-              b.id === activeBoardId
-                ? { ...b, elements_json: currentElements, viewport: currentViewport }
+              b.id === targetId
+                ? { ...b, elements_json: targetElements, viewport: targetVp }
                 : b
             )
           );
         } else {
           setSaveStatus("idle");
         }
-      }, 1000);
+      }, 1200);
     },
     [activeBoardId]
   );
@@ -263,19 +300,37 @@ export function WhiteboardWorkspace({
       const name = `Whiteboard ${boards.length + 1}`;
       const res = await createWhiteboard(name, folderId);
       if (res.status === "success" && res.id) {
+        const starter: WhiteboardElement[] = [
+          {
+            id: "el_" + Math.random().toString(36).substring(2, 8),
+            type: "sticky",
+            x: 120,
+            y: 120,
+            width: 220,
+            height: 160,
+            text: "💡 Brainstorming Note\nStart adding ideas, shapes & lines!",
+            color: "#fef08a",
+          },
+        ];
         const newBoard: WorkspaceWhiteboard = {
           id: res.id,
           organization_id: "",
           name,
           folder_id: folderId || null,
           task_id: null,
-          elements_json: [],
+          elements_json: starter,
           viewport: { x: 0, y: 0, zoom: 1 },
           created_by: null,
           updated_at: new Date().toISOString(),
         };
         setBoards((prev) => [newBoard, ...prev]);
         setActiveBoardId(res.id);
+        setElements(starter);
+        setViewport({ x: 0, y: 0, zoom: 1 });
+        setBoardName(name);
+        setHistory([starter]);
+        setHistoryIndex(0);
+        await saveWhiteboard(res.id, starter, { x: 0, y: 0, zoom: 1 });
       }
     });
   };
@@ -1068,7 +1123,14 @@ export function WhiteboardWorkspace({
   };
 
   return (
-    <div className="flex h-full w-full bg-background overflow-hidden relative select-none">
+    <div
+      className={cn(
+        "flex w-full overflow-hidden relative select-none transition-all",
+        isFullscreen
+          ? "fixed inset-0 z-50 h-screen w-screen rounded-none bg-background"
+          : "h-[calc(100vh-14rem)] min-h-[650px] rounded-xl border border-border bg-card shadow-sm"
+      )}
+    >
       {/* Sidebar */}
       {sidebarOpen && (
         <WhiteboardSidebar
@@ -1112,19 +1174,23 @@ export function WhiteboardWorkspace({
               {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
             </Button>
 
-            <Input
-              value={boardName}
-              onChange={(e) => setBoardName(e.target.value)}
-              onBlur={() => {
-                if (activeBoard && boardName.trim() && boardName !== activeBoard.name) {
-                  renameWhiteboard(activeBoard.id, boardName.trim());
-                  setBoards((prev) =>
-                    prev.map((b) => (b.id === activeBoard.id ? { ...b, name: boardName.trim() } : b))
-                  );
-                }
-              }}
-              className="h-8 font-semibold text-xs border-transparent hover:border-border focus:border-border max-w-[200px]"
-            />
+            {activeBoard ? (
+              <Input
+                value={boardName}
+                onChange={(e) => setBoardName(e.target.value)}
+                onBlur={() => {
+                  if (activeBoard && boardName.trim() && boardName !== activeBoard.name) {
+                    renameWhiteboard(activeBoard.id, boardName.trim());
+                    setBoards((prev) =>
+                      prev.map((b) => (b.id === activeBoard.id ? { ...b, name: boardName.trim() } : b))
+                    );
+                  }
+                }}
+                className="h-8 font-semibold text-xs border-transparent hover:border-border focus:border-border max-w-[200px]"
+              />
+            ) : (
+              <span className="text-xs font-semibold text-muted-foreground">Whiteboard Workspace</span>
+            )}
 
             {activeBoard?.task_id && (
               <Button
@@ -1146,7 +1212,7 @@ export function WhiteboardWorkspace({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              disabled={historyIndex <= 0}
+              disabled={historyIndex <= 0 || !activeBoard}
               onClick={handleUndo}
               title="Undo (Ctrl+Z)"
             >
@@ -1157,7 +1223,7 @@ export function WhiteboardWorkspace({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              disabled={historyIndex >= history.length - 1}
+              disabled={historyIndex >= history.length - 1 || !activeBoard}
               onClick={handleRedo}
               title="Redo (Ctrl+Y)"
             >
@@ -1165,6 +1231,30 @@ export function WhiteboardWorkspace({
             </Button>
 
             <div className="h-4 w-[1px] bg-border mx-1" />
+
+            {/* Recenter View */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
+              title="Reset View (0, 0)"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+
+            {/* Fullscreen Toggle */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Canvas"}
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
 
             {/* Grid selector */}
             <DropdownMenu>
@@ -1183,7 +1273,7 @@ export function WhiteboardWorkspace({
             {/* Export Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1.5 shadow-xs">
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1.5 shadow-xs" disabled={!activeBoard}>
                   <Download className="h-3 w-3" /> Export
                 </Button>
               </DropdownMenuTrigger>
@@ -1197,30 +1287,32 @@ export function WhiteboardWorkspace({
         </div>
 
         {/* Floating Toolbar */}
-        <WhiteboardToolbar
-          tool={tool}
-          setTool={setTool}
-          selectedElement={selectedElement}
-          selectedCount={selectedElementIds.length}
-          stickyColor={stickyColor}
-          setStickyColor={setStickyColor}
-          shapeFillColor={shapeFillColor}
-          setShapeFillColor={setShapeFillColor}
-          shapeStrokeColor={shapeStrokeColor}
-          setShapeStrokeColor={setShapeStrokeColor}
-          textColor={textColor}
-          setTextColor={setTextColor}
-          pencilColor={pencilColor}
-          setPencilColor={setPencilColor}
-          pencilWidth={pencilWidth}
-          setPencilWidth={setPencilWidth}
-          strokeWidth={strokeWidth}
-          setStrokeWidth={setStrokeWidth}
-          onUpdateSelected={handleUpdateSelected}
-          onDuplicateSelected={handleDuplicateSelected}
-          onDeleteSelected={handleDeleteSelected}
-          onLayerChange={handleLayerChange}
-        />
+        {activeBoard && (
+          <WhiteboardToolbar
+            tool={tool}
+            setTool={setTool}
+            selectedElement={selectedElement}
+            selectedCount={selectedElementIds.length}
+            stickyColor={stickyColor}
+            setStickyColor={setStickyColor}
+            shapeFillColor={shapeFillColor}
+            setShapeFillColor={setShapeFillColor}
+            shapeStrokeColor={shapeStrokeColor}
+            setShapeStrokeColor={setShapeStrokeColor}
+            textColor={textColor}
+            setTextColor={setTextColor}
+            pencilColor={pencilColor}
+            setPencilColor={setPencilColor}
+            pencilWidth={pencilWidth}
+            setPencilWidth={setPencilWidth}
+            strokeWidth={strokeWidth}
+            setStrokeWidth={setStrokeWidth}
+            onUpdateSelected={handleUpdateSelected}
+            onDuplicateSelected={handleDuplicateSelected}
+            onDeleteSelected={handleDeleteSelected}
+            onLayerChange={handleLayerChange}
+          />
+        )}
 
         {/* Interactive SVG Canvas */}
         <div
@@ -1234,6 +1326,27 @@ export function WhiteboardWorkspace({
             (tool === "pencil" || tool === "highlighter") && "cursor-crosshair"
           )}
         >
+          {!activeBoard && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-30 bg-background/90 backdrop-blur-xs">
+              <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mb-3 shadow-xs">
+                <Sparkles className="h-7 w-7" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-1">No Whiteboard Selected</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mb-4">
+                Select a canvas from the sidebar or create a new whiteboard to start brainstorming, drawing, and diagramming.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2 shadow-xs"
+                onClick={() => handleCreateBoard()}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create New Whiteboard</span>
+              </Button>
+            </div>
+          )}
+
           <svg
             ref={svgRef}
             className="w-full h-full absolute inset-0 touch-none"
