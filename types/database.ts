@@ -206,27 +206,61 @@ export interface WorkspaceDoc {
 
 export type WhiteboardTool =
   | "select"
+  | "hand"
   | "sticky"
   | "text"
   | "rectangle"
+  | "rounded-rectangle"
   | "circle"
+  | "diamond"
   | "arrow"
+  | "line"
+  | "pencil"
+  | "highlighter"
+  | "eraser"
   | "pen";
+
+export interface WhiteboardArrowBinding {
+  elementId: string;
+  anchor?: "top" | "right" | "bottom" | "left" | "center" | "auto";
+}
 
 export interface WhiteboardElement {
   id: string;
-  type: "sticky" | "text" | "rectangle" | "circle" | "arrow" | "pen";
+  type:
+    | "sticky"
+    | "text"
+    | "rectangle"
+    | "rounded-rectangle"
+    | "circle"
+    | "diamond"
+    | "arrow"
+    | "line"
+    | "pencil"
+    | "highlighter"
+    | "pen";
   x: number;
   y: number;
   width?: number;
   height?: number;
   text?: string;
-  color?: string;
-  strokeColor?: string;
-  strokeWidth?: number;
+  color?: string; // Note color, text color, or primary color
+  fillColor?: string; // Shape background fill color
+  strokeColor?: string; // Border or line stroke color
+  strokeWidth?: number; // 1, 2, 3, 4, 6, 8, etc.
+  strokeStyle?: "solid" | "dashed" | "dotted";
+  fontSize?: number; // 14, 18, 24, 32, 48
+  fontWeight?: "normal" | "bold";
+  fontStyle?: "normal" | "italic";
+  textAlign?: "left" | "center" | "right";
   points?: { x: number; y: number }[];
   endX?: number;
   endY?: number;
+  startBinding?: WhiteboardArrowBinding;
+  endBinding?: WhiteboardArrowBinding;
+  arrowStyle?: "straight" | "curved" | "orthogonal";
+  zIndex?: number;
+  opacity?: number;
 }
 
 export interface WhiteboardViewport {
@@ -235,10 +269,21 @@ export interface WhiteboardViewport {
   zoom: number;
 }
 
+export interface WorkspaceWhiteboardFolder {
+  id: string;
+  organization_id: string;
+  name: string;
+  color?: string;
+  order_index?: number;
+  created_at?: string;
+}
+
 export interface WorkspaceWhiteboard {
   id: string;
   organization_id: string;
   name: string;
+  folder_id?: string | null;
+  task_id?: string | null;
   elements_json: WhiteboardElement[];
   viewport: WhiteboardViewport;
   created_by: string | null;

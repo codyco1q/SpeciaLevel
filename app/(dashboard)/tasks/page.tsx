@@ -7,6 +7,7 @@ import {
   getTaskStages,
   getWorkspaceDocs,
   getWhiteboards,
+  getWhiteboardFolders,
 } from "@/lib/actions/tasks-powerhouse";
 import { createServerClient } from "@/lib/supabase/server";
 import { TasksView } from "./tasks-view";
@@ -52,11 +53,12 @@ export default async function TasksPage() {
     email: profile.email ?? null,
   }));
 
-  const [initialTasks, initialStages, initialDocs, initialWhiteboards] = await Promise.all([
+  const [initialTasks, initialStages, initialDocs, initialWhiteboards, initialWhiteboardFolders] = await Promise.all([
     getTasks(),
     getTaskStages(),
     getWorkspaceDocs(),
     getWhiteboards(),
+    getWhiteboardFolders(),
   ]);
 
   // Attachments: internal members holding tasks.view may upload; a Client
@@ -71,6 +73,7 @@ export default async function TasksPage() {
         initialStages={initialStages ?? []}
         initialDocs={initialDocs ?? []}
         initialWhiteboards={initialWhiteboards ?? []}
+        initialWhiteboardFolders={initialWhiteboardFolders ?? []}
         members={members}
         canManage={hasPermission("tasks.manage", userContext.permissions)}
         canUpload={canUpload}
