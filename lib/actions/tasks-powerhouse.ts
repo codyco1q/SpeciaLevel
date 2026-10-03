@@ -282,29 +282,45 @@ export async function getWorkspaceDocs(): Promise<WorkspaceDoc[]> {
   if (!auth.ok) return [];
 
   const supabase = await createServerClient();
-  const { data, error } = await supabase
+  let data: any[] | null = null;
+
+  const enhancedQuery = await supabase
     .from("workspace_docs")
-    .select("id, organization_id, title, icon, blocks_json, plain_text, parent_id, order_index, created_by, updated_at")
+    .select("id, organization_id, title, icon, blocks_json, plain_text, parent_id, order_index, created_by, updated_at, doc_type, color")
     .eq("organization_id", auth.organizationId)
     .order("order_index", { ascending: true })
     .order("updated_at", { ascending: false });
 
-  if (error) {
-    console.error("[tasks-powerhouse] getWorkspaceDocs failed:", error.message);
-    return [];
+  if (enhancedQuery.error) {
+    const legacyQuery = await supabase
+      .from("workspace_docs")
+      .select("id, organization_id, title, icon, blocks_json, plain_text, parent_id, order_index, created_by, updated_at")
+      .eq("organization_id", auth.organizationId)
+      .order("order_index", { ascending: true })
+      .order("updated_at", { ascending: false });
+
+    if (legacyQuery.error) {
+      console.error("[tasks-powerhouse] getWorkspaceDocs failed:", legacyQuery.error.message);
+      return [];
+    }
+    data = legacyQuery.data;
+  } else {
+    data = enhancedQuery.data;
   }
 
   const rows: WorkspaceDoc[] = (data ?? []).map((d) => ({
     id: d.id,
     organization_id: d.organization_id,
     title: d.title || "Untitled",
-    icon: d.icon || "📄",
+    icon: d.icon || (d.doc_type === "folder" ? "📁" : "📄"),
     blocks_json: Array.isArray(d.blocks_json) ? (d.blocks_json as RichTextBlock[]) : [],
     plain_text: d.plain_text || "",
     parent_id: d.parent_id || null,
     order_index: d.order_index ?? 0,
     created_by: d.created_by || null,
     updated_at: d.updated_at,
+    doc_type: (d.doc_type as "doc" | "folder") || "doc",
+    color: d.color || null,
     children: [],
   }));
 
@@ -330,33 +346,116 @@ export async function getWorkspaceDocs(): Promise<WorkspaceDoc[]> {
 export async function createDoc(
   title = "Untitled Document",
   parentId: string | null = null,
-  icon = "📄"
+  icon = "📄",
+  docType: "doc" | "folder" = "doc",
+  color: string | null = null
 ): Promise<PowerhouseActionState> {
   const auth = await requirePermission("tasks.view");
   if (!auth.ok) return auth.error;
 
   const supabase = await createServerClient();
-  const initialBlocks: RichTextBlock[] = [
-    { id: "b_" + Math.random().toString(36).substring(2, 8), type: "heading1", content: title },
-    { id: "b_" + Math.random().toString(36).substring(2, 8), type: "paragraph", content: "" },
-  ];
+  const initialBlocks: RichTextBlock[] =
+    docType === "folder"
+      ? []
+      : [
+          { id: "b_" + Math.random().toString(36).substring(2, 8), type: "heading1", content: title },
+          { id: "b_" + Math.random().toString(36).substring(2, 8), type: "paragraph", content: "" },
+        ];
 
-  const { data: inserted, error } = await supabase
+  const insertPayload: Record<string, unknown> = {
+    organization_id: auth.organizationId,
+    title: title.trim() || (docType === "folder" ? "New Folder" : "Untitled Document"),
+    icon: icon || (docType === "folder" ? "📁" : "📄"),
+    blocks_json: initialBlocks,
+    plain_text: title,
+    parent_id: parentId || null,
+    doc_type: docType,
+    color: color || (docType === "folder" ? "#3b82f6" : null),
+    created_by: auth.userId,
+  };
+
+  let { data: inserted, error } = await supabase
     .from("workspace_docs")
-    .insert({
+    .insert(insertPayload)
+    .select("id")
+    .single();
+
+  if (error && (error.message.includes("doc_type") || error.message.includes("color"))) {
+    const fallbackPayload: Record<string, unknown> = {
       organization_id: auth.organizationId,
-      title: title.trim() || "Untitled Document",
-      icon: icon || "📄",
+      title: title.trim() || (docType === "folder" ? "New Folder" : "Untitled Document"),
+      icon: icon || (docType === "folder" ? "📁" : "📄"),
       blocks_json: initialBlocks,
       plain_text: title,
       parent_id: parentId || null,
+      created_by: auth.userId,
+    };
+    const res = await supabase
+      .from("workspace_docs")
+      .insert(fallbackPayload)
+      .select("id")
+      .single();
+    inserted = res.data;
+    error = res.error;
+  }
+
+  if (error || !inserted) {
+    return { status: "error", error: error?.message ?? "Failed to create document" };
+  }
+
+  revalidatePath("/tasks");
+  return { status: "success", id: inserted.id };
+}
+
+export async function createDocFolder(
+  name = "New Folder",
+  parentId: string | null = null,
+  color = "#3b82f6"
+): Promise<PowerhouseActionState> {
+  return createDoc(name, parentId, "📁", "folder", color);
+}
+
+export async function renameDoc(id: string, newTitle: string): Promise<PowerhouseActionState> {
+  return updateDoc(id, { title: newTitle });
+}
+
+export async function moveDoc(id: string, newParentId: string | null): Promise<PowerhouseActionState> {
+  return updateDoc(id, { parentId: newParentId });
+}
+
+export async function duplicateDoc(id: string): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  const { data: source, error: fetchErr } = await supabase
+    .from("workspace_docs")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !source) {
+    return { status: "error", error: fetchErr?.message || "Source document not found" };
+  }
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from("workspace_docs")
+    .insert({
+      organization_id: auth.organizationId,
+      title: `${source.title || "Untitled"} (Copy)`,
+      icon: source.icon || "📄",
+      blocks_json: source.blocks_json || [],
+      plain_text: source.plain_text || "",
+      parent_id: source.parent_id || null,
+      doc_type: source.doc_type || "doc",
+      color: source.color || null,
       created_by: auth.userId,
     })
     .select("id")
     .single();
 
-  if (error || !inserted) {
-    return { status: "error", error: error?.message ?? "Failed to create document" };
+  if (insertErr || !inserted) {
+    return { status: "error", error: insertErr?.message || "Failed to duplicate document" };
   }
 
   revalidatePath("/tasks");
@@ -372,6 +471,7 @@ export async function updateDoc(
     plainText?: string;
     parentId?: string | null;
     orderIndex?: number;
+    color?: string | null;
   }
 ): Promise<PowerhouseActionState> {
   const auth = await requirePermission("tasks.view");
@@ -388,12 +488,23 @@ export async function updateDoc(
   if (data.plainText !== undefined) payload.plain_text = data.plainText;
   if (data.parentId !== undefined) payload.parent_id = data.parentId;
   if (data.orderIndex !== undefined) payload.order_index = data.orderIndex;
+  if (data.color !== undefined) payload.color = data.color;
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("workspace_docs")
     .update(payload)
     .eq("id", id)
     .eq("organization_id", auth.organizationId);
+
+  if (error && error.message.includes("color")) {
+    delete payload.color;
+    const fallbackRes = await supabase
+      .from("workspace_docs")
+      .update(payload)
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId);
+    error = fallbackRes.error;
+  }
 
   if (error) {
     return { status: "error", error: error.message };

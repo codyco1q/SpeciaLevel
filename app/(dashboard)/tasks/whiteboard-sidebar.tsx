@@ -235,30 +235,39 @@ export function WhiteboardSidebar({
 
           {filteredBoards.map((board) => {
             const isActive = activeBoardId === board.id;
+            const elementCount = Array.isArray(board.elements_json) ? board.elements_json.length : 0;
             return (
               <div
                 key={board.id}
                 onClick={() => onSelectBoard(board.id)}
                 className={cn(
-                  "group relative flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition border border-transparent",
+                  "group relative flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition border",
                   isActive
-                    ? "bg-card border-border shadow-xs text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    ? "bg-primary/10 border-primary/40 shadow-xs text-foreground font-semibold"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )}
               >
                 <div className="flex items-center gap-2 min-w-0 pr-1">
                   <Sparkles className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-primary" : "text-muted-foreground/60")} />
                   <div className="min-w-0">
-                    <p className="truncate leading-tight">{board.name}</p>
-                    {board.task_id && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-primary/80 font-normal">
-                        <Link2 className="h-2.5 w-2.5" /> Linked
+                    <p className="truncate leading-tight text-xs">{board.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground font-normal">
+                        {elementCount === 1 ? "1 element" : `${elementCount} elements`}
                       </span>
-                    )}
+                      {board.task_id && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-primary/80 font-normal">
+                          <Link2 className="h-2.5 w-2.5" /> Linked
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  {isActive && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 animate-pulse" />
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button

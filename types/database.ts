@@ -202,6 +202,8 @@ export interface WorkspaceDoc {
   created_by: string | null;
   updated_at: string;
   children?: WorkspaceDoc[];
+  doc_type?: "doc" | "folder";
+  color?: string | null;
 }
 
 export type WhiteboardTool =
