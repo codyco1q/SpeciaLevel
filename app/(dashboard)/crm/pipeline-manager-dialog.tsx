@@ -81,7 +81,7 @@ export function PipelineManagerDialog({
   onPipelineSelect,
   onSaved,
   platform,
-  locale = "en-US",
+  locale = "en",
 }: PipelineManagerDialogProps) {
   const t = platform.crm;
   const pDict = t.pipelines;

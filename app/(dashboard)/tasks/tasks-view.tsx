@@ -47,6 +47,7 @@ import type {
   TaskStatus,
   WorkspaceDoc,
   WorkspaceWhiteboard,
+  WorkspaceWhiteboardFolder,
 } from "@/types/database";
 import {
   formatDueDate,
@@ -68,6 +69,7 @@ interface TasksViewProps {
   initialStages: TaskStage[];
   initialDocs: WorkspaceDoc[];
   initialWhiteboards: WorkspaceWhiteboard[];
+  initialWhiteboardFolders?: WorkspaceWhiteboardFolder[];
   members: TaskMemberOption[];
   canManage: boolean;
   canUpload: boolean;
@@ -209,6 +211,7 @@ export function TasksView({
   initialStages,
   initialDocs,
   initialWhiteboards,
+  initialWhiteboardFolders = [],
   members,
   canManage,
   canUpload,
@@ -224,6 +227,8 @@ export function TasksView({
   const [activeView, setActiveView] = useState<TaskActiveView>("board");
   const [tasks, setTasks] = useState<TaskRow[]>(initialTasks);
   const [stages, setStages] = useState<TaskStage[]>(initialStages);
+  const [whiteboards, setWhiteboards] = useState<WorkspaceWhiteboard[]>(initialWhiteboards);
+  const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -745,9 +750,16 @@ export function TasksView({
       {/* VIEW 4: WHITEBOARDS WORKSPACE */}
       {activeView === "whiteboard" && (
         <WhiteboardWorkspace
-          initialWhiteboards={initialWhiteboards}
+          initialWhiteboards={whiteboards}
+          initialWhiteboardFolders={initialWhiteboardFolders}
+          tasks={tasks}
+          activeBoardIdProp={selectedWhiteboardId}
           platform={platform}
           locale={locale}
+          onOpenTask={(taskId) => {
+            const found = tasks.find((t) => t.id === taskId);
+            if (found) setDetailTask(found);
+          }}
         />
       )}
 
@@ -782,10 +794,22 @@ export function TasksView({
         currentUserId={currentUserId}
         organizationId={organizationId}
         stages={stages}
+        whiteboards={whiteboards}
         onStageChange={handleStageChange}
         onStatusChange={handleStatusChange}
         onEditRequest={handleOpenEditTask}
         onDeleted={handleRefreshTasks}
+        onOpenWhiteboard={(boardId) => {
+          setDetailTask(null);
+          setSelectedWhiteboardId(boardId);
+          setActiveView("whiteboard");
+        }}
+        onWhiteboardCreated={(newBoard) => {
+          setWhiteboards((prev) => [newBoard, ...prev]);
+          setDetailTask(null);
+          setSelectedWhiteboardId(newBoard.id);
+          setActiveView("whiteboard");
+        }}
         platform={platform}
         locale={locale}
       />

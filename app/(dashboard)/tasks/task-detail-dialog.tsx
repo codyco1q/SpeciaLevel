@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
+  ExternalLink,
   LoaderCircle,
   Pencil,
+  Plus,
+  Sparkles,
   Trash2,
   User,
 } from "lucide-react";
@@ -28,7 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { deleteTask, updateTask, type TaskRow } from "@/lib/actions/tasks";
-import type { RichTextBlock, TaskStage, TaskStatus } from "@/types/database";
+import { createWhiteboard, getTaskWhiteboards } from "@/lib/actions/tasks-powerhouse";
+import type { RichTextBlock, TaskStage, TaskStatus, WorkspaceWhiteboard } from "@/types/database";
 import {
   blocksToPlainText,
   formatDueDate,
@@ -49,10 +53,13 @@ interface TaskDetailDialogProps {
   currentUserId: string;
   organizationId: string;
   stages?: TaskStage[];
+  whiteboards?: WorkspaceWhiteboard[];
   onStageChange?: (taskId: string, stageId: string) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onEditRequest: (task: TaskRow) => void;
   onDeleted: () => void;
+  onOpenWhiteboard?: (whiteboardId: string) => void;
+  onWhiteboardCreated?: (board: WorkspaceWhiteboard) => void;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
@@ -71,10 +78,13 @@ export function TaskDetailDialog({
   currentUserId,
   organizationId,
   stages = [],
+  whiteboards = [],
   onStageChange,
   onStatusChange,
   onEditRequest,
   onDeleted,
+  onOpenWhiteboard,
+  onWhiteboardCreated,
   platform,
   locale,
 }: TaskDetailDialogProps) {
@@ -87,10 +97,40 @@ export function TaskDetailDialog({
   const [descriptionBlocks, setDescriptionBlocks] = useState<RichTextBlock[]>(
     task?.descriptionJson ?? []
   );
+  const [linkedBoards, setLinkedBoards] = useState<WorkspaceWhiteboard[]>([]);
+  const [loadingBoards, setLoadingBoards] = useState(false);
+  const [creatingCanvas, setCreatingCanvas] = useState(false);
 
   useEffect(() => {
     setDescriptionBlocks(task?.descriptionJson ?? []);
   }, [task?.descriptionJson]);
+
+  // Sync / fetch linked whiteboards when task changes
+  useEffect(() => {
+    if (!task) {
+      setLinkedBoards([]);
+      return;
+    }
+
+    const localMatches = whiteboards.filter((b) => b.task_id === task.id);
+    setLinkedBoards(localMatches);
+
+    let isMounted = true;
+    setLoadingBoards(true);
+    getTaskWhiteboards(task.id)
+      .then((fetched) => {
+        if (isMounted && fetched) {
+          setLinkedBoards(fetched);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoadingBoards(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [task?.id, whiteboards]);
 
   if (!task) return null;
 
@@ -107,6 +147,36 @@ export function TaskDetailDialog({
       } catch (err) {
         console.error("Failed to persist task block updates:", err);
       }
+    }
+  };
+
+  const handleCreateCanvas = async () => {
+    if (!task) return;
+    setCreatingCanvas(true);
+    try {
+      const boardName = `${task.title} (Canvas)`;
+      const res = await createWhiteboard(boardName, null, task.id);
+      if (res.status === "success" && res.id) {
+        const newBoard: WorkspaceWhiteboard = {
+          id: res.id,
+          organization_id: organizationId,
+          name: boardName,
+          folder_id: null,
+          task_id: task.id,
+          elements_json: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+          created_by: currentUserId,
+          updated_at: new Date().toISOString(),
+        };
+        setLinkedBoards((prev) => [newBoard, ...prev]);
+        if (onWhiteboardCreated) {
+          onWhiteboardCreated(newBoard);
+        } else if (onOpenWhiteboard) {
+          onOpenWhiteboard(res.id);
+        }
+      }
+    } finally {
+      setCreatingCanvas(false);
     }
   };
 
@@ -280,6 +350,103 @@ export function TaskDetailDialog({
           ) : (
             <p className="text-sm text-muted-foreground">{t.noDescription}</p>
           )}
+
+          {/* Linked Whiteboards & Visual Canvases */}
+          <div className="border-t border-border/60 pt-4">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Linked Canvases
+                </h4>
+                {linkedBoards.length > 0 && (
+                  <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-mono">
+                    {linkedBoards.length}
+                  </Badge>
+                )}
+              </div>
+              {canManage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  onClick={handleCreateCanvas}
+                  disabled={creatingCanvas}
+                >
+                  {creatingCanvas ? (
+                    <LoaderCircle className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Plus className="h-3 w-3" />
+                  )}
+                  <span>New Canvas</span>
+                </Button>
+              )}
+            </div>
+
+            {loadingBoards && linkedBoards.length === 0 ? (
+              <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                Loading canvases...
+              </div>
+            ) : linkedBoards.length > 0 ? (
+              <div className="grid gap-1.5">
+                {linkedBoards.map((board) => (
+                  <div
+                    key={board.id}
+                    className="flex items-center justify-between p-2 rounded-lg border border-border/70 bg-card hover:bg-accent/40 transition-colors group cursor-pointer"
+                    onClick={() => {
+                      if (onOpenWhiteboard) {
+                        onOpenWhiteboard(board.id);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{board.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {Array.isArray(board.elements_json) ? board.elements_json.length : 0} elements
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onOpenWhiteboard) onOpenWhiteboard(board.id);
+                      }}
+                    >
+                      <span>Open</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border/80 p-2.5 text-center">
+                <p className="text-xs text-muted-foreground">No whiteboard connected to this task yet.</p>
+                {canManage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-6 px-2.5 text-xs gap-1"
+                    onClick={handleCreateCanvas}
+                    disabled={creatingCanvas}
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Create Canvas</span>
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="border-t border-border/60 pt-4">
             <AttachmentPanel

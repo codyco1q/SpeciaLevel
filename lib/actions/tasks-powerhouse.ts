@@ -12,6 +12,7 @@ import type {
   WhiteboardViewport,
   WorkspaceDoc,
   WorkspaceWhiteboard,
+  WorkspaceWhiteboardFolder,
 } from "@/types/database";
 
 export interface PowerhouseActionState {
@@ -423,7 +424,134 @@ export async function deleteDoc(id: string): Promise<PowerhouseActionState> {
 
 
 // ==========================================
-// 3. Workspace Whiteboards Management
+// 3. Workspace Whiteboard Folders & Management
+// ==========================================
+
+export async function getWhiteboardFolders(): Promise<WorkspaceWhiteboardFolder[]> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return [];
+
+  const supabase = await createServerClient();
+  try {
+    const { data, error } = await supabase
+      .from("workspace_whiteboard_folders")
+      .select("id, organization_id, name, color, order_index, created_at")
+      .eq("organization_id", auth.organizationId)
+      .order("order_index", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return [];
+    }
+
+    return (data ?? []).map((f) => ({
+      id: f.id,
+      organization_id: f.organization_id,
+      name: f.name || "Untitled Folder",
+      color: f.color || "#64748b",
+      order_index: f.order_index ?? 0,
+      created_at: f.created_at,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function createWhiteboardFolder(
+  name: string,
+  color = "#64748b"
+): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  const folderName = name.trim() || "New Folder";
+
+  try {
+    const { data: inserted, error } = await supabase
+      .from("workspace_whiteboard_folders")
+      .insert({
+        organization_id: auth.organizationId,
+        name: folderName,
+        color: color.trim() || "#64748b",
+      })
+      .select("id")
+      .single();
+
+    if (error || !inserted) {
+      return { status: "error", error: error?.message ?? "Failed to create folder" };
+    }
+
+    revalidatePath("/tasks");
+    return { status: "success", id: inserted.id };
+  } catch (err: any) {
+    return { status: "error", error: err?.message ?? "Failed to create folder" };
+  }
+}
+
+export async function updateWhiteboardFolder(
+  id: string,
+  name: string,
+  color?: string
+): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  const payload: Record<string, unknown> = {
+    name: name.trim() || "Untitled Folder",
+  };
+  if (color) payload.color = color;
+
+  try {
+    const { error } = await supabase
+      .from("workspace_whiteboard_folders")
+      .update(payload)
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId);
+
+    if (error) {
+      return { status: "error", error: error.message };
+    }
+
+    revalidatePath("/tasks");
+    return { status: "success", id };
+  } catch (err: any) {
+    return { status: "error", error: err?.message ?? "Failed to update folder" };
+  }
+}
+
+export async function deleteWhiteboardFolder(id: string): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  try {
+    await supabase
+      .from("workspace_whiteboards")
+      .update({ folder_id: null })
+      .eq("folder_id", id)
+      .eq("organization_id", auth.organizationId);
+
+    const { error } = await supabase
+      .from("workspace_whiteboard_folders")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId);
+
+    if (error) {
+      return { status: "error", error: error.message };
+    }
+
+    revalidatePath("/tasks");
+    return { status: "success" };
+  } catch (err: any) {
+    return { status: "error", error: err?.message ?? "Failed to delete folder" };
+  }
+}
+
+// ==========================================
+// 4. Workspace Whiteboards Management
 // ==========================================
 
 export async function getWhiteboards(): Promise<WorkspaceWhiteboard[]> {
@@ -431,15 +559,28 @@ export async function getWhiteboards(): Promise<WorkspaceWhiteboard[]> {
   if (!auth.ok) return [];
 
   const supabase = await createServerClient();
-  const { data, error } = await supabase
+  let data: any[] | null = null;
+
+  const enhancedQuery = await supabase
     .from("workspace_whiteboards")
-    .select("id, organization_id, name, elements_json, viewport, created_by, updated_at")
+    .select("id, organization_id, name, folder_id, task_id, elements_json, viewport, created_by, updated_at")
     .eq("organization_id", auth.organizationId)
     .order("updated_at", { ascending: false });
 
-  if (error) {
-    console.error("[tasks-powerhouse] getWhiteboards failed:", error.message);
-    return [];
+  if (enhancedQuery.error) {
+    const legacyQuery = await supabase
+      .from("workspace_whiteboards")
+      .select("id, organization_id, name, elements_json, viewport, created_by, updated_at")
+      .eq("organization_id", auth.organizationId)
+      .order("updated_at", { ascending: false });
+
+    if (legacyQuery.error) {
+      console.error("[tasks-powerhouse] getWhiteboards failed:", legacyQuery.error.message);
+      return [];
+    }
+    data = legacyQuery.data;
+  } else {
+    data = enhancedQuery.data;
   }
 
   if (data && data.length > 0) {
@@ -447,6 +588,8 @@ export async function getWhiteboards(): Promise<WorkspaceWhiteboard[]> {
       id: w.id,
       organization_id: w.organization_id,
       name: w.name || "Untitled Whiteboard",
+      folder_id: w.folder_id || null,
+      task_id: w.task_id || null,
       elements_json: Array.isArray(w.elements_json) ? (w.elements_json as WhiteboardElement[]) : [],
       viewport: (w.viewport as WhiteboardViewport) || { x: 0, y: 0, zoom: 1 },
       created_by: w.created_by || null,
@@ -460,19 +603,19 @@ export async function getWhiteboards(): Promise<WorkspaceWhiteboard[]> {
       type: "sticky",
       x: 120,
       y: 120,
-      width: 220,
+      width: 240,
       height: 180,
-      text: "💡 Brainstorming Ideas\n- Dynamic Stage Workflows\n- Unified Notion Notes",
+      text: "💡 Brainstorming Canvas\n- Drag & drop shapes\n- Resizable sticky notes\n- Smart arrows & connectors",
       color: "#fef08a",
     },
     {
       id: "el_start_2",
       type: "sticky",
-      x: 380,
+      x: 420,
       y: 120,
-      width: 220,
+      width: 240,
       height: 180,
-      text: "🚀 Next Steps\n- Visual Whiteboards\n- Real-time save & collaborate",
+      text: "🚀 Task Whiteboards\n- Attach to tasks & deliverables\n- Live collaboration & export",
       color: "#bae6fd",
     },
   ];
@@ -498,6 +641,8 @@ export async function getWhiteboards(): Promise<WorkspaceWhiteboard[]> {
       id: inserted.id,
       organization_id: inserted.organization_id,
       name: inserted.name,
+      folder_id: null,
+      task_id: null,
       elements_json: Array.isArray(inserted.elements_json) ? (inserted.elements_json as WhiteboardElement[]) : [],
       viewport: (inserted.viewport as WhiteboardViewport) || { x: 0, y: 0, zoom: 1 },
       created_by: inserted.created_by || null,
@@ -506,36 +651,163 @@ export async function getWhiteboards(): Promise<WorkspaceWhiteboard[]> {
   ];
 }
 
-export async function createWhiteboard(name = "New Whiteboard"): Promise<PowerhouseActionState> {
+export async function createWhiteboard(
+  name = "New Whiteboard",
+  folderId?: string | null,
+  taskId?: string | null
+): Promise<PowerhouseActionState> {
   const auth = await requirePermission("tasks.view");
   if (!auth.ok) return auth.error;
 
   const supabase = await createServerClient();
-  const { data: inserted, error } = await supabase
+  const insertPayload: Record<string, unknown> = {
+    organization_id: auth.organizationId,
+    name: name.trim() || "New Whiteboard",
+    elements_json: [],
+    viewport: { x: 0, y: 0, zoom: 1 },
+    created_by: auth.userId,
+  };
+
+  if (folderId) insertPayload.folder_id = folderId;
+  if (taskId) insertPayload.task_id = taskId;
+
+  let { data: inserted, error } = await supabase
     .from("workspace_whiteboards")
-    .insert({
+    .insert(insertPayload)
+    .select("id")
+    .single();
+
+  if (error && (folderId || taskId)) {
+    const fallbackPayload = {
       organization_id: auth.organizationId,
       name: name.trim() || "New Whiteboard",
       elements_json: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       created_by: auth.userId,
-    })
-    .select("id")
-    .single();
+    };
+    const res = await supabase
+      .from("workspace_whiteboards")
+      .insert(fallbackPayload)
+      .select("id")
+      .single();
+    inserted = res.data;
+    error = res.error;
+  }
 
   if (error || !inserted) {
     return { status: "error", error: error?.message ?? "Failed to create whiteboard" };
+  }
+
+  if (taskId && inserted.id) {
+    try {
+      await supabase.from("task_whiteboards").insert({
+        organization_id: auth.organizationId,
+        task_id: taskId,
+        whiteboard_id: inserted.id,
+      });
+    } catch {}
   }
 
   revalidatePath("/tasks");
   return { status: "success", id: inserted.id };
 }
 
+export async function renameWhiteboard(id: string, name: string): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("workspace_whiteboards")
+    .update({
+      name: name.trim() || "Untitled Whiteboard",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("organization_id", auth.organizationId);
+
+  if (error) {
+    return { status: "error", error: error.message };
+  }
+
+  revalidatePath("/tasks");
+  return { status: "success", id };
+}
+
+export async function duplicateWhiteboard(id: string): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  const { data: source, error: fetchErr } = await supabase
+    .from("workspace_whiteboards")
+    .select("*")
+    .eq("id", id)
+    .eq("organization_id", auth.organizationId)
+    .single();
+
+  if (fetchErr || !source) {
+    return { status: "error", error: "Source whiteboard not found" };
+  }
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from("workspace_whiteboards")
+    .insert({
+      organization_id: auth.organizationId,
+      name: `${source.name || "Whiteboard"} (Copy)`,
+      elements_json: source.elements_json || [],
+      viewport: source.viewport || { x: 0, y: 0, zoom: 1 },
+      folder_id: source.folder_id || null,
+      task_id: source.task_id || null,
+      created_by: auth.userId,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !inserted) {
+    return { status: "error", error: insertErr?.message ?? "Failed to duplicate whiteboard" };
+  }
+
+  revalidatePath("/tasks");
+  return { status: "success", id: inserted.id };
+}
+
+export async function moveWhiteboardToFolder(
+  id: string,
+  folderId: string | null
+): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+  try {
+    const { error } = await supabase
+      .from("workspace_whiteboards")
+      .update({
+        folder_id: folderId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId);
+
+    if (error) {
+      return { status: "error", error: error.message };
+    }
+
+    revalidatePath("/tasks");
+    return { status: "success", id };
+  } catch (err: any) {
+    return { status: "error", error: err?.message ?? "Failed to move whiteboard" };
+  }
+}
+
 export async function saveWhiteboard(
   id: string,
   elements: WhiteboardElement[],
   viewport: WhiteboardViewport,
-  name?: string
+  name?: string,
+  folderId?: string | null,
+  taskId?: string | null
 ): Promise<PowerhouseActionState> {
   const auth = await requirePermission("tasks.view");
   if (!auth.ok) return auth.error;
@@ -550,12 +822,35 @@ export async function saveWhiteboard(
   if (name !== undefined) {
     payload.name = name.trim() || "Untitled Whiteboard";
   }
+  if (folderId !== undefined) {
+    payload.folder_id = folderId;
+  }
+  if (taskId !== undefined) {
+    payload.task_id = taskId;
+  }
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("workspace_whiteboards")
     .update(payload)
     .eq("id", id)
     .eq("organization_id", auth.organizationId);
+
+  if (error && (folderId !== undefined || taskId !== undefined)) {
+    const fallbackPayload: Record<string, unknown> = {
+      elements_json: elements,
+      viewport,
+      updated_at: new Date().toISOString(),
+    };
+    if (name !== undefined) {
+      fallbackPayload.name = name.trim() || "Untitled Whiteboard";
+    }
+    const fallbackRes = await supabase
+      .from("workspace_whiteboards")
+      .update(fallbackPayload)
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId);
+    error = fallbackRes.error;
+  }
 
   if (error) {
     return { status: "error", error: error.message };
@@ -569,6 +864,14 @@ export async function deleteWhiteboard(id: string): Promise<PowerhouseActionStat
   if (!auth.ok) return auth.error;
 
   const supabase = await createServerClient();
+  try {
+    await supabase
+      .from("task_whiteboards")
+      .delete()
+      .eq("whiteboard_id", id)
+      .eq("organization_id", auth.organizationId);
+  } catch {}
+
   const { error } = await supabase
     .from("workspace_whiteboards")
     .delete()
@@ -581,5 +884,151 @@ export async function deleteWhiteboard(id: string): Promise<PowerhouseActionStat
 
   revalidatePath("/tasks");
   return { status: "success" };
+}
+
+// ==========================================
+// 5. Task Whiteboard Attachments
+// ==========================================
+
+export async function getTaskWhiteboards(taskId: string): Promise<WorkspaceWhiteboard[]> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return [];
+
+  const supabase = await createServerClient();
+  const results: WorkspaceWhiteboard[] = [];
+  const seenIds = new Set<string>();
+
+  try {
+    const { data: junctionData } = await supabase
+      .from("task_whiteboards")
+      .select("whiteboard_id, workspace_whiteboards(*)")
+      .eq("task_id", taskId)
+      .eq("organization_id", auth.organizationId);
+
+    if (junctionData && junctionData.length > 0) {
+      for (const row of junctionData) {
+        const wb = (row as any).workspace_whiteboards;
+        if (wb && !seenIds.has(wb.id)) {
+          seenIds.add(wb.id);
+          results.push({
+            id: wb.id,
+            organization_id: wb.organization_id,
+            name: wb.name || "Untitled Whiteboard",
+            folder_id: wb.folder_id || null,
+            task_id: wb.task_id || taskId,
+            elements_json: Array.isArray(wb.elements_json) ? wb.elements_json : [],
+            viewport: wb.viewport || { x: 0, y: 0, zoom: 1 },
+            created_by: wb.created_by || null,
+            updated_at: wb.updated_at,
+          });
+        }
+      }
+    }
+  } catch {}
+
+  try {
+    const { data: directData } = await supabase
+      .from("workspace_whiteboards")
+      .select("id, organization_id, name, folder_id, task_id, elements_json, viewport, created_by, updated_at")
+      .eq("task_id", taskId)
+      .eq("organization_id", auth.organizationId);
+
+    if (directData && directData.length > 0) {
+      for (const wb of directData) {
+        if (!seenIds.has(wb.id)) {
+          seenIds.add(wb.id);
+          results.push({
+            id: wb.id,
+            organization_id: wb.organization_id,
+            name: wb.name || "Untitled Whiteboard",
+            folder_id: wb.folder_id || null,
+            task_id: wb.task_id || taskId,
+            elements_json: Array.isArray(wb.elements_json) ? wb.elements_json : [],
+            viewport: wb.viewport || { x: 0, y: 0, zoom: 1 },
+            created_by: wb.created_by || null,
+            updated_at: wb.updated_at,
+          });
+        }
+      }
+    }
+  } catch {}
+
+  return results;
+}
+
+export async function attachWhiteboardToTask(
+  taskId: string,
+  whiteboardId: string
+): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+
+  try {
+    const { error: junctionErr } = await supabase
+      .from("task_whiteboards")
+      .upsert(
+        {
+          organization_id: auth.organizationId,
+          task_id: taskId,
+          whiteboard_id: whiteboardId,
+        },
+        { onConflict: "task_id,whiteboard_id" }
+      );
+
+    if (!junctionErr) {
+      revalidatePath("/tasks");
+      return { status: "success", id: whiteboardId };
+    }
+  } catch {}
+
+  try {
+    const { error: directErr } = await supabase
+      .from("workspace_whiteboards")
+      .update({ task_id: taskId })
+      .eq("id", whiteboardId)
+      .eq("organization_id", auth.organizationId);
+
+    if (directErr) {
+      return { status: "error", error: directErr.message };
+    }
+
+    revalidatePath("/tasks");
+    return { status: "success", id: whiteboardId };
+  } catch (err: any) {
+    return { status: "error", error: err?.message ?? "Failed to attach whiteboard" };
+  }
+}
+
+export async function detachWhiteboardFromTask(
+  taskId: string,
+  whiteboardId: string
+): Promise<PowerhouseActionState> {
+  const auth = await requirePermission("tasks.view");
+  if (!auth.ok) return auth.error;
+
+  const supabase = await createServerClient();
+
+  try {
+    await supabase
+      .from("task_whiteboards")
+      .delete()
+      .eq("task_id", taskId)
+      .eq("whiteboard_id", whiteboardId)
+      .eq("organization_id", auth.organizationId);
+  } catch {}
+
+  try {
+    await supabase
+      .from("workspace_whiteboards")
+      .update({ task_id: null })
+      .eq("id", whiteboardId)
+      .eq("task_id", taskId)
+      .eq("organization_id", auth.organizationId);
+  } catch {}
+
+  revalidatePath("/tasks");
+  return { status: "success", id: whiteboardId };
 }
 

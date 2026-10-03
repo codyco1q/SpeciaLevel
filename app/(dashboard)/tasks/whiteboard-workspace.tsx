@@ -1,572 +1,916 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
 import {
-  ArrowUpRight,
-  Circle as CircleIcon,
-  Eraser,
-  Hand,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import {
+  Download,
+  Grid,
   LoaderCircle,
   Maximize2,
-  MousePointer,
-  Move,
-  PenTool,
+  Minimize2,
   Plus,
-  RotateCcw,
-  Square,
-  StickyNote,
-  Trash2,
-  Type,
   ZoomIn,
   ZoomOut,
+  RotateCcw,
+  Undo2,
+  Redo2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import {
   createWhiteboard,
+  createWhiteboardFolder,
   deleteWhiteboard,
+  deleteWhiteboardFolder,
+  duplicateWhiteboard,
+  moveWhiteboardToFolder,
+  renameWhiteboard,
   saveWhiteboard,
+  updateWhiteboardFolder,
+  attachWhiteboardToTask,
 } from "@/lib/actions/tasks-powerhouse";
+import type { TaskRow } from "@/lib/actions/tasks";
 import type {
   WhiteboardElement,
   WhiteboardTool,
   WhiteboardViewport,
   WorkspaceWhiteboard,
+  WorkspaceWhiteboardFolder,
 } from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
+import {
+  findClosestAnchor,
+  generateArrowPath,
+  getElementAnchorPoint,
+  isElementIntersectingBox,
+  resolveArrowCoordinates,
+  SHAPE_FILL_PRESETS,
+  STICKY_COLOR_PRESETS,
+  STICKY_SIZES,
+  STROKE_COLOR_PRESETS,
+} from "./whiteboard-types";
+import {
+  exportCanvasToJson,
+  exportCanvasToPng,
+  exportCanvasToSvg,
+} from "./whiteboard-export";
+import { WhiteboardToolbar } from "./whiteboard-toolbar";
+import { WhiteboardSidebar } from "./whiteboard-sidebar";
+import { WhiteboardFolderDialog } from "./whiteboard-folder-dialog";
+import { WhiteboardAttachDialog } from "./whiteboard-attach-dialog";
 
-const STICKY_COLORS = [
-  { name: "Yellow", value: "#fef08a", text: "#713f12" },
-  { name: "Blue", value: "#bae6fd", text: "#0369a1" },
-  { name: "Green", value: "#bbf7d0", text: "#15803d" },
-  { name: "Pink", value: "#fbcfe8", text: "#be185d" },
-  { name: "Purple", value: "#e9d5ff", text: "#6b21a8" },
-];
-
-const STROKE_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#8b5cf6", "#f59e0b", "#0f172a", "#ffffff"];
-
-interface WhiteboardWorkspaceProps {
+export interface WhiteboardWorkspaceProps {
   initialWhiteboards: WorkspaceWhiteboard[];
+  initialWhiteboardFolders?: WorkspaceWhiteboardFolder[];
+  tasks?: TaskRow[];
   platform: Dictionary["platform"];
   locale: Locale;
+  activeBoardIdProp?: string | null;
+  onOpenTask?: (taskId: string) => void;
 }
 
 export function WhiteboardWorkspace({
   initialWhiteboards,
+  initialWhiteboardFolders = [],
+  tasks = [],
   platform,
+  locale,
+  activeBoardIdProp,
+  onOpenTask,
 }: WhiteboardWorkspaceProps) {
-  const t = platform.tasks;
-  const ww = t.whiteboardWorkspace || {
-    title: "Whiteboards",
-    newBoard: "New Whiteboard",
-    searchBoards: "Search whiteboards...",
-    deleteBoard: "Delete Whiteboard",
-    deleteBoardConfirm: "Are you sure you want to delete this whiteboard?",
-    toolSelect: "Select / Move",
-    toolSticky: "Sticky Note",
-    toolText: "Text Box",
-    toolRectangle: "Rectangle",
-    toolCircle: "Circle",
-    toolArrow: "Arrow",
-    toolPen: "Freehand Pen",
-    clearCanvas: "Clear Canvas",
-    zoomIn: "Zoom In",
-    zoomOut: "Zoom Out",
-    resetZoom: "Reset View",
-    saved: "All changes saved",
-    saving: "Saving...",
-    emptyWorkspace: "No whiteboards found. Create a new canvas to start brainstorming.",
-  };
-
+  // ------ STATE ------
   const [boards, setBoards] = useState<WorkspaceWhiteboard[]>(initialWhiteboards);
+  const [folders, setFolders] = useState<WorkspaceWhiteboardFolder[]>(initialWhiteboardFolders);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(
-    initialWhiteboards.length > 0 ? initialWhiteboards[0].id : null
+    activeBoardIdProp ?? (initialWhiteboards.length > 0 ? initialWhiteboards[0].id : null)
   );
+  const activeBoard = useMemo(() => boards.find((b) => b.id === activeBoardId), [boards, activeBoardId]);
 
-  const activeBoard = boards.find((b) => b.id === activeBoardId);
-
-  const [tool, setTool] = useState<WhiteboardTool>("select");
-  const [stickyColor, setStickyColor] = useState(STICKY_COLORS[0].value);
-  const [strokeColor, setStrokeColor] = useState("#3b82f6");
-
-  const [elements, setElements] = useState<WhiteboardElement[]>(
-    activeBoard?.elements_json ?? []
-  );
-  const [viewport, setViewport] = useState<WhiteboardViewport>(
-    activeBoard?.viewport ?? { x: 0, y: 0, zoom: 1 }
-  );
-  const [boardName, setBoardName] = useState(activeBoard?.name ?? "Whiteboard");
-
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [editingElementId, setEditingElementId] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<WorkspaceWhiteboardFolder | null>(null);
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [attachingBoardId, setAttachingBoardId] = useState<string | null>(null);
+
+  // Canvas state
+  const [tool, setTool] = useState<WhiteboardTool>("select");
+  const [elements, setElements] = useState<WhiteboardElement[]>(activeBoard?.elements_json ?? []);
+  const [viewport, setViewport] = useState<WhiteboardViewport>(activeBoard?.viewport ?? { x: 0, y: 0, zoom: 1 });
+  const [boardName, setBoardName] = useState(activeBoard?.name ?? "Whiteboard");
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const [editingElementId, setEditingElementId] = useState<string | null>(null);
+  const [marqueeBox, setMarqueeBox] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const [gridMode, setGridMode] = useState<"dots" | "lines" | "none">("dots");
+
+  // Styling defaults
+  const [stickyColor, setStickyColor] = useState(STICKY_COLOR_PRESETS[0].value);
+  const [shapeFillColor, setShapeFillColor] = useState("rgba(59, 130, 246, 0.15)");
+  const [shapeStrokeColor, setShapeStrokeColor] = useState("#3b82f6");
+  const [textColor, setTextColor] = useState("#e2e8f0");
+  const [pencilColor, setPencilColor] = useState("#3b82f6");
+  const [pencilWidth, setPencilWidth] = useState(3);
+  const [strokeWidth, setStrokeWidth] = useState(2);
+
+  // History
+  const [history, setHistory] = useState<WhiteboardElement[][]>([activeBoard?.elements_json ?? []]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Refs
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
+  const isMarqueeRef = useRef(false);
+  const marqueeStartRef = useRef({ x: 0, y: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
-  const elementStartRef = useRef({ x: 0, y: 0 });
+  const elementStartsRef = useRef<
+    Map<string, { x: number; y: number; endX?: number; endY?: number; points?: { x: number; y: number }[] }>
+  >(new Map());
+  const hasMovedRef = useRef(false);
   const currentDrawingRef = useRef<WhiteboardElement | null>(null);
-
-  const currentBoardIdRef = useRef<string | null>(activeBoardId);
-  const pendingBoardSaveRef = useRef<{
-    id: string;
-    elements: WhiteboardElement[];
-    viewport: WhiteboardViewport;
-    name: string;
-  } | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const savedStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync state only when switching to a different whiteboard
+  const selectedElement = useMemo(
+    () => (selectedElementIds.length === 1 ? elements.find((el) => el.id === selectedElementIds[0]) || null : null),
+    [elements, selectedElementIds]
+  );
+  const elementMap = useMemo(() => {
+    const map = new Map<string, WhiteboardElement>();
+    for (const el of elements) map.set(el.id, el);
+    return map;
+  }, [elements]);
+
+  // Sync when active board changes
   useEffect(() => {
-    if (!activeBoardId) {
-      currentBoardIdRef.current = null;
-      return;
+    if (activeBoardIdProp) {
+      setActiveBoardId(activeBoardIdProp);
     }
+  }, [activeBoardIdProp]);
 
-    if (activeBoardId !== currentBoardIdRef.current) {
-      // Flush previous pending save immediately before switching
-      if (pendingBoardSaveRef.current && saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        const { id, elements: el, viewport: vp, name: nm } = pendingBoardSaveRef.current;
-        pendingBoardSaveRef.current = null;
-        void saveWhiteboard(id, el, vp, nm);
-      }
-
-      currentBoardIdRef.current = activeBoardId;
-      if (activeBoard) {
-        setElements(activeBoard.elements_json || []);
-        setViewport(activeBoard.viewport || { x: 0, y: 0, zoom: 1 });
-        setBoardName(activeBoard.name || "Whiteboard");
-        setSelectedElementId(null);
-        setEditingElementId(null);
-      }
-      setSaveStatus("idle");
-    }
-  }, [activeBoardId, activeBoard]);
-
-  // Clean up timers on unmount and flush pending save
   useEffect(() => {
-    return () => {
+    setBoards(initialWhiteboards);
+  }, [initialWhiteboards]);
+
+  useEffect(() => {
+    if (activeBoard) {
+      setElements(activeBoard.elements_json || []);
+      setViewport(activeBoard.viewport || { x: 0, y: 0, zoom: 1 });
+      setBoardName(activeBoard.name || "Whiteboard");
+      setSelectedElementIds([]);
+      setEditingElementId(null);
+      setHistory([activeBoard.elements_json || []]);
+      setHistoryIndex(0);
+    }
+  }, [activeBoardId]);
+
+  // Push to history
+  const pushHistory = useCallback((newElements: WhiteboardElement[]) => {
+    setHistory((prev) => {
+      const sliced = prev.slice(0, historyIndex + 1);
+      return [...sliced, newElements];
+    });
+    setHistoryIndex((prev) => prev + 1);
+  }, [historyIndex]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const nextIndex = historyIndex - 1;
+      setHistoryIndex(nextIndex);
+      setElements(history[nextIndex]);
+      setSelectedElementIds([]);
+    }
+  }, [history, historyIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1;
+      setHistoryIndex(nextIndex);
+      setElements(history[nextIndex]);
+      setSelectedElementIds([]);
+    }
+  }, [history, historyIndex]);
+
+  // Debounced auto-save
+  const triggerAutoSave = useCallback(
+    (currentElements: WhiteboardElement[], currentViewport: WhiteboardViewport) => {
+      if (!activeBoardId) return;
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
-      if (pendingBoardSaveRef.current) {
-        const { id, elements: el, viewport: vp, name: nm } = pendingBoardSaveRef.current;
-        void saveWhiteboard(id, el, vp, nm);
-      }
-    };
-  }, []);
-
-  // Smooth debounced auto-save (2500ms)
-  const triggerSave = (
-    newElements: WhiteboardElement[],
-    newViewport: WhiteboardViewport,
-    newName: string
-  ) => {
-    if (!activeBoardId) return;
-
-    pendingBoardSaveRef.current = {
-      id: activeBoardId,
-      elements: newElements,
-      viewport: newViewport,
-      name: newName,
-    };
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (!pendingBoardSaveRef.current) return;
-      const targetId = pendingBoardSaveRef.current.id;
-      const saveElements = pendingBoardSaveRef.current.elements;
-      const saveViewport = pendingBoardSaveRef.current.viewport;
-      const saveName = pendingBoardSaveRef.current.name;
-      pendingBoardSaveRef.current = null;
-
       setSaveStatus("saving");
-      const res = await saveWhiteboard(targetId, saveElements, saveViewport, saveName);
 
-      if (res.status === "success") {
-        setSaveStatus("saved");
-        // Update local boards list silently without resetting active canvas selection
-        setBoards((prev) =>
-          prev.map((b) =>
-            b.id === targetId
-              ? { ...b, name: saveName, elements_json: saveElements, viewport: saveViewport }
-              : b
-          )
-        );
-
-        savedStatusTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = setTimeout(async () => {
+        const res = await saveWhiteboard(activeBoardId, currentElements, currentViewport);
+        if (res.status === "success") {
+          setSaveStatus("saved");
+          if (savedStatusTimeoutRef.current) clearTimeout(savedStatusTimeoutRef.current);
+          savedStatusTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2500);
+          setBoards((prev) =>
+            prev.map((b) =>
+              b.id === activeBoardId
+                ? { ...b, elements_json: currentElements, viewport: currentViewport }
+                : b
+            )
+          );
+        } else {
           setSaveStatus("idle");
-        }, 2500);
-      } else {
-        setSaveStatus("idle");
+        }
+      }, 1000);
+    },
+    [activeBoardId]
+  );
+
+  const updateElementsState = useCallback(
+    (updater: (prev: WhiteboardElement[]) => WhiteboardElement[], addToHistory = true) => {
+      setElements((prev) => {
+        const next = updater(prev);
+        if (addToHistory) pushHistory(next);
+        triggerAutoSave(next, viewport);
+        return next;
+      });
+    },
+    [pushHistory, triggerAutoSave, viewport]
+  );
+
+  // Board CRUD
+  const handleCreateBoard = async (folderId?: string) => {
+    startTransition(async () => {
+      const name = `Whiteboard ${boards.length + 1}`;
+      const res = await createWhiteboard(name, folderId);
+      if (res.status === "success" && res.id) {
+        const newBoard: WorkspaceWhiteboard = {
+          id: res.id,
+          organization_id: "",
+          name,
+          folder_id: folderId || null,
+          task_id: null,
+          elements_json: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+          created_by: null,
+          updated_at: new Date().toISOString(),
+        };
+        setBoards((prev) => [newBoard, ...prev]);
+        setActiveBoardId(res.id);
       }
-    }, 2500);
-  };
-  const getCanvasCoords = (e: React.MouseEvent) => {
-    if (!svgRef.current) return { x: 0, y: 0 };
-    const rect = svgRef.current.getBoundingClientRect();
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-    const x = (clientX - viewport.x) / viewport.zoom;
-    const y = (clientY - viewport.y) / viewport.zoom;
-    return { x, y };
+    });
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0 && e.button !== 1) return;
+  const handleRenameBoard = async (board: WorkspaceWhiteboard) => {
+    const newName = window.prompt("Enter new whiteboard name:", board.name);
+    if (!newName || newName.trim() === "" || newName === board.name) return;
+    startTransition(async () => {
+      const res = await renameWhiteboard(board.id, newName.trim());
+      if (res.status === "success") {
+        setBoards((prev) =>
+          prev.map((b) => (b.id === board.id ? { ...b, name: newName.trim() } : b))
+        );
+        if (board.id === activeBoardId) setBoardName(newName.trim());
+      }
+    });
+  };
 
-    const coords = getCanvasCoords(e);
+  const handleDuplicateBoard = async (boardId: string) => {
+    startTransition(async () => {
+      const source = boards.find((b) => b.id === boardId);
+      const res = await duplicateWhiteboard(boardId);
+      if (res.status === "success" && res.id) {
+        const duplicated: WorkspaceWhiteboard = {
+          id: res.id,
+          organization_id: source?.organization_id || "",
+          name: source ? `${source.name} (Copy)` : "Whiteboard (Copy)",
+          folder_id: source?.folder_id || null,
+          task_id: source?.task_id || null,
+          elements_json: source?.elements_json || [],
+          viewport: source?.viewport || { x: 0, y: 0, zoom: 1 },
+          created_by: null,
+          updated_at: new Date().toISOString(),
+        };
+        setBoards((prev) => [duplicated, ...prev]);
+        setActiveBoardId(res.id);
+      }
+    });
+  };
 
-    if (e.button === 1 || (tool === "select" && (e.target as HTMLElement).tagName === "svg")) {
+  const handleMoveBoard = async (board: WorkspaceWhiteboard, folderId: string | null) => {
+    startTransition(async () => {
+      const res = await moveWhiteboardToFolder(board.id, folderId);
+      if (res.status === "success") {
+        setBoards((prev) =>
+          prev.map((b) => (b.id === board.id ? { ...b, folder_id: folderId } : b))
+        );
+      }
+    });
+  };
+
+  const handleDeleteBoard = async (boardId: string) => {
+    if (!window.confirm("Are you sure you want to delete this whiteboard?")) return;
+    startTransition(async () => {
+      const res = await deleteWhiteboard(boardId);
+      if (res.status === "success") {
+        setBoards((prev) => prev.filter((b) => b.id !== boardId));
+        if (activeBoardId === boardId) {
+          const remaining = boards.filter((b) => b.id !== boardId);
+          setActiveBoardId(remaining.length > 0 ? remaining[0].id : null);
+        }
+      }
+    });
+  };
+
+  // Folder Actions
+  const handleSaveFolder = async (name: string, color: string) => {
+    if (editingFolder) {
+      const res = await updateWhiteboardFolder(editingFolder.id, name, color);
+      if (res.status === "success") {
+        setFolders((prev) =>
+          prev.map((f) => (f.id === editingFolder.id ? { ...f, name, color } : f))
+        );
+      }
+    } else {
+      const res = await createWhiteboardFolder(name, color);
+      if (res.status === "success" && res.id) {
+        const newFolder: WorkspaceWhiteboardFolder = {
+          id: res.id,
+          organization_id: "",
+          name,
+          color,
+          created_at: new Date().toISOString(),
+        };
+        setFolders((prev) => [...prev, newFolder]);
+      }
+    }
+    setEditingFolder(null);
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    if (!window.confirm("Delete folder? Canvases inside will become unorganized.")) return;
+    startTransition(async () => {
+      const res = await deleteWhiteboardFolder(folderId);
+      if (res.status === "success") {
+        setFolders((prev) => prev.filter((f) => f.id !== folderId));
+        setBoards((prev) => prev.map((b) => (b.folder_id === folderId ? { ...b, folder_id: null } : b)));
+        if (selectedFolderId === folderId) setSelectedFolderId("all");
+      }
+    });
+  };
+
+  // Attach board to task
+  const handleAttachBoard = (board: WorkspaceWhiteboard) => {
+    setAttachingBoardId(board.id);
+    setAttachDialogOpen(true);
+  };
+
+  const handleSaveAttachment = async (taskId: string | null) => {
+    if (!attachingBoardId) return;
+    if (taskId) {
+      const res = await attachWhiteboardToTask(taskId, attachingBoardId);
+      if (res.status === "success") {
+        setBoards((prev) =>
+          prev.map((b) => (b.id === attachingBoardId ? { ...b, task_id: taskId } : b))
+        );
+      }
+    } else {
+      setBoards((prev) =>
+        prev.map((b) => (b.id === attachingBoardId ? { ...b, task_id: null } : b))
+      );
+    }
+  };
+
+  // Convert screen coords to canvas coords
+  const screenToCanvas = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!svgRef.current) return { x: 0, y: 0 };
+      const rect = svgRef.current.getBoundingClientRect();
+      const x = (clientX - rect.left - viewport.x) / viewport.zoom;
+      const y = (clientY - rect.top - viewport.y) / viewport.zoom;
+      return { x, y };
+    },
+    [viewport]
+  );
+
+  // Selection & drag handlers
+  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    // Right click (button 2) or Middle click (button 1) or Hand tool: Canvas Panning
+    if (e.button === 2 || e.button === 1 || tool === "hand") {
       isPanningRef.current = true;
-      dragStartRef.current = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
-      setSelectedElementId(null);
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
 
-    if (tool === "select") return;
+    // Only process left click (button 0) for drawing, selecting, and moving
+    if (e.button !== 0) return;
 
-    const newId = "el_" + Math.random().toString(36).substring(2, 9);
-    let newElement: WhiteboardElement | null = null;
+    const { x, y } = screenToCanvas(e.clientX, e.clientY);
+    hasMovedRef.current = false;
+
+    if (tool === "eraser") {
+      // Find element clicked
+      const targetEl = e.target as SVGElement;
+      const elId = targetEl.getAttribute("data-element-id");
+      if (elId) {
+        updateElementsState((prev) => prev.filter((item) => item.id !== elId));
+        setSelectedElementIds((prev) => prev.filter((id) => id !== elId));
+      }
+      return;
+    }
+
+    if (tool === "select") {
+      const targetEl = e.target as SVGElement;
+      const elId = targetEl.getAttribute("data-element-id");
+      if (elId) {
+        let nextSelectedIds: string[];
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          // Toggle selection with Shift or Ctrl
+          nextSelectedIds = selectedElementIds.includes(elId)
+            ? selectedElementIds.filter((id) => id !== elId)
+            : [...selectedElementIds, elId];
+        } else {
+          // If already in selection, keep multi-selection intact so dragging moves all selected together
+          if (selectedElementIds.includes(elId)) {
+            nextSelectedIds = selectedElementIds;
+          } else {
+            nextSelectedIds = [elId];
+          }
+        }
+
+        setSelectedElementIds(nextSelectedIds);
+        isDraggingRef.current = true;
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+
+        // Save starting coordinates for all selected elements
+        const starts = new Map<
+          string,
+          { x: number; y: number; endX?: number; endY?: number; points?: { x: number; y: number }[] }
+        >();
+        for (const item of elements) {
+          if (nextSelectedIds.includes(item.id)) {
+            starts.set(item.id, {
+              x: item.x,
+              y: item.y,
+              endX: item.endX,
+              endY: item.endY,
+              points: item.points ? item.points.map((p) => ({ ...p })) : undefined,
+            });
+          }
+        }
+        elementStartsRef.current = starts;
+      } else {
+        // Clicked on empty canvas
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          setSelectedElementIds([]);
+          setEditingElementId(null);
+        }
+        // Start multi-select marquee box
+        isMarqueeRef.current = true;
+        marqueeStartRef.current = { x, y };
+        setMarqueeBox({ startX: x, startY: y, currentX: x, currentY: y });
+      }
+      return;
+    }
+
+    // Creating new element
+    const id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    isDraggingRef.current = true;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+
+    let newEl: WhiteboardElement;
 
     if (tool === "sticky") {
-      newElement = {
-        id: newId,
+      const defSize = STICKY_SIZES.md;
+      newEl = {
+        id,
         type: "sticky",
-        x: coords.x - 100,
-        y: coords.y - 80,
-        width: 200,
-        height: 160,
-        text: "New Note",
+        x: x - defSize.width / 2,
+        y: y - defSize.height / 2,
+        width: defSize.width,
+        height: defSize.height,
+        text: "New sticky note...",
         color: stickyColor,
       };
+      updateElementsState((prev) => [...prev, newEl]);
+      setSelectedElementIds([id]);
+      setEditingElementId(id);
+      setTool("select");
+      isDraggingRef.current = false;
+      return;
     } else if (tool === "text") {
-      newElement = {
-        id: newId,
+      newEl = {
+        id,
         type: "text",
-        x: coords.x,
-        y: coords.y,
-        width: 180,
-        height: 40,
-        text: "Heading Text",
-        color: strokeColor,
+        x,
+        y,
+        text: "Click to edit text",
+        color: textColor,
+        fontSize: 20,
       };
-    } else if (tool === "rectangle") {
-      newElement = {
-        id: newId,
-        type: "rectangle",
-        x: coords.x,
-        y: coords.y,
-        width: 10,
-        height: 10,
-        strokeColor,
+      updateElementsState((prev) => [...prev, newEl]);
+      setSelectedElementIds([id]);
+      setEditingElementId(id);
+      setTool("select");
+      isDraggingRef.current = false;
+      return;
+    } else if (tool === "rectangle" || tool === "circle" || tool === "diamond") {
+      newEl = {
+        id,
+        type: tool,
+        x,
+        y,
+        width: 1,
+        height: 1,
+        fillColor: shapeFillColor,
+        strokeColor: shapeStrokeColor,
+        strokeWidth,
+      };
+    } else if (tool === "arrow" || tool === "line") {
+      // Find anchor at start
+      const startBinding = findClosestAnchor({ x, y }, elements);
+      const startPoint = startBinding
+        ? getElementAnchorPoint(elements.find((el) => el.id === startBinding.elementId)!, startBinding.anchor)
+        : { x, y };
+
+      newEl = {
+        id,
+        type: tool,
+        x: startPoint.x,
+        y: startPoint.y,
+        endX: startPoint.x + 1,
+        endY: startPoint.y + 1,
+        strokeColor: shapeStrokeColor,
         strokeWidth: 2,
+        arrowStyle: "straight",
+        startBinding: startBinding || undefined,
       };
-      currentDrawingRef.current = newElement;
-    } else if (tool === "circle") {
-      newElement = {
-        id: newId,
-        type: "circle",
-        x: coords.x,
-        y: coords.y,
-        width: 10,
-        height: 10,
-        strokeColor,
-        strokeWidth: 2,
+    } else if (tool === "pencil" || tool === "highlighter") {
+      newEl = {
+        id,
+        type: tool,
+        x,
+        y,
+        points: [{ x, y }],
+        strokeColor: tool === "highlighter" ? "rgba(234, 179, 8, 0.45)" : pencilColor,
+        strokeWidth: tool === "highlighter" ? 14 : pencilWidth,
       };
-      currentDrawingRef.current = newElement;
-    } else if (tool === "arrow") {
-      newElement = {
-        id: newId,
-        type: "arrow",
-        x: coords.x,
-        y: coords.y,
-        endX: coords.x + 10,
-        endY: coords.y + 10,
-        strokeColor,
-        strokeWidth: 3,
-      };
-      currentDrawingRef.current = newElement;
-    } else if (tool === "pen") {
-      newElement = {
-        id: newId,
-        type: "pen",
-        x: coords.x,
-        y: coords.y,
-        strokeColor,
-        strokeWidth: 3,
-        points: [{ x: coords.x, y: coords.y }],
-      };
-      currentDrawingRef.current = newElement;
+    } else {
+      return;
     }
 
-    if (newElement) {
-      const nextElements = [...elements, newElement];
-      setElements(nextElements);
-      setSelectedElementId(newId);
-
-      if (tool === "sticky" || tool === "text") {
-        setTool("select");
-        triggerSave(nextElements, viewport, boardName);
-      }
-    }
+    currentDrawingRef.current = newEl;
+    setElements((prev) => [...prev, newEl]);
+    setSelectedElementIds([id]);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    // Right-click or middle-click or hand-tool canvas panning
     if (isPanningRef.current) {
-      const newX = e.clientX - dragStartRef.current.x;
-      const newY = e.clientY - dragStartRef.current.y;
-      const newVp = { ...viewport, x: newX, y: newY };
-      setViewport(newVp);
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      setViewport((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
 
-    const coords = getCanvasCoords(e);
+    // Marquee multi-selection box
+    if (isMarqueeRef.current) {
+      const { x, y } = screenToCanvas(e.clientX, e.clientY);
+      setMarqueeBox((prev) => (prev ? { ...prev, currentX: x, currentY: y } : null));
 
+      const minX = Math.min(marqueeStartRef.current.x, x);
+      const maxX = Math.max(marqueeStartRef.current.x, x);
+      const minY = Math.min(marqueeStartRef.current.y, y);
+      const maxY = Math.max(marqueeStartRef.current.y, y);
+      const rect = { minX, minY, maxX, maxY };
+
+      const hits = elements.filter((el) => isElementIntersectingBox(el, rect)).map((el) => el.id);
+      setSelectedElementIds(hits);
+      return;
+    }
+
+    if (!isDraggingRef.current) return;
+    hasMovedRef.current = true;
+
+    const { x, y } = screenToCanvas(e.clientX, e.clientY);
+
+    // Drawing new shape/arrow/pencil
     if (currentDrawingRef.current) {
-      const drawing = currentDrawingRef.current;
-      setElements((prev) =>
-        prev.map((el) => {
-          if (el.id !== drawing.id) return el;
-          if (el.type === "rectangle" || el.type === "circle") {
-            const width = Math.max(10, coords.x - el.x);
-            const height = Math.max(10, coords.y - el.y);
-            return { ...el, width, height };
-          }
-          if (el.type === "arrow") {
-            return { ...el, endX: coords.x, endY: coords.y };
-          }
-          if (el.type === "pen") {
-            return { ...el, points: [...(el.points || []), { x: coords.x, y: coords.y }] };
-          }
-          return el;
-        })
-      );
+      const cur = currentDrawingRef.current;
+      if (cur.type === "rectangle" || cur.type === "circle" || cur.type === "diamond") {
+        const width = Math.max(10, Math.abs(x - cur.x));
+        const height = Math.max(10, Math.abs(y - cur.y));
+        const updated = { ...cur, width, height };
+        currentDrawingRef.current = updated;
+        setElements((prev) => prev.map((el) => (el.id === cur.id ? updated : el)));
+      } else if (cur.type === "arrow" || cur.type === "line") {
+        const endBinding = findClosestAnchor({ x, y }, elements, cur.startBinding?.elementId);
+        const endPoint = endBinding
+          ? getElementAnchorPoint(elements.find((el) => el.id === endBinding.elementId)!, endBinding.anchor)
+          : { x, y };
+
+        const updated = {
+          ...cur,
+          endX: endPoint.x,
+          endY: endPoint.y,
+          endBinding: endBinding || undefined,
+        };
+        currentDrawingRef.current = updated;
+        setElements((prev) => prev.map((el) => (el.id === cur.id ? updated : el)));
+      } else if (cur.type === "pencil" || cur.type === "highlighter") {
+        const points = [...(cur.points || []), { x, y }];
+        const updated = { ...cur, points };
+        currentDrawingRef.current = updated;
+        setElements((prev) => prev.map((el) => (el.id === cur.id ? updated : el)));
+      }
       return;
     }
 
-    if (isDraggingRef.current && selectedElementId && tool === "select") {
+    // Dragging selected element(s)
+    if (selectedElementIds.length > 0 && tool === "select") {
       const dx = (e.clientX - dragStartRef.current.x) / viewport.zoom;
       const dy = (e.clientY - dragStartRef.current.y) / viewport.zoom;
 
       setElements((prev) =>
         prev.map((el) => {
-          if (el.id !== selectedElementId) return el;
+          const start = elementStartsRef.current.get(el.id);
+          if (!start) return el;
+          if (el.type === "arrow" || el.type === "line") {
+            return {
+              ...el,
+              x: start.x + dx,
+              y: start.y + dy,
+              endX: start.endX !== undefined ? start.endX + dx : undefined,
+              endY: start.endY !== undefined ? start.endY + dy : undefined,
+            };
+          }
+          if (el.points && start.points) {
+            return {
+              ...el,
+              x: start.x + dx,
+              y: start.y + dy,
+              points: start.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+            };
+          }
           return {
             ...el,
-            x: elementStartRef.current.x + dx,
-            y: elementStartRef.current.y + dy,
+            x: start.x + dx,
+            y: start.y + dy,
           };
         })
       );
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     isPanningRef.current = false;
-
-    if (currentDrawingRef.current) {
-      currentDrawingRef.current = null;
-      setTool("select");
-      triggerSave(elements, viewport, boardName);
+    if (isMarqueeRef.current) {
+      isMarqueeRef.current = false;
+      setMarqueeBox(null);
     }
-
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
-      triggerSave(elements, viewport, boardName);
+      if (currentDrawingRef.current) {
+        const finished = currentDrawingRef.current;
+        currentDrawingRef.current = null;
+        updateElementsState((prev) => prev.map((el) => (el.id === finished.id ? finished : el)));
+        setTool("select");
+      } else if (hasMovedRef.current) {
+        updateElementsState((prev) => [...prev]);
+      }
+      hasMovedRef.current = false;
     }
   };
 
-  const handleElementMouseDown = (e: React.MouseEvent, el: WhiteboardElement) => {
-    if (tool !== "select") return;
-    e.stopPropagation();
-
-    setSelectedElementId(el.id);
-    isDraggingRef.current = true;
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    elementStartRef.current = { x: el.x, y: el.y };
-  };
-
-  const handleTextChange = (id: string, text: string) => {
-    const updated = elements.map((el) => (el.id === id ? { ...el, text } : el));
-    setElements(updated);
-    triggerSave(updated, viewport, boardName);
-  };
-
-  const handleDeleteSelected = () => {
-    if (!selectedElementId) return;
-    const updated = elements.filter((el) => el.id !== selectedElementId);
-    setElements(updated);
-    setSelectedElementId(null);
-    setEditingElementId(null);
-    triggerSave(updated, viewport, boardName);
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    const newZoom = Math.min(Math.max(0.3, viewport.zoom * zoomFactor), 3);
-    const newVp = { ...viewport, zoom: newZoom };
-    setViewport(newVp);
-    triggerSave(elements, newVp, boardName);
+  // Zoom handlers
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      const nextZoom = Math.min(Math.max(viewport.zoom * zoomFactor, 0.1), 5);
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const newX = mouseX - ((mouseX - viewport.x) * nextZoom) / viewport.zoom;
+      const newY = mouseY - ((mouseY - viewport.y) * nextZoom) / viewport.zoom;
+      const newViewport = { x: newX, y: newY, zoom: nextZoom };
+      setViewport(newViewport);
+      triggerAutoSave(elements, newViewport);
+    } else {
+      setViewport((prev) => ({ ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
+    }
   };
 
   const handleZoom = (direction: "in" | "out" | "reset") => {
-    let newZoom = viewport.zoom;
-    if (direction === "in") newZoom = Math.min(3, viewport.zoom * 1.2);
-    if (direction === "out") newZoom = Math.max(0.3, viewport.zoom / 1.2);
-    if (direction === "reset") {
-      const resetVp = { x: 0, y: 0, zoom: 1 };
-      setViewport(resetVp);
-      triggerSave(elements, resetVp, boardName);
-      return;
+    setViewport((prev) => {
+      let nextZoom = prev.zoom;
+      if (direction === "in") nextZoom = Math.min(prev.zoom * 1.2, 5);
+      if (direction === "out") nextZoom = Math.max(prev.zoom / 1.2, 0.1);
+      if (direction === "reset") return { x: 0, y: 0, zoom: 1 };
+      const newViewport = { ...prev, zoom: nextZoom };
+      triggerAutoSave(elements, newViewport);
+      return newViewport;
+    });
+  };
+
+  // Element modification
+  const handleUpdateSelected = (updates: Partial<WhiteboardElement>) => {
+    if (selectedElementIds.length === 0) return;
+    updateElementsState((prev) =>
+      prev.map((el) => (selectedElementIds.includes(el.id) ? { ...el, ...updates } : el))
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedElementIds.length === 0) return;
+    updateElementsState((prev) => prev.filter((el) => !selectedElementIds.includes(el.id)));
+    setSelectedElementIds([]);
+  };
+
+  const handleDuplicateSelected = () => {
+    if (selectedElementIds.length === 0) return;
+    const newIds: string[] = [];
+    const duplicatedElements: WhiteboardElement[] = [];
+
+    for (const el of elements) {
+      if (selectedElementIds.includes(el.id)) {
+        const newId = `el_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        newIds.push(newId);
+        duplicatedElements.push({
+          ...el,
+          id: newId,
+          x: el.x + 20,
+          y: el.y + 20,
+          endX: el.endX !== undefined ? el.endX + 20 : undefined,
+          endY: el.endY !== undefined ? el.endY + 20 : undefined,
+          points: el.points ? el.points.map((p) => ({ x: p.x + 20, y: p.y + 20 })) : undefined,
+        });
+      }
     }
-    const newVp = { ...viewport, zoom: newZoom };
-    setViewport(newVp);
-    triggerSave(elements, newVp, boardName);
+
+    updateElementsState((prev) => [...prev, ...duplicatedElements]);
+    setSelectedElementIds(newIds);
   };
 
-  const handleCreateNewBoard = () => {
-    startTransition(async () => {
-      const res = await createWhiteboard(ww.newBoard);
-      if (res.status === "success" && res.id) {
-        const newBoardObj: WorkspaceWhiteboard = {
-          id: res.id,
-          organization_id: "",
-          name: ww.newBoard,
-          elements_json: [],
-          viewport: { x: 0, y: 0, zoom: 1 },
-          created_by: null,
-          updated_at: new Date().toISOString(),
-        };
-        setBoards([newBoardObj, ...boards]);
-        setActiveBoardId(res.id);
-      }
+  const handleLayerChange = (direction: "front" | "back") => {
+    if (selectedElementIds.length === 0) return;
+    updateElementsState((prev) => {
+      const selected = prev.filter((el) => selectedElementIds.includes(el.id));
+      const unselected = prev.filter((el) => !selectedElementIds.includes(el.id));
+      return direction === "front" ? [...unselected, ...selected] : [...selected, ...unselected];
     });
   };
 
-  const handleDeleteBoard = (boardId: string) => {
-    if (!window.confirm(ww.deleteBoardConfirm)) return;
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when typing in inputs/textareas
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
 
-    startTransition(async () => {
-      const res = await deleteWhiteboard(boardId);
-      if (res.status === "success") {
-        const updated = boards.filter((b) => b.id !== boardId);
-        setBoards(updated);
-        if (activeBoardId === boardId) {
-          setActiveBoardId(updated.length > 0 ? updated[0].id : null);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setSelectedElementIds(elements.map((el) => el.id));
+      } else if (e.key === "Escape") {
+        setSelectedElementIds([]);
+        setEditingElementId(null);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        handleRedo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        handleDuplicateSelected();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedElementIds.length > 0 && !editingElementId) {
+          e.preventDefault();
+          handleDeleteSelected();
         }
+      } else if (e.key === "v" || e.key === "V") {
+        setTool("select");
+      } else if (e.key === "h" || e.key === "H") {
+        setTool("hand");
+      } else if (e.key === "s" || e.key === "S") {
+        setTool("sticky");
+      } else if (e.key === "t" || e.key === "T") {
+        setTool("text");
+      } else if (e.key === "r" || e.key === "R") {
+        setTool("rectangle");
+      } else if (e.key === "o" || e.key === "O") {
+        setTool("circle");
+      } else if (e.key === "d" || e.key === "D") {
+        setTool("diamond");
+      } else if (e.key === "a" || e.key === "A") {
+        setTool("arrow");
+      } else if (e.key === "p" || e.key === "P") {
+        setTool("pencil");
+      } else if (e.key === "e" || e.key === "E") {
+        setTool("eraser");
       }
-    });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedElementIds, editingElementId, elements, handleUndo, handleRedo]);
+
+  // Export handlers
+  const handleExport = (format: "png" | "svg" | "json") => {
+    if (!svgRef.current) return;
+    const name = activeBoard?.name || "whiteboard";
+    if (format === "png") {
+      exportCanvasToPng(svgRef.current, name);
+    } else if (format === "svg") {
+      exportCanvasToSvg(svgRef.current, name);
+    } else if (format === "json") {
+      exportCanvasToJson(elements, name);
+    }
   };
 
+  // Render individual SVG elements
   const renderElement = (el: WhiteboardElement) => {
-    const isSelected = el.id === selectedElementId;
-    const isEditing = el.id === editingElementId;
+    const isSelected = selectedElementIds.includes(el.id);
 
     if (el.type === "sticky") {
+      const isEditing = editingElementId === el.id;
       return (
         <g
           key={el.id}
           transform={`translate(${el.x}, ${el.y})`}
-          onMouseDown={(e) => handleElementMouseDown(e, el)}
+          data-element-id={el.id}
+          className="cursor-move group"
           onDoubleClick={(e) => {
             e.stopPropagation();
             setEditingElementId(el.id);
           }}
-          className="cursor-move select-none"
         >
+          {/* Note drop shadow & shape */}
           <rect
-            width={el.width || 200}
-            height={el.height || 160}
+            width={el.width || 180}
+            height={el.height || 180}
             rx={8}
+            ry={8}
             fill={el.color || "#fef08a"}
-            stroke={isSelected ? "#2563eb" : "rgba(0,0,0,0.15)"}
-            strokeWidth={isSelected ? 2.5 : 1}
-            filter="drop-shadow(0 4px 6px rgba(0,0,0,0.08))"
+            stroke={isSelected ? "#3b82f6" : "rgba(0,0,0,0.08)"}
+            strokeWidth={isSelected ? 2 : 1}
+            filter="drop-shadow(0 4px 6px rgba(0,0,0,0.07))"
+            data-element-id={el.id}
           />
-
-          {isEditing ? (
-            <foreignObject x={10} y={10} width={(el.width || 200) - 20} height={(el.height || 160) - 20}>
+          {/* Content inside sticky */}
+          <foreignObject
+            x={12}
+            y={12}
+            width={(el.width || 180) - 24}
+            height={(el.height || 180) - 24}
+            className="pointer-events-none"
+          >
+            {isEditing ? (
               <textarea
                 autoFocus
-                defaultValue={el.text || ""}
+                defaultValue={el.text}
+                data-element-id={el.id}
                 onBlur={(e) => {
-                  handleTextChange(el.id, e.target.value);
+                  handleUpdateSelected({ text: e.target.value });
                   setEditingElementId(null);
                 }}
-                className="w-full h-full p-1 bg-transparent border-0 resize-none outline-none text-xs leading-relaxed text-slate-800 font-medium font-sans"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setEditingElementId(null);
+                }}
+                className="w-full h-full bg-transparent resize-none border-none outline-none font-sans text-xs text-neutral-900 leading-relaxed pointer-events-auto p-0"
               />
-            </foreignObject>
-          ) : (
-            <foreignObject
-              x={12}
-              y={12}
-              width={(el.width || 200) - 24}
-              height={(el.height || 160) - 24}
-              className="pointer-events-none"
-            >
-              <div className="w-full h-full text-xs font-medium leading-relaxed whitespace-pre-wrap text-slate-800 break-words font-sans">
-                {el.text || "Double click to write..."}
+            ) : (
+              <div className="w-full h-full text-xs text-neutral-900 font-sans break-words whitespace-pre-wrap select-none leading-relaxed overflow-hidden">
+                {el.text || "Double-click to write..."}
               </div>
-            </foreignObject>
-          )}
-        </g>
-      );
-    }
-
-    if (el.type === "text") {
-      return (
-        <g
-          key={el.id}
-          transform={`translate(${el.x}, ${el.y})`}
-          onMouseDown={(e) => handleElementMouseDown(e, el)}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            setEditingElementId(el.id);
-          }}
-          className="cursor-move select-none"
-        >
-          {isSelected && (
-            <rect
-              x={-4}
-              y={-4}
-              width={(el.width || 180) + 8}
-              height={(el.height || 40) + 8}
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth={1.5}
-              strokeDasharray="4 2"
-              rx={4}
-            />
-          )}
-          {isEditing ? (
-            <foreignObject x={0} y={0} width={el.width || 200} height={el.height || 50}>
-              <input
-                autoFocus
-                defaultValue={el.text || ""}
-                onBlur={(e) => {
-                  handleTextChange(el.id, e.target.value);
-                  setEditingElementId(null);
-                }}
-                className="w-full h-full px-1 bg-transparent border-0 outline-none text-base font-bold text-foreground"
-              />
-            </foreignObject>
-          ) : (
-            <text
-              x={0}
-              y={24}
-              fill={el.color || "currentColor"}
-              className="text-base font-bold select-none fill-foreground"
-            >
-              {el.text || "Text Box"}
-            </text>
-          )}
+            )}
+          </foreignObject>
         </g>
       );
     }
@@ -577,71 +921,144 @@ export function WhiteboardWorkspace({
           key={el.id}
           x={el.x}
           y={el.y}
-          width={el.width || 50}
-          height={el.height || 50}
-          rx={4}
-          fill="rgba(59, 130, 246, 0.08)"
-          stroke={isSelected ? "#2563eb" : el.strokeColor || "#3b82f6"}
-          strokeWidth={isSelected ? 3 : el.strokeWidth || 2}
-          onMouseDown={(e) => handleElementMouseDown(e, el)}
+          width={el.width || 100}
+          height={el.height || 60}
+          rx={6}
+          ry={6}
+          fill={el.fillColor || "rgba(59, 130, 246, 0.1)"}
+          stroke={isSelected ? "#3b82f6" : el.strokeColor || "#3b82f6"}
+          strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
+          strokeDasharray={el.strokeStyle === "dashed" ? "6 4" : el.strokeStyle === "dotted" ? "2 3" : undefined}
+          data-element-id={el.id}
           className="cursor-move"
         />
       );
     }
 
     if (el.type === "circle") {
-      const rx = (el.width || 50) / 2;
-      const ry = (el.height || 50) / 2;
+      const rx = (el.width || 100) / 2;
+      const ry = (el.height || 100) / 2;
       return (
         <ellipse
           key={el.id}
           cx={el.x + rx}
           cy={el.y + ry}
-          rx={Math.max(5, rx)}
-          ry={Math.max(5, ry)}
-          fill="rgba(59, 130, 246, 0.08)"
-          stroke={isSelected ? "#2563eb" : el.strokeColor || "#3b82f6"}
-          strokeWidth={isSelected ? 3 : el.strokeWidth || 2}
-          onMouseDown={(e) => handleElementMouseDown(e, el)}
+          rx={rx}
+          ry={ry}
+          fill={el.fillColor || "rgba(16, 185, 129, 0.1)"}
+          stroke={isSelected ? "#3b82f6" : el.strokeColor || "#10b981"}
+          strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
+          strokeDasharray={el.strokeStyle === "dashed" ? "6 4" : el.strokeStyle === "dotted" ? "2 3" : undefined}
+          data-element-id={el.id}
           className="cursor-move"
         />
       );
     }
 
-    if (el.type === "arrow") {
-      const endX = el.endX ?? el.x + 100;
-      const endY = el.endY ?? el.y;
+    if (el.type === "diamond") {
+      const w = el.width || 100;
+      const h = el.height || 80;
+      const points = `${el.x + w / 2},${el.y} ${el.x + w},${el.y + h / 2} ${el.x + w / 2},${el.y + h} ${el.x},${el.y + h / 2}`;
       return (
-        <g key={el.id} onMouseDown={(e) => handleElementMouseDown(e, el)} className="cursor-move">
-          <line
-            x1={el.x}
-            y1={el.y}
-            x2={endX}
-            y2={endY}
-            stroke={isSelected ? "#2563eb" : el.strokeColor || "#3b82f6"}
-            strokeWidth={isSelected ? 4 : el.strokeWidth || 3}
-            strokeLinecap="round"
-            markerEnd="url(#arrowhead)"
+        <polygon
+          key={el.id}
+          points={points}
+          fill={el.fillColor || "rgba(168, 85, 247, 0.1)"}
+          stroke={isSelected ? "#3b82f6" : el.strokeColor || "#a855f7"}
+          strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
+          data-element-id={el.id}
+          className="cursor-move"
+        />
+      );
+    }
+
+    if (el.type === "text") {
+      const isEditing = editingElementId === el.id;
+      return (
+        <g
+          key={el.id}
+          transform={`translate(${el.x}, ${el.y})`}
+          data-element-id={el.id}
+          className="cursor-move"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setEditingElementId(el.id);
+          }}
+        >
+          {isEditing ? (
+            <foreignObject x={0} y={0} width={300} height={100}>
+              <input
+                autoFocus
+                defaultValue={el.text}
+                onBlur={(e) => {
+                  handleUpdateSelected({ text: e.target.value });
+                  setEditingElementId(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") setEditingElementId(null);
+                }}
+                style={{ fontSize: `${el.fontSize || 20}px`, color: el.color || "#ffffff" }}
+                className="bg-transparent border-b border-primary outline-none font-sans font-medium w-full"
+              />
+            </foreignObject>
+          ) : (
+            <text
+              x={0}
+              y={el.fontSize || 20}
+              fill={el.color || "#ffffff"}
+              fontSize={el.fontSize || 20}
+              fontWeight={el.fontWeight || "normal"}
+              fontStyle={el.fontStyle || "normal"}
+              fontFamily="sans-serif"
+              data-element-id={el.id}
+              className={cn("select-none", isSelected && "underline decoration-primary")}
+            >
+              {el.text || "Text"}
+            </text>
+          )}
+        </g>
+      );
+    }
+
+    if (el.type === "arrow" || el.type === "line") {
+      const coords = resolveArrowCoordinates(el, elementMap);
+      const isCurved = el.arrowStyle === "curved";
+      const isOrthogonal = el.arrowStyle === "orthogonal";
+      const pathData = isCurved
+        ? generateArrowPath(coords.x1, coords.y1, coords.x2, coords.y2, "curved")
+        : isOrthogonal
+        ? generateArrowPath(coords.x1, coords.y1, coords.x2, coords.y2, "orthogonal")
+        : `M ${coords.x1} ${coords.y1} L ${coords.x2} ${coords.y2}`;
+
+      return (
+        <g key={el.id} data-element-id={el.id} className="cursor-move">
+          <path
+            d={pathData}
+            fill="none"
+            stroke={isSelected ? "#3b82f6" : el.strokeColor || "#3b82f6"}
+            strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
+            markerEnd={el.type === "arrow" ? "url(#arrowhead)" : undefined}
+            data-element-id={el.id}
           />
         </g>
       );
     }
 
-    if (el.type === "pen" && el.points && el.points.length > 0) {
-      const pathData =
-        `M ${el.points[0].x} ${el.points[0].y} ` +
-        el.points.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ");
-
+    if (el.type === "pencil" || el.type === "highlighter" || el.type === "pen") {
+      const pts = el.points || [];
+      if (pts.length < 2) return null;
+      const d = `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ");
       return (
         <path
           key={el.id}
-          d={pathData}
+          d={d}
           fill="none"
-          stroke={isSelected ? "#2563eb" : el.strokeColor || "#3b82f6"}
-          strokeWidth={isSelected ? 4 : el.strokeWidth || 3}
+          stroke={el.strokeColor || "#3b82f6"}
+          strokeWidth={el.strokeWidth || (el.type === "highlighter" ? 14 : 3)}
           strokeLinecap="round"
           strokeLinejoin="round"
-          onMouseDown={(e) => handleElementMouseDown(e, el)}
+          opacity={el.type === "highlighter" ? 0.45 : 1}
+          data-element-id={el.id}
           className="cursor-move"
         />
       );
@@ -651,252 +1068,320 @@ export function WhiteboardWorkspace({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-14rem)] min-h-[550px] rounded-xl border border-border bg-card overflow-hidden shadow-sm relative select-none">
-      {/* Top Header Bar */}
-      <div className="h-12 border-b border-border/60 px-4 flex items-center justify-between gap-4 bg-background/80 backdrop-blur shrink-0 z-20">
-        <div className="flex items-center gap-2 overflow-x-auto py-1">
-          {boards.map((b) => (
-            <div
-              key={b.id}
-              onClick={() => setActiveBoardId(b.id)}
-              className={`group flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition shrink-0 ${
-                b.id === activeBoardId
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
+    <div className="flex h-full w-full bg-background overflow-hidden relative select-none">
+      {/* Sidebar */}
+      {sidebarOpen && (
+        <WhiteboardSidebar
+          boards={boards}
+          folders={folders}
+          activeBoardId={activeBoardId}
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={setSelectedFolderId}
+          onSelectBoard={setActiveBoardId}
+          onCreateBoard={handleCreateBoard}
+          onRenameBoard={handleRenameBoard}
+          onDuplicateBoard={handleDuplicateBoard}
+          onMoveBoard={handleMoveBoard}
+          onAttachBoard={handleAttachBoard}
+          onDeleteBoard={handleDeleteBoard}
+          onCreateFolder={() => {
+            setEditingFolder(null);
+            setFolderDialogOpen(true);
+          }}
+          onEditFolder={(folder) => {
+            setEditingFolder(folder);
+            setFolderDialogOpen(true);
+          }}
+          onDeleteFolder={handleDeleteFolder}
+        />
+      )}
+
+      {/* Main Canvas Area */}
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-dot-grid">
+        {/* Top bar */}
+        <div className="h-12 border-b border-border/60 bg-background/80 backdrop-blur-md px-4 flex items-center justify-between z-20">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
             >
-              <span>{b.name}</span>
-              {boards.length > 1 && (
-                <button
-                  type="button"
-                  className="opacity-0 group-hover:opacity-100 hover:text-destructive transition p-0.5 rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteBoard(b.id);
-                  }}
-                  title={ww.deleteBoard}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ))}
+              {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </Button>
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground shrink-0"
-            onClick={handleCreateNewBoard}
-            disabled={isPending}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>{ww.newBoard}</span>
-          </Button>
-        </div>
+            <Input
+              value={boardName}
+              onChange={(e) => setBoardName(e.target.value)}
+              onBlur={() => {
+                if (activeBoard && boardName.trim() && boardName !== activeBoard.name) {
+                  renameWhiteboard(activeBoard.id, boardName.trim());
+                  setBoards((prev) =>
+                    prev.map((b) => (b.id === activeBoard.id ? { ...b, name: boardName.trim() } : b))
+                  );
+                }
+              }}
+              className="h-8 font-semibold text-xs border-transparent hover:border-border focus:border-border max-w-[200px]"
+            />
 
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs text-muted-foreground">
-            {saveStatus === "saving" && (
-              <span className="flex items-center gap-1 text-primary">
-                <LoaderCircle className="h-3 w-3 animate-spin" /> {ww.saving}
-              </span>
+            {activeBoard?.task_id && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px] gap-1 px-2 text-primary border-primary/30 hover:bg-primary/10"
+                onClick={() => onOpenTask && onOpenTask(activeBoard.task_id!)}
+              >
+                <Sparkles className="h-3 w-3" /> Attached to Task
+              </Button>
             )}
-            {saveStatus === "saved" && <span className="text-emerald-500">{ww.saved}</span>}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* Undo / Redo */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={historyIndex <= 0}
+              onClick={handleUndo}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={historyIndex >= history.length - 1}
+              onClick={handleRedo}
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </Button>
+
+            <div className="h-4 w-[1px] bg-border mx-1" />
+
+            {/* Grid selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Grid Pattern">
+                  <Grid className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="text-xs">
+                <DropdownMenuItem onClick={() => setGridMode("dots")}>Dot Grid</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setGridMode("lines")}>Line Grid</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setGridMode("none")}>Blank Canvas</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Export Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1.5 shadow-xs">
+                  <Download className="h-3 w-3" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40 text-xs">
+                <DropdownMenuItem onClick={() => handleExport("png")}>Export as PNG</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("svg")}>Export as SVG</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("json")}>Export as JSON</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Floating Toolbar */}
+        <WhiteboardToolbar
+          tool={tool}
+          setTool={setTool}
+          selectedElement={selectedElement}
+          selectedCount={selectedElementIds.length}
+          stickyColor={stickyColor}
+          setStickyColor={setStickyColor}
+          shapeFillColor={shapeFillColor}
+          setShapeFillColor={setShapeFillColor}
+          shapeStrokeColor={shapeStrokeColor}
+          setShapeStrokeColor={setShapeStrokeColor}
+          textColor={textColor}
+          setTextColor={setTextColor}
+          pencilColor={pencilColor}
+          setPencilColor={setPencilColor}
+          pencilWidth={pencilWidth}
+          setPencilWidth={setPencilWidth}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+          onUpdateSelected={handleUpdateSelected}
+          onDuplicateSelected={handleDuplicateSelected}
+          onDeleteSelected={handleDeleteSelected}
+          onLayerChange={handleLayerChange}
+        />
+
+        {/* Interactive SVG Canvas */}
+        <div
+          ref={containerRef}
+          onWheel={handleWheel}
+          onContextMenu={(e) => e.preventDefault()}
+          className={cn(
+            "flex-1 relative overflow-hidden bg-background select-none cursor-default",
+            tool === "hand" && "cursor-grab active:cursor-grabbing",
+            tool === "eraser" && "cursor-crosshair",
+            (tool === "pencil" || tool === "highlighter") && "cursor-crosshair"
+          )}
+        >
+          <svg
+            ref={svgRef}
+            className="w-full h-full absolute inset-0 touch-none"
+            onContextMenu={(e) => e.preventDefault()}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          >
+            <defs>
+              {/* Dot Grid pattern */}
+              <pattern
+                id="wb-dots"
+                x={viewport.x % (24 * viewport.zoom)}
+                y={viewport.y % (24 * viewport.zoom)}
+                width={24 * viewport.zoom}
+                height={24 * viewport.zoom}
+                patternUnits="userSpaceOnUse"
+              >
+                <circle cx={2} cy={2} r={1 * Math.min(viewport.zoom, 1.5)} fill="rgba(148, 163, 184, 0.25)" />
+              </pattern>
+
+              {/* Line Grid pattern */}
+              <pattern
+                id="wb-lines"
+                x={viewport.x % (24 * viewport.zoom)}
+                y={viewport.y % (24 * viewport.zoom)}
+                width={24 * viewport.zoom}
+                height={24 * viewport.zoom}
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d={`M ${24 * viewport.zoom} 0 L 0 0 0 ${24 * viewport.zoom}`}
+                  fill="none"
+                  stroke="rgba(148, 163, 184, 0.12)"
+                  strokeWidth="1"
+                />
+              </pattern>
+
+              {/* Arrow Head Marker */}
+              <marker
+                id="arrowhead"
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+              </marker>
+            </defs>
+
+            {/* Grid Background */}
+            {gridMode === "dots" && <rect width="100%" height="100%" fill="url(#wb-dots)" />}
+            {gridMode === "lines" && <rect width="100%" height="100%" fill="url(#wb-lines)" />}
+
+            {/* Viewport Transform Layer */}
+            <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
+              {elements.map((el) => renderElement(el))}
+
+              {/* Marquee Selection Rectangle */}
+              {marqueeBox && (
+                <rect
+                  x={Math.min(marqueeBox.startX, marqueeBox.currentX)}
+                  y={Math.min(marqueeBox.startY, marqueeBox.currentY)}
+                  width={Math.abs(marqueeBox.currentX - marqueeBox.startX)}
+                  height={Math.abs(marqueeBox.currentY - marqueeBox.startY)}
+                  fill="rgba(59, 130, 246, 0.12)"
+                  stroke="#3b82f6"
+                  strokeWidth={1.5 / viewport.zoom}
+                  strokeDasharray="4 4"
+                  className="pointer-events-none"
+                />
+              )}
+            </g>
+          </svg>
+        </div>
+
+        {/* Bottom Zoom & Status Bar */}
+        <div className="absolute bottom-3 right-4 z-20 flex items-center gap-1.5 p-1 rounded-xl border border-border/80 bg-background/90 backdrop-blur-md shadow-lg text-xs">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 p-0"
+            onClick={() => handleZoom("out")}
+            title="Zoom Out (Ctrl -)"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <span className="w-10 text-center font-mono font-medium text-[11px]">
+            {Math.round(viewport.zoom * 100)}%
           </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 p-0"
+            onClick={() => handleZoom("in")}
+            title="Zoom In (Ctrl +)"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 p-0"
+            onClick={() => handleZoom("reset")}
+            title="Reset Zoom"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+
+          <div className="h-3.5 w-[1px] bg-border mx-1" />
+
+          <div className="flex items-center gap-1 pr-1 text-[11px] text-muted-foreground">
+            {saveStatus === "saving" && (
+              <>
+                <LoaderCircle className="h-3 w-3 animate-spin text-primary" />
+                <span>Saving...</span>
+              </>
+            )}
+            {saveStatus === "saved" && (
+              <>
+                <Check className="h-3 w-3 text-emerald-500" />
+                <span>Saved</span>
+              </>
+            )}
+            {saveStatus === "idle" && <span>{elements.length} elements</span>}
+          </div>
         </div>
       </div>
 
-      {/* Floating Canvas Toolbar */}
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 p-1.5 rounded-xl border border-border/80 bg-background/90 backdrop-blur shadow-lg">
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "select" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("select")}
-          title={ww.toolSelect}
-        >
-          <MousePointer className="h-4 w-4" />
-        </Button>
+      {/* Dialogs */}
+      <WhiteboardFolderDialog
+        open={folderDialogOpen}
+        onOpenChange={setFolderDialogOpen}
+        onSave={handleSaveFolder}
+        folder={editingFolder}
+      />
 
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "sticky" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("sticky")}
-          title={ww.toolSticky}
-        >
-          <StickyNote className="h-4 w-4 text-amber-500" />
-        </Button>
-
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "text" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("text")}
-          title={ww.toolText}
-        >
-          <Type className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "rectangle" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("rectangle")}
-          title={ww.toolRectangle}
-        >
-          <Square className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "circle" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("circle")}
-          title={ww.toolCircle}
-        >
-          <CircleIcon className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "arrow" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("arrow")}
-          title={ww.toolArrow}
-        >
-          <ArrowUpRight className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          size="sm"
-          variant={tool === "pen" ? "default" : "ghost"}
-          className="h-8 w-8 p-0"
-          onClick={() => setTool("pen")}
-          title={ww.toolPen}
-        >
-          <PenTool className="h-4 w-4" />
-        </Button>
-
-        <div className="h-5 w-px bg-border mx-1" />
-
-        {tool === "sticky" && (
-          <div className="flex items-center gap-1 px-1">
-            {STICKY_COLORS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                className={`h-5 w-5 rounded-full border transition ${
-                  stickyColor === c.value ? "scale-125 border-primary" : "border-black/10"
-                }`}
-                style={{ backgroundColor: c.value }}
-                onClick={() => setStickyColor(c.value)}
-              />
-            ))}
-          </div>
-        )}
-
-        {(tool === "rectangle" || tool === "circle" || tool === "arrow" || tool === "pen" || tool === "text") && (
-          <div className="flex items-center gap-1 px-1">
-            {STROKE_COLORS.slice(0, 5).map((color) => (
-              <button
-                key={color}
-                type="button"
-                className={`h-5 w-5 rounded-full border transition ${
-                  strokeColor === color ? "scale-125 border-primary" : "border-black/10"
-                }`}
-                style={{ backgroundColor: color }}
-                onClick={() => setStrokeColor(color)}
-              />
-            ))}
-          </div>
-        )}
-
-        {selectedElementId && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-            onClick={handleDeleteSelected}
-            title="Delete Selected"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Floating Bottom-Right Zoom Controls */}
-      <div className="absolute bottom-4 right-4 z-30 flex items-center gap-1 p-1 rounded-xl border border-border/80 bg-background/90 backdrop-blur shadow-lg">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => handleZoom("out")}
-          title={ww.zoomOut}
-        >
-          <ZoomOut className="h-3.5 w-3.5" />
-        </Button>
-
-        <button
-          type="button"
-          onClick={() => handleZoom("reset")}
-          className="px-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
-          title={ww.resetZoom}
-        >
-          {Math.round(viewport.zoom * 100)}%
-        </button>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => handleZoom("in")}
-          title={ww.zoomIn}
-        >
-          <ZoomIn className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      {/* Main Interactive Canvas */}
-      <div className="flex-1 w-full h-full relative overflow-hidden bg-dot-grid cursor-crosshair">
-        <svg
-          ref={svgRef}
-          className="w-full h-full absolute inset-0 cursor-default"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onWheel={handleWheel}
-        >
-          <defs>
-            <marker
-              id="arrowhead"
-              markerWidth="10"
-              markerHeight="7"
-              refX="8"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
-            </marker>
-          </defs>
-
-          <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
-            {elements.map((el) => renderElement(el))}
-          </g>
-        </svg>
-      </div>
+      <WhiteboardAttachDialog
+        open={attachDialogOpen}
+        onOpenChange={setAttachDialogOpen}
+        tasks={tasks}
+        currentTaskId={activeBoard?.task_id || null}
+        onAttach={handleSaveAttachment}
+      />
     </div>
   );
 }
-
