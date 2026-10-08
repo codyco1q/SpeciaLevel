@@ -35,7 +35,7 @@ export interface DurationUnits {
   seconds: string;
 }
 
-const DEFAULT_DURATION_UNITS: DurationUnits = {
+export const DEFAULT_DURATION_UNITS: DurationUnits = {
   hours: "h",
   minutes: "m",
   seconds: "s",
@@ -59,19 +59,112 @@ export function formatDurationCompact(
   return `${localizeDigits(s, locale)}${units.seconds}`;
 }
 
+/** Alias for formatDurationCompact */
+export function formatDuration(
+  totalSeconds: number | null,
+  units: DurationUnits = DEFAULT_DURATION_UNITS,
+  locale?: string
+): string {
+  return formatDurationCompact(totalSeconds, units, locale);
+}
+
+/** Format seconds as decimal hours string, e.g. "2.50 hrs" */
+export function formatHoursDecimal(
+  totalSeconds: number | null,
+  hoursLabel = "hrs",
+  locale?: string
+): string {
+  if (totalSeconds === null || Number.isNaN(totalSeconds)) return `0.00 ${hoursLabel}`;
+  const hours = (Math.max(0, totalSeconds) / 3600).toFixed(2);
+  return `${localizeDigits(hours, locale)} ${hoursLabel}`;
+}
+
 /** ISO -> "3:04 PM". */
 export function formatTime(iso: string, locale?: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(toIntlLocale(locale), {
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(iso));
+  }).format(date);
 }
 
 /** ISO -> "Sep 9, 2026". */
 export function formatDate(iso: string, locale?: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(toIntlLocale(locale), {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(iso));
+  }).format(date);
 }
+
+/** ISO -> "Sep 9, 2026, 3:04 PM". */
+export function formatDateTime(iso: string, locale?: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/** ISO or Date -> Short Day Name (e.g. "Mon"). */
+export function formatDayName(dateOrIso: string | Date, locale?: string): string {
+  const date = typeof dateOrIso === "string" ? new Date(dateOrIso) : dateOrIso;
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
+    weekday: "short",
+  }).format(date);
+}
+
+/** Export time entries to a CSV file. */
+export function exportTimesheetsToCsv(
+  rows: {
+    userName?: string;
+    departmentName?: string | null;
+    clockedInAt: string;
+    clockedOutAt: string | null;
+    durationSeconds: number | null;
+    status: string;
+    notes?: string | null;
+  }[],
+  filename = "timesheets.csv"
+) {
+  const headers = ["Employee", "Department", "Clock In", "Clock Out", "Duration (Hours)", "Status", "Notes"];
+  const csvContent = [
+    headers.join(","),
+    ...rows.map((r) => {
+      const hours = r.durationSeconds ? (r.durationSeconds / 3600).toFixed(2) : "0.00";
+      const notesClean = (r.notes || "").replace(/"/g, '""');
+      return [
+        `"${(r.userName || "").replace(/"/g, '""')}"`,
+        `"${(r.departmentName || "").replace(/"/g, '""')}"`,
+        `"${r.clockedInAt}"`,
+        `"${r.clockedOutAt || ""}"`,
+        `"${hours}"`,
+        `"${r.status}"`,
+        `"${notesClean}"`,
+      ].join(",");
+    }),
+  ].join("\n");
+
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+
