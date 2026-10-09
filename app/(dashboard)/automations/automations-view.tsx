@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   Plus,
   Zap,
@@ -43,7 +44,6 @@ import {
   type WorkflowWithMeta,
   type AutomationConfigOptions,
 } from "@/lib/actions/automations";
-import { WorkflowBuilderStudio } from "./workflow-builder-studio";
 import { ExecutionLogsDialog } from "./execution-logs-dialog";
 import type {
   AutomationWorkflow,
@@ -75,9 +75,6 @@ export function AutomationsView({
   const [logs, setLogs] = useState<AutomationExecutionLog[]>(initialLogs);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTriggerFilter, setSelectedTriggerFilter] = useState<string>("all");
-
-  const [studioOpen, setStudioOpen] = useState(false);
-  const [editingWorkflow, setEditingWorkflow] = useState<AutomationWorkflow | null>(null);
 
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [selectedWorkflowForLogs, setSelectedWorkflowForLogs] = useState<WorkflowWithMeta | null>(null);
@@ -154,14 +151,13 @@ export function AutomationsView({
           {canManage && (
             <Button
               size="sm"
-              onClick={() => {
-                setEditingWorkflow(null);
-                setStudioOpen(true);
-              }}
+              asChild
               className="gap-1.5 text-xs h-9 font-medium shadow-sm"
             >
-              <Plus className="size-4" />
-              <span>{vb.newWorkflow}</span>
+              <Link href="/automations/new">
+                <Plus className="size-4" />
+                <span>{vb.newWorkflow}</span>
+              </Link>
             </Button>
           )}
         </div>
@@ -237,14 +233,13 @@ export function AutomationsView({
           {canManage && (
             <Button
               size="sm"
-              onClick={() => {
-                setEditingWorkflow(null);
-                setStudioOpen(true);
-              }}
+              asChild
               className="mt-4 gap-1.5 text-xs font-medium"
             >
-              <Plus className="size-4" />
-              <span>{vb.newWorkflow}</span>
+              <Link href="/automations/new">
+                <Plus className="size-4" />
+                <span>{vb.newWorkflow}</span>
+              </Link>
             </Button>
           )}
         </div>
@@ -261,15 +256,12 @@ export function AutomationsView({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3
+                    <Link
+                      href={`/automations/${wf.id}`}
                       className="text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
-                      onClick={() => {
-                        setEditingWorkflow(wf);
-                        setStudioOpen(true);
-                      }}
                     >
                       {wf.name}
-                    </h3>
+                    </Link>
 
                     <Badge variant="outline" className="text-[10px] font-medium capitalize bg-primary/5 text-primary border-primary/20 gap-1">
                       {wf.trigger_type === "form_submitted" && <FileText className="size-3" />}
@@ -344,15 +336,11 @@ export function AutomationsView({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setEditingWorkflow(wf);
-                          setStudioOpen(true);
-                        }}
-                        className="text-xs gap-2"
-                      >
-                        <Pencil className="size-3.5" />
-                        <span>{vb.editWorkflow}</span>
+                      <DropdownMenuItem asChild className="text-xs gap-2 cursor-pointer">
+                        <Link href={`/automations/${wf.id}`}>
+                          <Pencil className="size-3.5" />
+                          <span>{vb.editWorkflow}</span>
+                        </Link>
                       </DropdownMenuItem>
 
                       <DropdownMenuItem
@@ -385,31 +373,6 @@ export function AutomationsView({
             );
           })}
         </div>
-      )}
-      {/* Visual Workflow Builder Studio Modal */}
-      {studioOpen && (
-        <WorkflowBuilderStudio
-          workflow={editingWorkflow}
-          configOptions={configOptions}
-          open={studioOpen}
-          onOpenChange={(op) => {
-            setStudioOpen(op);
-            if (!op) setEditingWorkflow(null);
-          }}
-          onSaved={(savedWf) => {
-            setWorkflows((prev) => {
-              const idx = prev.findIndex((w) => w.id === savedWf.id);
-              if (idx >= 0) {
-                const updated = [...prev];
-                updated[idx] = { ...updated[idx], ...savedWf };
-                return updated;
-              }
-              return [savedWf, ...prev];
-            });
-          }}
-          platform={platform}
-          locale={locale}
-        />
       )}
 
       {/* Execution History Dialog */}

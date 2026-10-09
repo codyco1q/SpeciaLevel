@@ -742,8 +742,13 @@ export function TasksView({
       {activeView === "docs" && (
         <DocsWorkspace
           initialDocs={initialDocs}
+          initialWhiteboards={whiteboards}
           platform={platform}
           locale={locale}
+          onOpenWhiteboard={(whiteboardId) => {
+            setSelectedWhiteboardId(whiteboardId);
+            setActiveView("whiteboard");
+          }}
         />
       )}
 

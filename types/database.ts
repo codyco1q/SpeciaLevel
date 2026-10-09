@@ -150,6 +150,10 @@ export type RichTextBlockType =
   | "code"
   | "callout"
   | "divider"
+  | "doc_link"
+  | "whiteboard_link"
+  | "image"
+  | "file"
   | "p"
   | "h1"
   | "h2"
@@ -163,6 +167,17 @@ export interface RichTextBlock {
   content?: string;
   checked?: boolean;
   language?: string;
+  url?: string;
+  meta?: {
+    docId?: string;
+    docTitle?: string;
+    whiteboardId?: string;
+    whiteboardTitle?: string;
+    fileName?: string;
+    fileSize?: number;
+    fileType?: string;
+    [key: string]: any;
+  };
 }
 
 export interface TaskComment {

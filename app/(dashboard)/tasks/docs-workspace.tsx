@@ -51,13 +51,18 @@ const DOC_ICONS = ["📄", "📝", "💡", "🚀", "🎯", "📌", "✨", "📚"
 
 interface DocsWorkspaceProps {
   initialDocs: WorkspaceDoc[];
+  initialWhiteboards?: WorkspaceWhiteboard[];
   platform: Dictionary["platform"];
   locale: Locale;
+  onOpenWhiteboard?: (whiteboardId: string) => void;
 }
 
 export function DocsWorkspace({
   initialDocs,
+  initialWhiteboards = [],
   platform,
+  locale,
+  onOpenWhiteboard,
 }: DocsWorkspaceProps) {
   const t = platform.tasks;
   const dw = t.docsWorkspace || {
@@ -886,6 +891,10 @@ export function DocsWorkspace({
                   onChange={handleBlocksChange}
                   readOnly={false}
                   placeholder="Type '/' for commands or start writing notes..."
+                  availableDocs={docs}
+                  availableWhiteboards={initialWhiteboards}
+                  onOpenDoc={(docId) => setActiveDocId(docId)}
+                  onOpenWhiteboard={onOpenWhiteboard}
                 />
               </div>
             </div>
