@@ -61,6 +61,8 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   openrouter: "https://openrouter.ai/api/v1",
   custom_openai: "http://localhost:11434/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
 function resolveBaseUrl(provider: string): string | null {
@@ -68,7 +70,13 @@ function resolveBaseUrl(provider: string): string | null {
     const customBase = process.env.AI_CUSTOM_API_BASE
     return customBase && customBase.trim()
       ? customBase.trim().replace(/\/+$/, "")
-      : (PROVIDER_BASE_URLS[provider] ?? null)
+      : (PROVIDER_BASE_URLS[provider] ?? "http://localhost:11434/v1")
+  }
+  if (provider === "openai") {
+    const openaiBase = process.env.OPENAI_BASE_URL
+    return openaiBase && openaiBase.trim()
+      ? openaiBase.trim().replace(/\/+$/, "")
+      : PROVIDER_BASE_URLS.openai
   }
   return PROVIDER_BASE_URLS[provider] ?? null
 }
@@ -194,37 +202,85 @@ export async function runPromptExecution(
   }
 
   const input = extractInput(inputData)
-  if (userTemplate.includes("{input}") && !input) {
+  const attachments = Array.isArray(inputData?.attachments) ? inputData.attachments : []
+  if (userTemplate.includes("{input}") && !input && attachments.length === 0) {
     return { status: "error", error: errors.inputRequired }
   }
 
-  const renderedUserTemplate = renderTemplate(userTemplate, {
+  let renderedUserTemplate = renderTemplate(userTemplate, {
     ...inputData,
     input,
   })
 
-  let apiKey = process.env.AI_API_KEY
-  let baseUrl = resolveBaseUrl(modelProvider)
+  let apiKey: string | undefined = undefined
+  let baseUrl: string | null = null
 
-  // Look up tenant's BYOK provider credentials if available
+  // 1. Look up tenant's BYOK provider credentials from ai_model_providers table
   if (request.organizationId && request.organizationId !== "__api__") {
-    const { data: orgProvider } = await supabase
-      .from("ai_model_providers")
-      .select("api_key_encrypted, base_url, default_model, is_active")
-      .eq("organization_id", request.organizationId)
-      .eq("provider", modelProvider)
-      .eq("is_active", true)
-      .maybeSingle()
+    const requestedProvider =
+      typeof inputData?.modelProvider === "string"
+        ? inputData.modelProvider
+        : typeof inputData?.provider === "string"
+          ? inputData.provider
+          : null
+    const requestedModel =
+      typeof inputData?.modelName === "string"
+        ? inputData.modelName
+        : typeof inputData?.model === "string"
+          ? inputData.model
+          : null
 
-    if (orgProvider?.api_key_encrypted) {
-      apiKey = orgProvider.api_key_encrypted
-      if (orgProvider.base_url) {
-        baseUrl = orgProvider.base_url.replace(/\/+$/, "")
+    if (requestedProvider) {
+      modelProvider = requestedProvider
+    }
+    if (requestedModel) {
+      modelName = requestedModel
+    }
+
+    const { data: orgProviders } = await supabase
+      .from("ai_model_providers")
+      .select("provider, api_key_encrypted, base_url, default_model, is_active, updated_at")
+      .eq("organization_id", request.organizationId)
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+
+    if (orgProviders && orgProviders.length > 0) {
+      // Look for requested provider match (including custom vs custom_openai alias)
+      let matched = orgProviders.find(
+        (p) =>
+          p.provider === modelProvider ||
+          (modelProvider === "custom" && p.provider === "custom_openai") ||
+          (modelProvider === "custom_openai" && p.provider === "custom")
+      )
+
+      // If no direct match and running raw playground, use the first active BYOK provider
+      if (!matched && !promptId) {
+        matched = orgProviders[0]
       }
-      if (!promptId && orgProvider.default_model) {
-        modelName = orgProvider.default_model
+
+      if (matched && matched.api_key_encrypted) {
+        apiKey = matched.api_key_encrypted
+        modelProvider = matched.provider
+        baseUrl = matched.base_url?.trim()
+          ? matched.base_url.trim().replace(/\/+$/, "")
+          : resolveBaseUrl(matched.provider)
+
+        if (!promptId && !requestedModel && matched.default_model) {
+          modelName = matched.default_model
+        }
       }
     }
+  }
+
+  // 2. Fall back to environment variables only if no BYOK provider was resolved from the database
+  if (!apiKey) {
+    apiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY
+    baseUrl =
+      baseUrl ||
+      resolveBaseUrl(modelProvider) ||
+      process.env.AI_CUSTOM_API_BASE ||
+      process.env.OPENAI_BASE_URL ||
+      "https://api.openai.com/v1"
   }
 
   if (!apiKey || !baseUrl) {
@@ -249,6 +305,43 @@ export async function runPromptExecution(
       executed_by: request.userId,
     })
 
+  // Process attachments for multimodal/vision and document contexts
+  const imageAttachments = attachments.filter((att: any) => {
+    if (!att || typeof att !== "object") return false
+    const url = att.dataUrl || att.data || att.url
+    return (
+      Boolean(url) &&
+      (att.type?.startsWith("image/") || (typeof url === "string" && url.startsWith("data:image/")))
+    )
+  })
+  const textAttachments = attachments.filter((att: any) => {
+    if (!att || typeof att !== "object") return false
+    const url = att.dataUrl || att.data || att.url
+    return (
+      !att.type?.startsWith("image/") &&
+      (!url || (typeof url === "string" && !url.startsWith("data:image/")))
+    )
+  })
+
+  for (const doc of textAttachments) {
+    if (doc?.content) {
+      renderedUserTemplate += `\n\n--- Attachment: ${doc.name || "Document"} ---\n${doc.content}`
+    } else if (doc?.name) {
+      renderedUserTemplate += `\n\n--- Attachment: ${doc.name} (${doc.type || "file"}) ---`
+    }
+  }
+
+  const userMessageContent =
+    imageAttachments.length > 0
+      ? [
+          { type: "text", text: renderedUserTemplate },
+          ...imageAttachments.map((img: any) => ({
+            type: "image_url",
+            image_url: { url: img.dataUrl || img.data || img.url },
+          })),
+        ]
+      : renderedUserTemplate
+
   // Provider round-trip (OpenAI-compatible chat completions).
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS)
@@ -265,7 +358,7 @@ export async function runPromptExecution(
         model: modelName,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: renderedUserTemplate },
+          { role: "user", content: userMessageContent },
         ],
         temperature,
         ...(maxTokens ? { max_tokens: maxTokens } : {}),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -78,6 +78,11 @@ export function ManageTaskStagesDialog({
   const [newStageIsDone, setNewStageIsDone] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Sync internal state with prop changes when parent updates
+  useEffect(() => {
+    setStages(initialStages);
+  }, [initialStages]);
 
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen) {

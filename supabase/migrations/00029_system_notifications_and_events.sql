@@ -309,7 +309,7 @@ begin
   select * into v_form
   from public.inbound_forms
   where slug = p_form_slug
-    and is_active = true;
+    and is_published = true;
 
   if not found then
     return jsonb_build_object('success', false, 'error', 'Form not found or inactive');

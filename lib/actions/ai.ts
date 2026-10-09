@@ -67,6 +67,7 @@ export interface AiExecutionRow {
   toolKey: string | null
   status: "success" | "failed" | "running"
   modelUsed: string | null
+  inputData?: Record<string, unknown> | null
   outputText: string | null
   errorMessage: string | null
   durationMs: number | null
@@ -80,6 +81,7 @@ interface AiExecutionJoinRow {
   tool_key: string | null
   status: string
   model_used: string | null
+  input_data?: Record<string, unknown> | null
   output_text: string | null
   error_message: string | null
   duration_ms: number | null
@@ -124,6 +126,7 @@ function toAiExecutionRow(row: AiExecutionJoinRow): AiExecutionRow {
         ? row.status
         : "failed",
     modelUsed: row.model_used,
+    inputData: row.input_data ?? null,
     outputText: row.output_text ?? null,
     errorMessage: row.error_message ?? null,
     durationMs: row.duration_ms ?? null,

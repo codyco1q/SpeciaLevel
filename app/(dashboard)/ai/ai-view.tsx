@@ -1,14 +1,17 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useRef } from "react"
 import {
   Brain,
   Check,
   Copy,
   Cpu,
+  FileText,
   History,
+  Image as ImageIcon,
   LoaderCircle,
   MoreHorizontal,
+  Paperclip,
   Pencil,
   Play,
   Plus,
@@ -16,6 +19,7 @@ import {
   Sparkles,
   Trash2,
   Wand2,
+  X,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -42,11 +46,11 @@ import type { AiModelProvider, AiMcpServer } from "@/types/database"
 import { AI_PROVIDER_BADGE_CLASSES } from "./ai-meta"
 import { PromptDialog } from "./prompt-dialog"
 import { RunPromptDialog } from "./run-dialog"
-import { HistoryDialog } from "./history-dialog"
+import { HistoryDialog, HistoryContent } from "./history-dialog"
 import { ProvidersMcpTab } from "./providers-mcp-tab"
 
 type AiDict = Dictionary["platform"]["ai"]
-type TabKey = "playground" | "quickTools" | "prompts" | "providers_mcp"
+type TabKey = "playground" | "quickTools" | "prompts" | "providers_mcp" | "history"
 
 interface AiViewProps {
   initialPrompts: AiPromptRow[]
@@ -60,6 +64,12 @@ interface AiViewProps {
 interface OutputMeta {
   modelUsed: string | null
   durationMs: number | null
+}
+
+interface AttachmentItem {
+  name: string
+  type: string
+  data: string
 }
 
 function OutputBody({
@@ -100,7 +110,7 @@ function OutputBody({
         <>
           <pre
             dir="auto"
-            className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 text-sm leading-relaxed"
+            className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 text-sm leading-relaxed font-sans"
           >
             {output}
           </pre>
@@ -130,23 +140,72 @@ function OutputBody({
   )
 }
 
-function PlaygroundPane({ t }: { t: AiDict }) {
-  const [input, setInput] = useState("")
+function PlaygroundPane({
+  t,
+  initialInput = "",
+}: {
+  t: AiDict
+  initialInput?: string
+}) {
+  const [input, setInput] = useState(initialInput)
   const [output, setOutput] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [copied, setCopied] = useState(false)
   const [meta, setMeta] = useState<OutputMeta>({ modelUsed: null, durationMs: null })
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setAttachments((prev) => [
+            ...prev,
+            {
+              name: file.name,
+              type: file.type || "application/octet-stream",
+              data: reader.result as string,
+            },
+          ])
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
 
   function handleRun() {
-    if (running) return
+    if (running || (!input.trim() && attachments.length === 0)) return
     setError(null)
     setCopied(false)
     setOutput("")
     setMeta({ modelUsed: null, durationMs: null })
     setRunning(true)
 
-    executeAiTask({ promptId: null, toolKey: null, inputData: { input } })
+    executeAiTask({
+      promptId: null,
+      toolKey: null,
+      inputData: {
+        input: input.trim(),
+        attachments: attachments.map((a) => ({
+          name: a.name,
+          type: a.type,
+          data: a.data,
+        })),
+      },
+    })
       .then((result) => {
         setRunning(false)
         if (result.status === "error") {
@@ -165,6 +224,13 @@ function PlaygroundPane({ t }: { t: AiDict }) {
       })
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleRun()
+    }
+  }
+
   async function handleCopy() {
     if (!output) return
     try {
@@ -172,7 +238,7 @@ function PlaygroundPane({ t }: { t: AiDict }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Clipboard unavailable — nothing actionable to surface.
+      // Clipboard unavailable
     }
   }
 
@@ -189,12 +255,63 @@ function PlaygroundPane({ t }: { t: AiDict }) {
           id="ai-playground-input"
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={t.playground.placeholder}
           rows={5}
-          className="resize-y"
+          className="resize-y font-sans"
         />
+
+        {attachments.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {attachments.map((att, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs"
+              >
+                {att.type.startsWith("image/") ? (
+                  <ImageIcon className="size-3.5 text-primary shrink-0" />
+                ) : (
+                  <FileText className="size-3.5 text-muted-foreground shrink-0" />
+                )}
+                <span className="max-w-[140px] truncate font-medium">{att.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(idx)}
+                  className="text-muted-foreground hover:text-foreground ml-1"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">{t.playground.hint}</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+              multiple
+              accept="image/*,.txt,.md,.json,.csv"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={running}
+              className="h-8 gap-1.5 text-xs"
+            >
+              <Paperclip className="size-3.5" />
+              <span>Attach File / Image</span>
+            </Button>
+            <p className="hidden sm:inline-block text-xs text-muted-foreground">
+              Press <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd> to run, <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Shift+Enter</kbd> for newline
+            </p>
+          </div>
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -203,6 +320,7 @@ function PlaygroundPane({ t }: { t: AiDict }) {
                 setInput("")
                 setOutput("")
                 setError(null)
+                setAttachments([])
               }}
               disabled={running}
             >
@@ -211,7 +329,7 @@ function PlaygroundPane({ t }: { t: AiDict }) {
             <Button
               size="sm"
               onClick={handleRun}
-              disabled={running || !input.trim()}
+              disabled={running || (!input.trim() && attachments.length === 0)}
             >
               {running ? (
                 <LoaderCircle className="size-4 animate-spin" />
@@ -265,7 +383,7 @@ function QuickToolsPane({ t }: { t: AiDict }) {
     executeAiTask({
       promptId: null,
       toolKey: selectedTool,
-      inputData: { input },
+      inputData: { input: input.trim() },
     })
       .then((result) => {
         setRunning(false)
@@ -285,6 +403,13 @@ function QuickToolsPane({ t }: { t: AiDict }) {
       })
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleRun()
+    }
+  }
+
   async function handleCopy() {
     if (!output) return
     try {
@@ -292,7 +417,7 @@ function QuickToolsPane({ t }: { t: AiDict }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Clipboard unavailable — nothing actionable to surface.
+      // Clipboard unavailable
     }
   }
 
@@ -343,11 +468,15 @@ function QuickToolsPane({ t }: { t: AiDict }) {
         <Textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={t.quickTools.placeholder}
           rows={6}
-          className="resize-y"
+          className="resize-y font-sans"
         />
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Press <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd> to run
+          </p>
           <Button
             size="sm"
             onClick={handleRun}
@@ -396,6 +525,7 @@ export function AiView({
 
   const [tab, setTab] = useState<TabKey>("playground")
   const [prompts, setPrompts] = useState<AiPromptRow[]>(initialPrompts)
+  const [playgroundInput, setPlaygroundInput] = useState("")
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<AiPromptRow | null>(null)
@@ -447,7 +577,6 @@ export function AiView({
     })
   }
 
-  /** Deletes after the inline confirm bar has been armed. */
   function confirmDeletePrompt(row: AiPromptRow) {
     setActionError(null)
     setConfirmDeleteId(null)
@@ -459,6 +588,11 @@ export function AiView({
       }
       void refreshAll()
     })
+  }
+
+  function handleSelectFromHistory(input: string) {
+    setPlaygroundInput(input)
+    setTab("playground")
   }
 
   return (
@@ -510,12 +644,19 @@ export function AiView({
             className="gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg shrink-0 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
           >
             <Cpu className="size-4 shrink-0" />
-            <span>{(t.tabs as any).providersMcp ?? "Model Providers & MCP"}</span>
+            <span>{(t.tabs as Record<string, string>).providersMcp ?? "Model Providers & MCP"}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="history"
+            className="gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg shrink-0 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            <History className="size-4 shrink-0" />
+            <span>{t.history.title}</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="playground">
-          <PlaygroundPane t={t} />
+          <PlaygroundPane t={t} initialInput={playgroundInput} key={playgroundInput} />
         </TabsContent>
 
         <TabsContent value="quickTools">
@@ -689,6 +830,7 @@ export function AiView({
             </div>
           )}
         </TabsContent>
+
         <TabsContent value="providers_mcp">
           <ProvidersMcpTab
             initialProviders={initialProviders}
@@ -699,6 +841,15 @@ export function AiView({
           />
         </TabsContent>
 
+        <TabsContent value="history">
+          <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+            <HistoryContent
+              platform={platform}
+              locale={locale}
+              onSelectPrompt={handleSelectFromHistory}
+            />
+          </div>
+        </TabsContent>
       </Tabs>
 
       <PromptDialog
@@ -723,6 +874,7 @@ export function AiView({
         onOpenChange={setHistoryOpen}
         platform={platform}
         locale={locale}
+        onSelectPrompt={handleSelectFromHistory}
       />
     </div>
   )

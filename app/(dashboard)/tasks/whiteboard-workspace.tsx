@@ -790,6 +790,12 @@ export function WhiteboardWorkspace({
   };
 
   // Element modification
+  const handleUpdateElement = (elementId: string, updates: Partial<WhiteboardElement>) => {
+    updateElementsState((prev) =>
+      prev.map((el) => (el.id === elementId ? { ...el, ...updates } : el))
+    );
+  };
+
   const handleUpdateSelected = (updates: Partial<WhiteboardElement>) => {
     if (selectedElementIds.length === 0) return;
     updateElementsState((prev) =>
@@ -952,7 +958,7 @@ export function WhiteboardWorkspace({
                 defaultValue={el.text}
                 data-element-id={el.id}
                 onBlur={(e) => {
-                  handleUpdateSelected({ text: e.target.value });
+                  handleUpdateElement(el.id, { text: e.target.value });
                   setEditingElementId(null);
                 }}
                 onKeyDown={(e) => {
@@ -1046,7 +1052,7 @@ export function WhiteboardWorkspace({
                 autoFocus
                 defaultValue={el.text}
                 onBlur={(e) => {
-                  handleUpdateSelected({ text: e.target.value });
+                  handleUpdateElement(el.id, { text: e.target.value });
                   setEditingElementId(null);
                 }}
                 onKeyDown={(e) => {
