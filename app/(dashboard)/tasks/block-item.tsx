@@ -169,16 +169,13 @@ export function BlockItem({
 
   return (
     <div
-      draggable={!readOnly}
-      onDragStart={(e) => onDragStart?.(e, index)}
       onDragOver={(e) => onDragOver?.(e, index)}
       onDragLeave={(e) => onDragLeave?.(e, index)}
       onDrop={(e) => onDrop?.(e, index)}
-      onDragEnd={(e) => onDragEnd?.(e)}
       className={cn(
         "group relative flex items-start gap-1 rounded-lg px-1.5 py-1 hover:bg-muted/30 transition-all border border-transparent",
         isDragging && "opacity-40 bg-muted/50 border-dashed border-primary/40",
-        isDragOver && "border-t-2 border-t-primary bg-primary/5"
+        isDragOver && "relative before:absolute before:left-0 before:right-0 before:-top-1 before:h-0.5 before:bg-primary before:rounded-full before:shadow-[0_0_8px_rgba(59,130,246,0.8)] bg-primary/5"
       )}
     >
       {!readOnly && (
@@ -195,6 +192,13 @@ export function BlockItem({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
+                draggable={!readOnly}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", String(index));
+                  e.dataTransfer.effectAllowed = "move";
+                  onDragStart?.(e, index);
+                }}
+                onDragEnd={(e) => onDragEnd?.(e)}
                 className="rounded p-1 hover:bg-muted hover:text-foreground text-muted-foreground/70 cursor-grab active:cursor-grabbing transition-colors"
                 title="Drag to reorder or click for block options"
               >

@@ -98,6 +98,11 @@ export function DocsWorkspace({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [showIconPicker, setShowIconPicker] = useState(false);
 
+  // Drag and Drop state
+  const [draggingDocId, setDraggingDocId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [dragOverRoot, setDragOverRoot] = useState(false);
+
   // Dialog states
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [editingFolderDoc, setEditingFolderDoc] = useState<WorkspaceDoc | null>(null);
@@ -562,15 +567,79 @@ export function DocsWorkspace({
     const isFolder = doc.doc_type === "folder";
     const isCollapsed = collapsedFolders[doc.id] ?? false;
     const hasChildren = doc.children && doc.children.length > 0;
+    const isTargetFolder = dragOverFolderId === doc.id;
+    const isBeingDragged = draggingDocId === doc.id;
 
     return (
       <div key={doc.id} className="space-y-0.5 select-none">
         <div
+          draggable={true}
+          onDragStart={(e) => {
+            e.dataTransfer.setData(
+              "application/json",
+              JSON.stringify({ docId: doc.id, isFolder })
+            );
+            e.dataTransfer.setData("text/plain", doc.id);
+            e.dataTransfer.effectAllowed = "move";
+            setDraggingDocId(doc.id);
+          }}
+          onDragEnd={() => {
+            setDraggingDocId(null);
+            setDragOverFolderId(null);
+            setDragOverRoot(false);
+          }}
+          onDragOver={(e) => {
+            if (isFolder) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (dragOverFolderId !== doc.id) {
+                setDragOverFolderId(doc.id);
+              }
+            }
+          }}
+          onDragEnter={(e) => {
+            if (isFolder) {
+              e.preventDefault();
+              setDragOverFolderId(doc.id);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (isFolder) {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              if (dragOverFolderId === doc.id) {
+                setDragOverFolderId(null);
+              }
+            }
+          }}
+          onDrop={(e) => {
+            if (!isFolder) return;
+            e.preventDefault();
+            e.stopPropagation();
+            setDragOverFolderId(null);
+            setDraggingDocId(null);
+
+            let droppedDocId = draggingDocId;
+            if (!droppedDocId) {
+              try {
+                const payload = JSON.parse(
+                  e.dataTransfer.getData("application/json") || "{}"
+                );
+                droppedDocId = payload.docId;
+              } catch {
+                droppedDocId = e.dataTransfer.getData("text/plain");
+              }
+            }
+            if (!droppedDocId || droppedDocId === doc.id) return;
+            handleMove(droppedDocId, doc.id);
+          }}
           className={cn(
             "group flex items-center justify-between rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer transition border border-transparent",
             isActive
               ? "bg-primary/10 border-primary/30 text-primary font-semibold shadow-xs"
-              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            isTargetFolder &&
+              "ring-2 ring-primary bg-primary/20 text-primary border-primary/50 shadow-inner scale-[1.01]",
+            isBeingDragged && "opacity-40 scale-[0.98] border-dashed border-primary/40"
           )}
           style={{ paddingLeft: `${Math.max(8, depth * 14 + 8)}px` }}
           onClick={() => setActiveDocId(doc.id)}
@@ -744,7 +813,44 @@ export function DocsWorkspace({
         </div>
 
         {/* Tree List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (!dragOverRoot) setDragOverRoot(true);
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setDragOverRoot(true);
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+            setDragOverRoot(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverRoot(false);
+            setDraggingDocId(null);
+
+            let droppedDocId = draggingDocId;
+            if (!droppedDocId) {
+              try {
+                const payload = JSON.parse(
+                  e.dataTransfer.getData("application/json") || "{}"
+                );
+                droppedDocId = payload.docId;
+              } catch {
+                droppedDocId = e.dataTransfer.getData("text/plain");
+              }
+            }
+            if (!droppedDocId) return;
+            handleMove(droppedDocId, null);
+          }}
+          className={cn(
+            "flex-1 overflow-y-auto p-2 space-y-0.5 transition-colors",
+            dragOverRoot && "bg-primary/5 ring-1 ring-inset ring-primary/40 rounded-lg"
+          )}
+        >
           {filteredDocs.length === 0 ? (
             <div className="p-6 text-center text-xs text-muted-foreground">
               {dw.emptyWorkspace}
@@ -771,6 +877,7 @@ export function DocsWorkspace({
               onDeleteFolder={handleDelete}
               onSelectDoc={(docId) => setActiveDocId(docId)}
               onRenameDoc={handleRenamePrompt}
+              onMoveDoc={handleMove}
               dw={{
                 untitledFolder: dw.untitledFolder,
                 untitled: dw.untitled,

@@ -78,6 +78,10 @@ interface DealCardProps {
   hasNext: boolean;
   prevStageId?: string;
   nextStageId?: string;
+  canManage?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (e: React.DragEvent, deal: DealRow) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }
 
 function DealCard({
@@ -91,6 +95,10 @@ function DealCard({
   hasNext,
   prevStageId,
   nextStageId,
+  canManage,
+  isDragging,
+  onDragStart,
+  onDragEnd,
 }: DealCardProps) {
   const t = platform.crm;
   const daysSinceUpdate = Math.floor(
@@ -107,6 +115,18 @@ function DealCard({
 
   return (
     <div
+      draggable={canManage}
+      onDragStart={(e) => {
+        if (!canManage) return;
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify({ dealId: deal.id, sourceStageId: stageObj?.id })
+        );
+        e.dataTransfer.setData("text/plain", deal.id);
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart?.(e, deal);
+      }}
+      onDragEnd={onDragEnd}
       onClick={() => onSelect(deal)}
       role="button"
       tabIndex={0}
@@ -116,7 +136,10 @@ function DealCard({
           onSelect(deal);
         }
       }}
-      className="cursor-pointer rounded-lg border border-border bg-card p-3 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        "cursor-pointer rounded-lg border border-border bg-card p-3 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none",
+        isDragging && "shadow-2xl rotate-1 scale-[1.02] opacity-75 ring-2 ring-primary/50 border-primary transition-transform"
+      )}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-snug text-foreground line-clamp-2">
@@ -272,6 +295,9 @@ export function CrmView({
   const [winLossStatus, setWinLossStatus] = useState<"won" | "lost">("won");
   const [winLossTargetStageId, setWinLossTargetStageId] = useState<string | undefined>(undefined);
 
+  const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
+  const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
+
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -321,14 +347,14 @@ export function CrmView({
     if (!deal) return;
 
     const targetStage = activeStages.find((s) => s.id === stageId);
-    if (targetStage && (targetStage.probability === 100 || targetStage.name.toLowerCase() === "won")) {
+    if (targetStage && (targetStage.probability === 100 || targetStage.name.toLowerCase() === "won" || targetStage.stageType === "won")) {
       setWinLossDeal(deal);
       setWinLossStatus("won");
       setWinLossTargetStageId(stageId);
       setWinLossModalOpen(true);
       return;
     }
-    if (targetStage && (targetStage.probability === 0 || targetStage.name.toLowerCase() === "lost")) {
+    if (targetStage && (targetStage.probability === 0 || targetStage.name.toLowerCase() === "lost" || targetStage.stageType === "lost")) {
       setWinLossDeal(deal);
       setWinLossStatus("lost");
       setWinLossTargetStageId(stageId);
@@ -336,14 +362,28 @@ export function CrmView({
       return;
     }
 
+    // Optimistically update local board state
+    setDeals((prev) =>
+      prev.map((d) => {
+        if (d.id !== dealId) return d;
+        return {
+          ...d,
+          stageId,
+          stage: targetStage ? targetStage.name : d.stage,
+          stageObj: targetStage || d.stageObj,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+
     startTransition(async () => {
       setActionError(null);
       const res = await updateDealStage(dealId, stageId);
       if (res.status === "error") {
         setActionError(res.error || t.errors.updateFailed);
+        refreshData();
         return;
       }
-      refreshData();
     });
   }
 
@@ -577,7 +617,62 @@ export function CrmView({
                     </div>
 
                     {/* Column Cards Container */}
-                    <div className="space-y-2 rounded-xl bg-muted/40 p-2 min-h-[140px] flex-1">
+                    <div
+                      onDragOver={(e) => {
+                        if (!canManage) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverStageId !== stage.id) {
+                          setDragOverStageId(stage.id);
+                        }
+                      }}
+                      onDragEnter={(e) => {
+                        if (!canManage) return;
+                        e.preventDefault();
+                        setDragOverStageId(stage.id);
+                      }}
+                      onDragLeave={(e) => {
+                        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                        if (dragOverStageId === stage.id) {
+                          setDragOverStageId(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        if (!canManage) return;
+                        e.preventDefault();
+                        setDragOverStageId(null);
+                        setDraggingDealId(null);
+
+                        let droppedDealId = draggingDealId;
+                        if (!droppedDealId) {
+                          try {
+                            const payload = JSON.parse(
+                              e.dataTransfer.getData("application/json") || "{}"
+                            );
+                            droppedDealId = payload.dealId;
+                          } catch {
+                            droppedDealId = e.dataTransfer.getData("text/plain");
+                          }
+                        }
+                        if (!droppedDealId) return;
+
+                        const currentDeal = deals.find((d) => d.id === droppedDealId);
+                        if (!currentDeal) return;
+                        const currentStageId =
+                          currentDeal.stageId ||
+                          activeStages.find(
+                            (s) => s.name.toLowerCase() === currentDeal.stage.toLowerCase()
+                          )?.id;
+                        if (currentStageId === stage.id) return;
+
+                        handleStageMove(droppedDealId, stage.id);
+                      }}
+                      className={cn(
+                        "space-y-2 rounded-xl bg-muted/40 p-2 min-h-[140px] flex-1 transition-all border-2 border-transparent",
+                        dragOverStageId === stage.id &&
+                          "ring-2 ring-primary/70 bg-primary/10 border-dashed border-primary/50 shadow-inner"
+                      )}
+                    >
                       {stageDeals.length === 0 ? (
                         <p className="py-8 text-center text-xs text-muted-foreground/60 italic">
                           {t.noDealsInColumn}
@@ -596,6 +691,13 @@ export function CrmView({
                             hasNext={hasNext}
                             prevStageId={prevStageId}
                             nextStageId={nextStageId}
+                            canManage={canManage}
+                            isDragging={draggingDealId === deal.id}
+                            onDragStart={() => setDraggingDealId(deal.id)}
+                            onDragEnd={() => {
+                              setDraggingDealId(null);
+                              setDragOverStageId(null);
+                            }}
                           />
                         ))
                       )}

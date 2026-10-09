@@ -1,29 +1,48 @@
 "use client";
 
-import { ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { ArrowUp, ArrowDown, Trash2, GripVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { WORKFLOW_TEMPLATE_VARIABLES } from "@/lib/validations/automations";
 import type { EmailBlock } from "@/types/database";
 
 interface EmailBlockItemProps {
   block: EmailBlock;
+  index: number;
   isSelected: boolean;
+  isDragging?: boolean;
+  isDragOver?: boolean;
   onSelect: () => void;
   onUpdate: (updated: EmailBlock) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnter?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }
 
 export function EmailBlockItem({
   block,
+  index,
   isSelected,
+  isDragging,
+  isDragOver,
   onSelect,
   onUpdate,
   onMoveUp,
   onMoveDown,
   onDelete,
+  onDragStart,
+  onDragOver,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
 }: EmailBlockItemProps) {
   const align = block.style?.textAlign || "left";
 
@@ -38,20 +57,63 @@ export function EmailBlockItem({
   return (
     <div
       onClick={onSelect}
-      className={`relative p-3 rounded-lg border transition-all cursor-pointer group ${
+      onDragOver={onDragOver}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={cn(
+        "relative p-3 rounded-lg border transition-all cursor-pointer group",
         isSelected
           ? "border-primary ring-2 ring-primary/20 bg-primary/2 shadow-xs"
-          : "border-border/60 hover:border-border bg-background"
-      }`}
+          : "border-border/60 hover:border-border bg-background",
+        isDragOver &&
+          "relative before:absolute before:left-0 before:right-0 before:-top-1.5 before:h-0.5 before:bg-primary before:rounded-full before:shadow-[0_0_8px_rgba(59,130,246,0.8)] bg-primary/5",
+        isDragging && "opacity-40 scale-[0.99] border-dashed border-primary/40"
+      )}
     >
-      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 rounded-md border p-0.5 shadow-xs">
-        <button type="button" onClick={(e) => { e.stopPropagation(); onMoveUp(); }} className="size-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground">
+      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 rounded-md border p-0.5 shadow-xs z-10">
+        <button
+          type="button"
+          draggable={true}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onClick={(e) => e.stopPropagation()}
+          title="Drag to reorder block"
+          className="size-5 flex items-center justify-center rounded cursor-grab active:cursor-grabbing hover:bg-muted text-muted-foreground hover:text-foreground"
+        >
+          <GripVertical className="size-3" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveUp();
+          }}
+          title="Move up"
+          className="size-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+        >
           <ArrowUp className="size-3" />
         </button>
-        <button type="button" onClick={(e) => { e.stopPropagation(); onMoveDown(); }} className="size-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveDown();
+          }}
+          title="Move down"
+          className="size-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+        >
           <ArrowDown className="size-3" />
         </button>
-        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="size-5 flex items-center justify-center rounded hover:bg-destructive/10 text-destructive">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          title="Delete block"
+          className="size-5 flex items-center justify-center rounded hover:bg-destructive/10 text-destructive"
+        >
           <Trash2 className="size-3" />
         </button>
       </div>

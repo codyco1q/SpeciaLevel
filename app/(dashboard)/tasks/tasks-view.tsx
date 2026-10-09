@@ -89,6 +89,9 @@ interface TaskCardProps {
   onStageChange: (taskId: string, stageId: string) => void;
   platform: Dictionary["platform"];
   locale: Locale;
+  isDragging?: boolean;
+  onDragStart?: (e: React.DragEvent, task: TaskRow) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }
 
 function TaskCard({
@@ -100,6 +103,9 @@ function TaskCard({
   onStageChange,
   platform,
   locale,
+  isDragging,
+  onDragStart,
+  onDragEnd,
 }: TaskCardProps) {
   const t = platform.tasks;
   const isOverdue = task.dueDate ? isTaskOverdue(task.dueDate, todayIso) : false;
@@ -110,8 +116,23 @@ function TaskCard({
 
   return (
     <div
+      draggable={canManage}
+      onDragStart={(e) => {
+        if (!canManage) return;
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify({ taskId: task.id, sourceStageId: task.stageId })
+        );
+        e.dataTransfer.setData("text/plain", task.id);
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart?.(e, task);
+      }}
+      onDragEnd={onDragEnd}
       onClick={() => onOpen(task)}
-      className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3.5 shadow-sm transition hover:border-primary/50 hover:shadow-md cursor-pointer space-y-3"
+      className={cn(
+        "group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3.5 shadow-sm transition hover:border-primary/50 hover:shadow-md cursor-pointer space-y-3 select-none",
+        isDragging && "shadow-2xl rotate-1 scale-[1.02] opacity-75 ring-2 ring-primary/50 border-primary transition-transform"
+      )}
     >
       <div className="flex items-center justify-between gap-2">
         <Badge
@@ -229,6 +250,10 @@ export function TasksView({
   const [stages, setStages] = useState<TaskStage[]>(initialStages);
   const [whiteboards, setWhiteboards] = useState<WorkspaceWhiteboard[]>(initialWhiteboards);
   const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string | null>(null);
+
+  // Drag and Drop state
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -523,7 +548,54 @@ export function TasksView({
             return (
               <div
                 key={stage.id}
-                className="flex flex-col rounded-xl border border-border/80 bg-muted/20 p-3 shadow-xs min-h-[500px]"
+                onDragOver={(e) => {
+                  if (!canManage) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOverStageId !== stage.id) {
+                    setDragOverStageId(stage.id);
+                  }
+                }}
+                onDragEnter={(e) => {
+                  if (!canManage) return;
+                  e.preventDefault();
+                  setDragOverStageId(stage.id);
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  if (dragOverStageId === stage.id) {
+                    setDragOverStageId(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  if (!canManage) return;
+                  e.preventDefault();
+                  setDragOverStageId(null);
+                  setDraggingTaskId(null);
+
+                  let droppedTaskId = draggingTaskId;
+                  if (!droppedTaskId) {
+                    try {
+                      const payload = JSON.parse(
+                        e.dataTransfer.getData("application/json") || "{}"
+                      );
+                      droppedTaskId = payload.taskId;
+                    } catch {
+                      droppedTaskId = e.dataTransfer.getData("text/plain");
+                    }
+                  }
+                  if (!droppedTaskId) return;
+
+                  const currentTask = tasks.find((t) => t.id === droppedTaskId);
+                  if (!currentTask || currentTask.stageId === stage.id) return;
+
+                  handleStageChange(droppedTaskId, stage.id);
+                }}
+                className={cn(
+                  "flex flex-col rounded-xl border border-border/80 bg-muted/20 p-3 shadow-xs min-h-[500px] transition-all",
+                  dragOverStageId === stage.id &&
+                    "ring-2 ring-primary/70 bg-primary/10 border-dashed border-primary/50 shadow-inner"
+                )}
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between gap-2 pb-3 border-b border-border/50 mb-3">
@@ -572,6 +644,12 @@ export function TasksView({
                         onStageChange={handleStageChange}
                         platform={platform}
                         locale={locale}
+                        isDragging={draggingTaskId === task.id}
+                        onDragStart={() => setDraggingTaskId(task.id)}
+                        onDragEnd={() => {
+                          setDraggingTaskId(null);
+                          setDragOverStageId(null);
+                        }}
                       />
                     ))
                   )}

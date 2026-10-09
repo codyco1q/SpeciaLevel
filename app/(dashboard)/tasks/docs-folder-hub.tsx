@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Folder, FolderPlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { BlockEditor } from "./block-editor";
 import type { RichTextBlock, WorkspaceDoc } from "@/types/database";
@@ -18,6 +20,7 @@ interface DocsFolderHubProps {
   onDeleteFolder: (folder: WorkspaceDoc) => void;
   onSelectDoc: (docId: string) => void;
   onRenameDoc: (doc: WorkspaceDoc) => void;
+  onMoveDoc?: (docId: string, targetFolderId: string | null) => void;
   dw: {
     untitledFolder: string;
     untitled: string;
@@ -40,8 +43,11 @@ export function DocsFolderHub({
   onDeleteFolder,
   onSelectDoc,
   onRenameDoc,
+  onMoveDoc,
   dw,
 }: DocsFolderHubProps) {
+  const [draggingChildId, setDraggingChildId] = useState<string | null>(null);
+  const [dragOverSubfolderId, setDragOverSubfolderId] = useState<string | null>(null);
   const folderColor = folder.color || "#3b82f6";
   const childCount = folder.children?.length || 0;
 
@@ -158,45 +164,117 @@ export function DocsFolderHub({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {folder.children!.map((child) => (
-                <div
-                  key={child.id}
-                  onClick={() => onSelectDoc(child.id)}
-                  className="group flex items-start justify-between p-3.5 rounded-xl border border-border/70 bg-card hover:border-primary/40 hover:shadow-xs transition cursor-pointer"
-                >
-                  <div className="flex items-start gap-3 min-w-0 pr-2">
-                    {child.doc_type === "folder" ? (
-                      <Folder className="h-5 w-5 shrink-0 mt-0.5" style={{ color: child.color || "#3b82f6" }} />
-                    ) : (
-                      <span className="text-xl shrink-0 leading-none">{child.icon || "📄"}</span>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground group-hover:text-primary transition truncate">
-                        {child.title || (child.doc_type === "folder" ? dw.untitledFolder : dw.untitled)}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                        {child.doc_type === "folder"
-                          ? `${child.children?.length || 0} files`
-                          : child.plain_text || "Empty note"}
-                      </p>
-                    </div>
-                  </div>
+              {folder.children!.map((child) => {
+                const isSubfolder = child.doc_type === "folder";
+                const isOver = dragOverSubfolderId === child.id;
+                const isDragging = draggingChildId === child.id;
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 p-0 text-muted-foreground hover:text-foreground shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRenameDoc(child);
+                return (
+                  <div
+                    key={child.id}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "application/json",
+                        JSON.stringify({ docId: child.id, isFolder: isSubfolder })
+                      );
+                      e.dataTransfer.setData("text/plain", child.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      setDraggingChildId(child.id);
                     }}
-                    title={dw.rename}
+                    onDragEnd={() => {
+                      setDraggingChildId(null);
+                      setDragOverSubfolderId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (isSubfolder) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverSubfolderId !== child.id) {
+                          setDragOverSubfolderId(child.id);
+                        }
+                      }
+                    }}
+                    onDragEnter={(e) => {
+                      if (isSubfolder) {
+                        e.preventDefault();
+                        setDragOverSubfolderId(child.id);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (isSubfolder) {
+                        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                        if (dragOverSubfolderId === child.id) {
+                          setDragOverSubfolderId(null);
+                        }
+                      }
+                    }}
+                    onDrop={(e) => {
+                      if (!isSubfolder) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverSubfolderId(null);
+                      setDraggingChildId(null);
+
+                      let droppedDocId = draggingChildId;
+                      if (!droppedDocId) {
+                        try {
+                          const payload = JSON.parse(
+                            e.dataTransfer.getData("application/json") || "{}"
+                          );
+                          droppedDocId = payload.docId;
+                        } catch {
+                          droppedDocId = e.dataTransfer.getData("text/plain");
+                        }
+                      }
+                      if (!droppedDocId || droppedDocId === child.id) return;
+                      onMoveDoc?.(droppedDocId, child.id);
+                    }}
+                    onClick={() => onSelectDoc(child.id)}
+                    className={cn(
+                      "group flex items-start justify-between p-3.5 rounded-xl border border-border/70 bg-card hover:border-primary/40 hover:shadow-xs transition cursor-pointer select-none",
+                      isOver &&
+                        "ring-2 ring-primary bg-primary/15 border-primary shadow-md scale-[1.01]",
+                      isDragging && "opacity-40 scale-[0.98] border-dashed border-primary/40"
+                    )}
                   >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-start gap-3 min-w-0 pr-2">
+                      {child.doc_type === "folder" ? (
+                        <Folder
+                          className="h-5 w-5 shrink-0 mt-0.5"
+                          style={{ color: child.color || "#3b82f6" }}
+                        />
+                      ) : (
+                        <span className="text-xl shrink-0 leading-none">{child.icon || "📄"}</span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground group-hover:text-primary transition truncate">
+                          {child.title || (child.doc_type === "folder" ? dw.untitledFolder : dw.untitled)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {child.doc_type === "folder"
+                            ? `${child.children?.length || 0} files`
+                            : child.plain_text || "Empty note"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRenameDoc(child);
+                      }}
+                      title={dw.rename}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

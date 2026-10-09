@@ -64,6 +64,8 @@ export function WhiteboardSidebar({
   onDeleteFolder,
 }: WhiteboardSidebarProps) {
   const [search, setSearch] = useState("");
+  const [draggingBoardId, setDraggingBoardId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   const filteredBoards = boards.filter((b) => {
     const matchesSearch = b.name.toLowerCase().includes(search.toLowerCase());
@@ -154,11 +156,35 @@ export function WhiteboardSidebar({
           <button
             type="button"
             onClick={() => onSelectFolder("unorganized")}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (dragOverFolderId !== "unorganized") setDragOverFolderId("unorganized");
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragOverFolderId("unorganized");
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              if (dragOverFolderId === "unorganized") setDragOverFolderId(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOverFolderId(null);
+              setDraggingBoardId(null);
+              const boardId = draggingBoardId || e.dataTransfer.getData("text/plain");
+              if (!boardId) return;
+              const board = boards.find((b) => b.id === boardId);
+              if (board) onMoveBoard(board, null);
+            }}
             className={cn(
               "w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition",
               selectedFolderId === "unorganized"
                 ? "bg-primary/10 text-primary font-semibold"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+              dragOverFolderId === "unorganized" &&
+                "ring-2 ring-primary bg-primary/20 text-primary shadow-inner"
             )}
           >
             <div className="flex items-center gap-2">
@@ -170,14 +196,38 @@ export function WhiteboardSidebar({
 
           {folders.map((folder) => {
             const isSelected = selectedFolderId === folder.id;
+            const isOver = dragOverFolderId === folder.id;
             return (
               <div
                 key={folder.id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOverFolderId !== folder.id) setDragOverFolderId(folder.id);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDragOverFolderId(folder.id);
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  if (dragOverFolderId === folder.id) setDragOverFolderId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverFolderId(null);
+                  setDraggingBoardId(null);
+                  const boardId = draggingBoardId || e.dataTransfer.getData("text/plain");
+                  if (!boardId) return;
+                  const board = boards.find((b) => b.id === boardId);
+                  if (board && board.folder_id !== folder.id) onMoveBoard(board, folder.id);
+                }}
                 className={cn(
                   "group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer",
                   isSelected
                     ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  isOver && "ring-2 ring-primary bg-primary/20 text-primary shadow-inner"
                 )}
                 onClick={() => onSelectFolder(folder.id)}
               >
@@ -235,16 +285,28 @@ export function WhiteboardSidebar({
 
           {filteredBoards.map((board) => {
             const isActive = activeBoardId === board.id;
+            const isDragging = draggingBoardId === board.id;
             const elementCount = Array.isArray(board.elements_json) ? board.elements_json.length : 0;
             return (
               <div
                 key={board.id}
+                draggable={true}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", board.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  setDraggingBoardId(board.id);
+                }}
+                onDragEnd={() => {
+                  setDraggingBoardId(null);
+                  setDragOverFolderId(null);
+                }}
                 onClick={() => onSelectBoard(board.id)}
                 className={cn(
-                  "group relative flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition border",
+                  "group relative flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition border select-none",
                   isActive
                     ? "bg-primary/10 border-primary/40 shadow-xs text-foreground font-semibold"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                  isDragging && "opacity-40 scale-[0.98] border-dashed border-primary/40"
                 )}
               >
                 <div className="flex items-center gap-2 min-w-0 pr-1">

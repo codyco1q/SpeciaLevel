@@ -38,8 +38,10 @@ import {
   Layers,
   Code2,
   X,
+  GripVertical,
 } from "lucide-react";
 import { FormPreviewPane } from "./form-preview-pane";
+import { cn } from "@/lib/utils";
 import { createForm, updateForm } from "@/lib/actions/forms";
 import type {
   FormRow,
@@ -257,6 +259,8 @@ export function FormBuilderDialog({
   const [description, setDescription] = useState<string>("");
   const [isPublished, setIsPublished] = useState<boolean>(true);
   const [fields, setFields] = useState<FormField[]>(DEFAULT_FIELDS);
+  const [draggedFieldIndex, setDraggedFieldIndex] = useState<number | null>(null);
+  const [dragOverFieldIndex, setDragOverFieldIndex] = useState<number | null>(null);
 
   // Settings
   const [submitButtonText, setSubmitButtonText] = useState<string>("");
@@ -402,6 +406,23 @@ export function FormBuilderDialog({
     updated[index] = updated[targetIndex];
     updated[targetIndex] = temp;
     setFields(updated);
+  };
+
+  const handleReorderField = (fromIdx: number, toIdx: number) => {
+    if (
+      fromIdx === toIdx ||
+      fromIdx < 0 ||
+      toIdx < 0 ||
+      fromIdx >= fields.length ||
+      toIdx >= fields.length
+    )
+      return;
+    setFields((prev) => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, moved);
+      return updated;
+    });
   };
 
 
@@ -704,37 +725,68 @@ export function FormBuilderDialog({
                   )}
 
                   <div className="space-y-3">
-
                     {fields.map((field, idx) => (
                       <div
                         key={field.id}
-                        className="rounded-lg border border-border bg-card p-3.5 space-y-3 shadow-sm transition hover:border-border/80"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          if (dragOverFieldIndex !== idx) setDragOverFieldIndex(idx);
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          setDragOverFieldIndex(idx);
+                        }}
+                        onDragLeave={(e) => {
+                          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                          if (dragOverFieldIndex === idx) setDragOverFieldIndex(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragOverFieldIndex(null);
+                          setDraggedFieldIndex(null);
+                          const sourceIdx =
+                            draggedFieldIndex !== null
+                              ? draggedFieldIndex
+                              : parseInt(e.dataTransfer.getData("text/plain"), 10);
+                          if (isNaN(sourceIdx) || sourceIdx === idx) return;
+                          handleReorderField(sourceIdx, idx);
+                        }}
+                        className={cn(
+                          "group relative rounded-lg border border-border bg-card p-3.5 space-y-3 shadow-sm transition hover:border-border/80",
+                          dragOverFieldIndex === idx &&
+                            "relative before:absolute before:left-0 before:right-0 before:-top-1.5 before:h-0.5 before:bg-primary before:rounded-full before:shadow-[0_0_8px_rgba(59,130,246,0.8)] bg-primary/5",
+                          draggedFieldIndex === idx &&
+                            "opacity-40 scale-[0.99] border-dashed border-primary/40"
+                        )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-semibold text-muted-foreground font-mono">
-                            #{idx + 1}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              draggable={true}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("text/plain", String(idx));
+                                e.dataTransfer.effectAllowed = "move";
+                                setDraggedFieldIndex(idx);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedFieldIndex(null);
+                                setDragOverFieldIndex(null);
+                              }}
+                              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Drag to reorder field"
+                            >
+                              <GripVertical className="size-4" />
+                            </button>
+                            <span className="text-xs font-semibold text-muted-foreground font-mono">
+                              #{idx + 1}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] uppercase font-mono py-0 h-4">
+                              {field.type}
+                            </Badge>
+                          </div>
                           <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-7"
-                              disabled={idx === 0}
-                              onClick={() => handleMoveField(idx, "up")}
-                            >
-                              <ArrowUp className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-7"
-                              disabled={idx === fields.length - 1}
-                              onClick={() => handleMoveField(idx, "down")}
-                            >
-                              <ArrowDown className="size-3.5" />
-                            </Button>
                             <Button
                               type="button"
                               variant="ghost"
@@ -742,6 +794,7 @@ export function FormBuilderDialog({
                               className="size-7 text-destructive hover:text-destructive"
                               disabled={fields.length <= 1}
                               onClick={() => handleRemoveField(idx)}
+                              title={t.fieldsTab.removeField}
                             >
                               <Trash2 className="size-3.5" />
                             </Button>

@@ -79,6 +79,8 @@ export function EmailEditorStudio({
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [draggingBlockIndex, setDraggingBlockIndex] = useState<number | null>(null);
+  const [dragOverBlockIndex, setDragOverBlockIndex] = useState<number | null>(null);
 
   const handleAddBlock = (newBlock: EmailBlock) => {
     setBlocks([...blocks, newBlock]);
@@ -113,6 +115,23 @@ export function EmailEditorStudio({
     newBlocks[index + 1] = newBlocks[index];
     newBlocks[index] = temp;
     setBlocks(newBlocks);
+  };
+
+  const handleReorderBlocks = (fromIdx: number, toIdx: number) => {
+    if (
+      fromIdx === toIdx ||
+      fromIdx < 0 ||
+      toIdx < 0 ||
+      fromIdx >= blocks.length ||
+      toIdx >= blocks.length
+    )
+      return;
+    setBlocks((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
   };
 
   const handleInsertVariable = (blockId: string, varKey: string) => {
@@ -241,12 +260,48 @@ export function EmailEditorStudio({
               <EmailBlockItem
                 key={block.id}
                 block={block}
+                index={idx}
                 isSelected={block.id === selectedBlockId}
+                isDragging={draggingBlockIndex === idx}
+                isDragOver={dragOverBlockIndex === idx}
                 onSelect={() => setSelectedBlockId(block.id)}
                 onUpdate={handleUpdateBlock}
                 onMoveUp={() => handleMoveUp(idx)}
                 onMoveDown={() => handleMoveDown(idx)}
                 onDelete={() => handleDeleteBlock(block.id)}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", String(idx));
+                  e.dataTransfer.effectAllowed = "move";
+                  setDraggingBlockIndex(idx);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOverBlockIndex !== idx) setDragOverBlockIndex(idx);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDragOverBlockIndex(idx);
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  if (dragOverBlockIndex === idx) setDragOverBlockIndex(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverBlockIndex(null);
+                  setDraggingBlockIndex(null);
+                  const sourceIdx =
+                    draggingBlockIndex !== null
+                      ? draggingBlockIndex
+                      : parseInt(e.dataTransfer.getData("text/plain"), 10);
+                  if (isNaN(sourceIdx) || sourceIdx === idx) return;
+                  handleReorderBlocks(sourceIdx, idx);
+                }}
+                onDragEnd={() => {
+                  setDraggingBlockIndex(null);
+                  setDragOverBlockIndex(null);
+                }}
               />
             ))}
           </div>
