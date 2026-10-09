@@ -120,6 +120,7 @@ export async function getWorkflowById(id: string): Promise<AutomationWorkflow | 
 export async function saveWorkflow(input: unknown): Promise<{
   status: "success" | "error";
   workflow?: AutomationWorkflow;
+  data?: AutomationWorkflow;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 }> {
@@ -135,7 +136,11 @@ export async function saveWorkflow(input: unknown): Promise<{
     };
   }
 
-  const { id, name, description, isActive, triggerType, triggerConfig, steps } = parsed.data;
+  const { id, name, description } = parsed.data;
+  const isActive = parsed.data.isActive ?? parsed.data.is_active ?? false;
+  const triggerType = parsed.data.triggerType ?? parsed.data.trigger_type ?? "form_submitted";
+  const triggerConfig = parsed.data.triggerConfig ?? parsed.data.trigger_config ?? {};
+  const steps = parsed.data.steps ?? [];
   const supabase = await createServerClient();
 
   if (id) {
@@ -161,7 +166,7 @@ export async function saveWorkflow(input: unknown): Promise<{
     }
 
     revalidatePath("/automations");
-    return { status: "success", workflow: updated as AutomationWorkflow };
+    return { status: "success", workflow: updated as AutomationWorkflow, data: updated as AutomationWorkflow };
   } else {
     const { data: created, error } = await supabase
       .from("automation_workflows")
@@ -183,7 +188,7 @@ export async function saveWorkflow(input: unknown): Promise<{
     }
 
     revalidatePath("/automations");
-    return { status: "success", workflow: created as AutomationWorkflow };
+    return { status: "success", workflow: created as AutomationWorkflow, data: created as AutomationWorkflow };
   }
 }
 export async function toggleWorkflowStatus(
@@ -237,8 +242,8 @@ export async function deleteWorkflow(
 }
 
 export async function testWorkflowRun(
-  workflowId: string,
-  mockPayload?: Record<string, any>
+  workflowIdOrInput: string | { workflowId: string; mockPayload?: Record<string, any> },
+  mockPayloadArg?: Record<string, any>
 ): Promise<{
   status: "success" | "error";
   result?: { status: "completed" | "failed"; error?: string };
@@ -246,6 +251,9 @@ export async function testWorkflowRun(
 }> {
   const auth = await requirePermission("automations.manage");
   if (!auth.ok) return { status: "error", error: auth.error };
+
+  const workflowId = typeof workflowIdOrInput === "string" ? workflowIdOrInput : workflowIdOrInput?.workflowId;
+  const mockPayload = typeof workflowIdOrInput === "string" ? mockPayloadArg : (workflowIdOrInput?.mockPayload || mockPayloadArg);
 
   const parsed = testWorkflowSchema.safeParse({ workflowId, mockPayload });
   if (!parsed.success) {
@@ -406,5 +414,7 @@ export async function getAutomationConfigOptions(): Promise<AutomationConfigOpti
     emailTemplates,
   };
 }
+export { testWorkflowRun as testWorkflow };
+
 
 

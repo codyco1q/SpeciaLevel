@@ -44,7 +44,7 @@ export function ImportContactsDialog({
   onImportCompleted,
   platform,
 }: ImportContactsDialogProps) {
-  const t = platform.contacts?.import!;
+  const t = platform.contacts.import;
   const common = platform.common;
 
   const [step, setStep] = useState<Step>(1);

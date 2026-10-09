@@ -55,14 +55,14 @@ export function TriggerNode({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold tracking-wider uppercase text-primary">
-                {vb.trigger}
+                {t.triggerEvent}
               </span>
               <Badge variant="outline" className="text-[10px] py-0">
                 {currentTriggerDef?.title || triggerType}
               </Badge>
             </div>
             <h3 className="text-sm font-semibold text-foreground mt-0.5">
-              {t.triggerEvents[triggerType] || currentTriggerDef?.title}
+              {(t.triggerEvents as Record<string, string>)[triggerType] || currentTriggerDef?.title}
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
               {currentTriggerDef?.description}

@@ -453,7 +453,7 @@ export async function saveMcpServer(
   const { id, name, transportType, endpointUrl, headers, isActive } = parsed.data;
   const supabase = await createServerClient();
 
-  let finalHeaders = { ...(headers || {}) };
+  const finalHeaders = { ...(headers || {}) };
   if (id) {
     const { data: existing } = await supabase
       .from("ai_mcp_servers")
@@ -496,7 +496,7 @@ export async function saveMcpServer(
     updated_at: new Date().toISOString(),
   };
 
-  let query = supabase.from("ai_mcp_servers");
+  const query = supabase.from("ai_mcp_servers");
   let result;
 
   if (id) {

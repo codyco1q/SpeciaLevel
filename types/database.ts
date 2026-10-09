@@ -716,7 +716,8 @@ export interface WorkflowStep {
   type: WorkflowStepType;
   action_type: WorkflowActionType;
   name?: string;
-  config: Record<string, any>;
+  config?: Record<string, any>;
+  action_config?: Record<string, any>;
 }
 
 export interface AutomationWorkflow {

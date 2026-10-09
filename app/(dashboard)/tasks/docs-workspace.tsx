@@ -40,7 +40,7 @@ import {
   renameDoc,
   updateDoc,
 } from "@/lib/actions/tasks-powerhouse";
-import type { RichTextBlock, WorkspaceDoc } from "@/types/database";
+import type { RichTextBlock, WorkspaceDoc, WorkspaceWhiteboard } from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { DocsFolderDialog } from "./docs-folder-dialog";
 import { DocsMoveDialog } from "./docs-move-dialog";

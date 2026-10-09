@@ -119,7 +119,7 @@ export function WorkflowBuilderStudio({
   const handleAddStep = (actionType: WorkflowActionType) => {
     const actionDef = WORKFLOW_ACTION_DEFINITIONS.find((d) => d.type === actionType);
     const newStep: WorkflowStep = {
-      id: "step_" + Math.random().toString(36).slice(2, 9),
+      id: `step_${Date.now()}_${steps.length + 1}`,
       type: "action",
       action_type: actionType,
       name: actionDef?.name || "Action Step",

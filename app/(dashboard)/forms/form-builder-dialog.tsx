@@ -50,7 +50,6 @@ import type {
   DealStage,
 } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
-import { cn } from "@/lib/utils";
 
 interface FieldOptionsManagerProps {
   options: string[];

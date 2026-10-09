@@ -38,11 +38,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { RichTextBlock, RichTextBlockType, WorkspaceDoc, WorkspaceWhiteboard } from "@/types/database";
@@ -521,7 +516,9 @@ export function BlockItem({
           <div className="my-1.5">
             {block.meta?.docId ? (
               <div
-                onClick={() => onOpenDoc?.(block.meta?.docId)}
+                onClick={() => {
+                  if (block.meta?.docId) onOpenDoc?.(block.meta.docId);
+                }}
                 className="group/link flex items-center justify-between rounded-lg border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/40 transition-all cursor-pointer shadow-xs max-w-md"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -554,8 +551,8 @@ export function BlockItem({
                 </div>
               </div>
             ) : (
-              <Popover open={docPickerOpen} onOpenChange={setDocPickerOpen}>
-                <PopoverTrigger asChild>
+              <DropdownMenu open={docPickerOpen} onOpenChange={setDocPickerOpen}>
+                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="outline"
@@ -565,8 +562,8 @@ export function BlockItem({
                     <FileText className="size-3.5 text-primary" />
                     <span>Select document page to link...</span>
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-64 p-2">
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64 p-2">
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-2 size-3.5 text-muted-foreground" />
                     <Input
@@ -596,8 +593,8 @@ export function BlockItem({
                       ))
                     )}
                   </div>
-                </PopoverContent>
-              </Popover>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         )}
@@ -607,7 +604,9 @@ export function BlockItem({
           <div className="my-1.5">
             {block.meta?.whiteboardId ? (
               <div
-                onClick={() => onOpenWhiteboard?.(block.meta?.whiteboardId)}
+                onClick={() => {
+                  if (block.meta?.whiteboardId) onOpenWhiteboard?.(block.meta.whiteboardId);
+                }}
                 className="group/board flex items-center justify-between rounded-lg border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/40 transition-all cursor-pointer shadow-xs max-w-md"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -640,8 +639,8 @@ export function BlockItem({
                 </div>
               </div>
             ) : (
-              <Popover open={boardPickerOpen} onOpenChange={setBoardPickerOpen}>
-                <PopoverTrigger asChild>
+              <DropdownMenu open={boardPickerOpen} onOpenChange={setBoardPickerOpen}>
+                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="outline"
@@ -651,8 +650,8 @@ export function BlockItem({
                     <Layout className="size-3.5 text-purple-500" />
                     <span>Select whiteboard to embed...</span>
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-64 p-2">
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64 p-2">
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-2 size-3.5 text-muted-foreground" />
                     <Input
@@ -682,8 +681,8 @@ export function BlockItem({
                       ))
                     )}
                   </div>
-                </PopoverContent>
-              </Popover>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         )}

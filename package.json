@@ -46,8 +46,11 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.0.0",
+    "lightningcss-win32-x64-msvc": "^1.32.0"
   }
 }

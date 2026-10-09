@@ -6,6 +6,13 @@ import type {
   WorkflowStep,
 } from "@/types/database";
 
+export type {
+  WorkflowTriggerType,
+  WorkflowStepType,
+  WorkflowActionType,
+  WorkflowStep,
+};
+
 export const WORKFLOW_TRIGGER_TYPES = [
   "form_submitted",
   "appointment_booked",
@@ -30,6 +37,7 @@ export const WORKFLOW_ACTION_TYPES = [
 export interface WorkflowTriggerDefinition {
   type: WorkflowTriggerType;
   name: string;
+  title?: string;
   description: string;
   icon: string;
   badge: string;
@@ -46,6 +54,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
   {
     type: "form_submitted",
     name: "Form Submitted",
+    title: "Form Submitted",
     description: "Triggers when a lead or contact submits a public or internal form.",
     icon: "FileText",
     badge: "Lead Gen",
@@ -62,6 +71,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
   {
     type: "appointment_booked",
     name: "Appointment Booked",
+    title: "Appointment Booked",
     description: "Triggers when a client or lead schedules a calendar appointment.",
     icon: "Calendar",
     badge: "Scheduling",
@@ -70,6 +80,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
   {
     type: "deal_stage_changed",
     name: "Deal Stage Changed",
+    title: "Deal Stage Changed",
     description: "Triggers when a CRM deal is moved to a target pipeline stage.",
     icon: "TrendingUp",
     badge: "CRM Pipeline",
@@ -86,6 +97,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
   {
     type: "contact_tag_added",
     name: "Contact Tag Added",
+    title: "Contact Tag Added",
     description: "Triggers when a specific tag is applied to a contact profile.",
     icon: "Tag",
     badge: "CRM Contacts",
@@ -102,6 +114,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
   {
     type: "inbound_sms",
     name: "Inbound SMS Received",
+    title: "Inbound SMS Received",
     description: "Triggers when an incoming text message arrives on a telephony number.",
     icon: "MessageSquare",
     badge: "Telecom",
@@ -118,6 +131,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
   {
     type: "invoice_paid",
     name: "Invoice Paid",
+    title: "Invoice Paid",
     description: "Triggers when an invoice is fully paid via online gateway or manual receipt.",
     icon: "CreditCard",
     badge: "Billing",
@@ -128,6 +142,7 @@ export const WORKFLOW_TRIGGER_DEFINITIONS: WorkflowTriggerDefinition[] = [
 export interface WorkflowActionDefinition {
   type: WorkflowActionType;
   name: string;
+  title?: string;
   description: string;
   icon: string;
   badge: string;
@@ -232,20 +247,24 @@ export const WORKFLOW_TEMPLATE_VARIABLES = [
 
 export const workflowStepSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(WORKFLOW_STEP_TYPES),
-  action_type: z.enum(WORKFLOW_ACTION_TYPES),
+  type: z.enum(WORKFLOW_STEP_TYPES).optional(),
+  action_type: z.enum(WORKFLOW_ACTION_TYPES).optional(),
   name: z.string().optional(),
-  config: z.record(z.string(), z.any()).default({}),
+  config: z.record(z.string(), z.any()).optional().default({}),
+  action_config: z.record(z.string(), z.any()).optional().default({}),
 });
 
 export const saveWorkflowSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1, "Workflow name is required.").max(120, "Name must be 120 characters or fewer."),
   description: z.string().trim().max(500, "Description must be 500 characters or fewer.").optional().nullable(),
-  isActive: z.boolean().default(false),
-  triggerType: z.enum(WORKFLOW_TRIGGER_TYPES),
-  triggerConfig: z.record(z.string(), z.any()).default({}),
-  steps: z.array(workflowStepSchema).default([]),
+  isActive: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  triggerType: z.enum(WORKFLOW_TRIGGER_TYPES).optional(),
+  trigger_type: z.enum(WORKFLOW_TRIGGER_TYPES).optional(),
+  triggerConfig: z.record(z.string(), z.any()).optional(),
+  trigger_config: z.record(z.string(), z.any()).optional(),
+  steps: z.array(z.any()).default([]),
 });
 
 export type SaveWorkflowInput = z.infer<typeof saveWorkflowSchema>;

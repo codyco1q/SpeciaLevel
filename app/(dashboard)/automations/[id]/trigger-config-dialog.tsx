@@ -128,8 +128,8 @@ export function TriggerConfigDialog({
                 <SelectContent>
                   <SelectItem value="all">Any Inbound Phone Number</SelectItem>
                   {configOptions.phoneNumbers.map((pn) => (
-                    <SelectItem key={pn.id} value={pn.phone_number} className="text-xs">
-                      {pn.phone_number} {pn.friendly_name ? `(${pn.friendly_name})` : ""}
+                    <SelectItem key={pn.id} value={pn.phoneNumber} className="text-xs">
+                      {pn.label || pn.phoneNumber}
                     </SelectItem>
                   ))}
                 </SelectContent>

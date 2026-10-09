@@ -59,10 +59,10 @@ export function WorkflowStudioPage({
   const [triggerConfig, setTriggerConfig] = useState<Record<string, any>>(
     (workflow?.trigger_config as Record<string, any>) || {}
   );
-  const [steps, setSteps] = useState<WorkflowStep[]>(
-    ((workflow?.steps as WorkflowStep[]) || []).map((s) => ({
+  const [steps, setSteps] = useState<WorkflowStep[]>(() =>
+    ((workflow?.steps as WorkflowStep[]) || []).map((s, idx) => ({
       ...s,
-      id: s.id || `step_${Math.random().toString(36).substring(2, 9)}`,
+      id: s.id || `step_${idx + 1}`,
     }))
   );
 
@@ -82,20 +82,6 @@ export function WorkflowStudioPage({
   const [testRunning, setTestRunning] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
 
-  // Ctrl+S / Cmd+S save hotkey
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        if (canManage && !isPending) {
-          handleSave();
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [name, description, isActive, triggerType, triggerConfig, steps, canManage, isPending]);
-
   const handleSave = () => {
     if (!name.trim()) {
       setStatusMessage({ type: "error", text: "Workflow name cannot be empty." });
@@ -113,17 +99,32 @@ export function WorkflowStudioPage({
         is_active: isActive,
       });
 
-      if (res.status === "success" && res.data) {
-        setStatusMessage({ type: "success", text: vb.savedSuccess });
-        if (!workflowId) {
-          setWorkflowId(res.data.id);
-          router.replace(`/automations/${res.data.id}`);
+      if (res.status === "success" && (res.data || res.workflow)) {
+        const wf = res.data || res.workflow;
+        setStatusMessage({ type: "success", text: vb.savedToast });
+        if (!workflowId && wf) {
+          setWorkflowId(wf.id);
+          router.replace(`/automations/${wf.id}`);
         }
       } else {
-        setStatusMessage({ type: "error", text: res.error || vb.savedError });
+        setStatusMessage({ type: "error", text: res.error || "Failed to save workflow." });
       }
     });
   };
+
+  // Ctrl+S / Cmd+S save hotkey
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (canManage && !isPending) {
+          handleSave();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [name, description, isActive, triggerType, triggerConfig, steps, canManage, isPending]);
 
   const handleAddStep = (actionType: WorkflowActionType) => {
     const actionDef = WORKFLOW_ACTION_DEFINITIONS.find((a) => a.type === actionType);
@@ -155,8 +156,10 @@ export function WorkflowStudioPage({
 
     const newStep: WorkflowStep = {
       id: `step_${Math.random().toString(36).substring(2, 9)}`,
+      type: "action",
       action_type: actionType,
       name: actionDef?.title || actionType,
+      config: defaultActionConfig,
       action_config: defaultActionConfig,
     };
 

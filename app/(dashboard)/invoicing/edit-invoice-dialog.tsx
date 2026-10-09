@@ -97,10 +97,10 @@ function EditInvoiceForm({
   const [taxRate, setTaxRate] = useState(invoice.taxRate.toString());
   const [dueDate, setDueDate] = useState(invoice.dueDate ?? "");
   const [notes, setNotes] = useState(invoice.notes ?? "");
-  const [items, setItems] = useState<LineItemState[]>(
+  const [items, setItems] = useState<LineItemState[]>(() =>
     invoice.items && invoice.items.length > 0
-      ? invoice.items.map((item) => ({
-          key: item.id || Math.random().toString(36).slice(2),
+      ? invoice.items.map((item, idx) => ({
+          key: item.id || `item_${idx + 1}`,
           description: item.description,
           quantity: item.quantity.toString(),
           unitPrice: item.unitPrice.toString(),

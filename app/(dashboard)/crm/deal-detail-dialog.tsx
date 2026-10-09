@@ -95,9 +95,9 @@ export function DealDetailDialog({
   const availableStages = currentPipeline?.stages || [];
   const activeStage = availableStages.find((s) => s.id === deal.stageId) || deal.stageObj;
 
-  const daysSinceUpdate = Math.floor(
-    (Date.now() - new Date(deal.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const daysSinceUpdate = deal.updatedAt
+    ? Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
   const isStale =
     activeStage &&
     activeStage.probability > 0 &&

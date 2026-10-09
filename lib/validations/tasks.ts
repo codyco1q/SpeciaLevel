@@ -34,6 +34,10 @@ export const richTextBlockTypeSchema = z.enum([
   "code",
   "callout",
   "divider",
+  "doc_link",
+  "whiteboard_link",
+  "image",
+  "file",
   "p",
   "h1",
   "h2",
@@ -48,6 +52,8 @@ export const richTextBlockSchema = z.object({
   content: z.string().optional(),
   checked: z.boolean().optional(),
   language: z.string().optional(),
+  url: z.string().optional(),
+  meta: z.record(z.string(), z.any()).optional(),
 });
 
 /** Localized string messages consumed by the task schema. */

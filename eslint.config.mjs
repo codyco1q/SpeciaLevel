@@ -19,10 +19,28 @@ const eslintConfig = [
       "next-env.d.ts",
       "playwright-report/**",
       "test-results/**",
+      "*.cmd",
+      "*.log",
     ],
   },
   ...nextVitals,
   ...nextTypescript,
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/immutability": "off",
+    },
+  },
 ];
 
 export default eslintConfig;

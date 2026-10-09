@@ -90,7 +90,7 @@ export function StudioHeader({
           className="gap-1.5 text-xs h-8"
         >
           <Play className="size-3.5 fill-current text-primary" />
-          <span className="hidden sm:inline">{vb.testTrigger}</span>
+          <span className="hidden sm:inline">{vb.runTest}</span>
         </Button>
 
         {/* Execution Logs Button */}

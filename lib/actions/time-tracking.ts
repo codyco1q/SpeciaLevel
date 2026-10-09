@@ -341,12 +341,12 @@ export async function clockOut(): Promise<ClockActionState> {
 }
 
 /** Start of the current UTC day (00:00:00 UTC). */
-export function startOfTodayUtc(now: Date): Date {
+function startOfTodayUtc(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
 /** Start of the current UTC week (Monday 00:00:00 UTC). */
-export function startOfWeekUtc(now: Date): Date {
+function startOfWeekUtc(now: Date): Date {
   const today = startOfTodayUtc(now);
   const day = today.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
   const offset = (day + 6) % 7; // Mon = 0, Sun = 6
@@ -356,7 +356,7 @@ export function startOfWeekUtc(now: Date): Date {
 }
 
 /** Start of the current UTC month (1st of month 00:00:00 UTC). */
-export function startOfMonthUtc(now: Date): Date {
+function startOfMonthUtc(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
