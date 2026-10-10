@@ -103,10 +103,32 @@ html[lang="ar"] *::after {
   }
 }
 
-  html, body {
-    scrollbar-gutter: stable;
-  }
-
+/* Hide scrollbars by default, show ultra-slim overlay on hover */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
 
 /* ------------------------------------------------------------------
  * Print — dedicated print-friendly invoice view (/invoicing/[id]).

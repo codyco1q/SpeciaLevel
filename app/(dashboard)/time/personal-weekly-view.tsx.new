@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState } from \"react\";\n
+import { formatDate, formatDurationCompact, formatHoursDecimal, localizeDigits } from \"./format\";\n
 import { formatDate, formatDurationCompact, formatHoursDecimal, localizeDigits } from "./format";
 import { EntriesTable } from "./entries-table";
-import { Button } from "@/components/ui/button";
 import type { PersonalStats } from "@/lib/actions/time-tracking";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
-import { cn } from "@/lib/utils";
 
 export interface PersonalWeeklyViewProps {
   personalStats: PersonalStats;
@@ -16,7 +15,7 @@ export interface PersonalWeeklyViewProps {
 
 export function PersonalWeeklyView({ personalStats, locale, platform }: PersonalWeeklyViewProps) {
   const t = platform.time;
-  const days = personalStats.weekDays;
+  const days = personalStats.weekDays; const [filterDate, setFilterDate] = useState<string | null>(null); const filteredEntries = filterDate ? entries.filter(e => e.startTime.startsWith(filterDate)) : entries;
   const entries = personalStats.weekEntries;
   const [filterDate, setFilterDate] = useState<string | null>(null);
 
@@ -43,33 +42,22 @@ export function PersonalWeeklyView({ personalStats, locale, platform }: Personal
             <span className="text-muted-foreground">{t.averageDailyHours}: </span>
             <span className="font-mono font-bold">{formatHoursDecimal(personalStats.averageDailySecondsThisWeek, t.durationHours, locale)}</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setFilterDate(null)} disabled={!filterDate}>
-            All Week
-          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {days.map((day) => {
-          const d = new Date(day.date);
-          const formattedWeekDay = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(d);
-          const formattedDate = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(d);
-          
           const percentage = Math.min(100, Math.round((day.totalSeconds / maxSeconds) * 100));
           return (
             <div
               key={day.date}
-              className={cn(
-                "rounded-lg border p-3 transition-all cursor-pointer hover:border-primary/50",
-                filterDate === day.date ? "border-primary bg-primary/10" : day.isToday ? "border-primary bg-primary/5 shadow-xs" : "border-border bg-card"
-              )}
-              onClick={() => setFilterDate(day.date)}
+              className={`rounded-lg border p-3 transition-all ${day.isToday ? "border-primary bg-primary/5 shadow-xs" : "border-border bg-card"}`}
             >
               <div className="flex items-center justify-between text-xs">
-                <span className={cn("font-semibold", day.isToday || filterDate === day.date ? "text-primary" : "text-muted-foreground")}>{formattedWeekDay}</span>
+                <span className={`font-semibold ${day.isToday ? "text-primary" : "text-muted-foreground"}`}>{day.dayLabel}</span>
                 {day.isToday && <span className="size-1.5 rounded-full bg-primary" />}
               </div>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{formattedDate}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(day.date, locale)}</p>
               <p className="mt-3 font-mono text-lg font-bold tabular-nums">{formatHoursDecimal(day.totalSeconds, t.durationHours, locale)}</p>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${percentage}%` }} />

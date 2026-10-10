@@ -61,7 +61,7 @@ export function FormsView({
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormRow | null>(null);
   const [builderTab, setBuilderTab] = useState<"fields" | "settings" | "share">("fields");
-  const [submissionsForm, setSubmissionsForm] = useState<FormRow | null>(null);
+  const [activeTab, setActiveTab] = useState<"forms" | "submissions">("forms");
   const [deletingForm, setDeletingForm] = useState<FormRow | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -389,6 +389,21 @@ export function FormsView({
         dictionary={t}
         locale={locale}
       />
+
+        <div className=\"flex items-center gap-1 mb-4 border-b border-border\">
+          <button
+            onClick={() => setActiveTab(\"forms\")}
+            className={`px-4 py-2 text-sm ${activeTab === \"forms\" ? \"border-b-2 border-primary font-medium\" : \"text-muted-foreground\"}`}
+          >
+            {t.title}
+          </button>
+          <button
+            onClick={() => setActiveTab(\"submissions\")}
+            className={`px-4 py-2 text-sm ${activeTab === \"submissions\" ? \"border-b-2 border-primary font-medium\" : \"text-muted-foreground\"}`}
+          >
+            {t.submissions.title}
+          </button>
+        </div>
 
       {/* Delete Confirmation Alert */}
       <Dialog
