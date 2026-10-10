@@ -570,6 +570,7 @@ export function PhoneNumbersView({
         onOpenChange={setLogCallOpen}
         contacts={initialContacts}
         onLogged={refreshAuditLogs}
+        platform={platform}
       />
 
       <DeleteConfirmationDialog
