@@ -390,16 +390,16 @@ export function FormsView({
         locale={locale}
       />
 
-        <div className=\"flex items-center gap-1 mb-4 border-b border-border\">
+        <div className="flex items-center gap-1 mb-4 border-b border-border">
           <button
-            onClick={() => setActiveTab(\"forms\")}
-            className={`px-4 py-2 text-sm ${activeTab === \"forms\" ? \"border-b-2 border-primary font-medium\" : \"text-muted-foreground\"}`}
+            onClick={() => setActiveTab("forms")}
+            className={`px-4 py-2 text-sm ${activeTab === "forms" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
           >
             {t.title}
           </button>
           <button
-            onClick={() => setActiveTab(\"submissions\")}
-            className={`px-4 py-2 text-sm ${activeTab === \"submissions\" ? \"border-b-2 border-primary font-medium\" : \"text-muted-foreground\"}`}
+            onClick={() => setActiveTab("submissions")}
+            className={`px-4 py-2 text-sm ${activeTab === "submissions" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
           >
             {t.submissions.title}
           </button>
