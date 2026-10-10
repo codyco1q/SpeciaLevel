@@ -57,6 +57,7 @@ export function FormsView({
   locale,
 }: FormsViewProps) {
   const [forms, setForms] = useState<FormRow[]>(initialForms);
+  const [submissionsForm, setSubmissionsForm] = useState<FormRow | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormRow | null>(null);

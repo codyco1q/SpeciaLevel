@@ -21,7 +21,7 @@ export function PersonalWeeklyView({ personalStats, locale, platform }: Personal
   const [filterDate, setFilterDate] = useState<string | null>(null);
 
   const filteredEntries = filterDate 
-    ? entries.filter(e => e.startTime.startsWith(filterDate))
+    ? entries.filter(e => e.clockedInAt.startsWith(filterDate))
     : entries;
 
   const maxSeconds = Math.max(1, ...days.map((d) => d.totalSeconds));
