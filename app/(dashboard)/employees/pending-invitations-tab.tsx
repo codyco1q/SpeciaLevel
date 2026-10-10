@@ -68,7 +68,7 @@ function InviteLinkButton({
   const [copied, setCopied] = useState(false);
 
   async function copyLink() {
-    const url = `${window.location.origin}/signup?invite=${token}`;
+    const url = `${window.location.origin}/accept-invite?token=${token}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

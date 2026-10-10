@@ -514,7 +514,14 @@ export type InvoiceStatus =
   | "overdue"
   | "cancelled";
 
-export type PaymentProvider = "manual" | "stripe" | "bank_transfer";
+export type PaymentProvider =
+  | "manual"
+  | "stripe"
+  | "bank_transfer"
+  | "paymob"
+  | "paytabs"
+  | "fawry"
+  | "paypal";
 
 /** NUMERIC columns arrive from PostgREST as strings by default. */
 export interface Invoice {

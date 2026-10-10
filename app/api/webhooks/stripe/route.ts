@@ -11,10 +11,9 @@ export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!stripeSecretKey || !webhookSecret) {
-    console.error("[stripe-webhook] Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET");
     return NextResponse.json(
-      { error: "Stripe configuration is missing on the server." },
-      { status: 500 }
+      { message: "Stripe not configured" },
+      { status: 200 }
     );
   }
 

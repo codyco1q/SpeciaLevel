@@ -103,6 +103,11 @@ html[lang="ar"] *::after {
   }
 }
 
+  html, body {
+    scrollbar-gutter: stable;
+  }
+
+
 /* ------------------------------------------------------------------
  * Print — dedicated print-friendly invoice view (/invoicing/[id]).
  * Neutralise the fixed-height dashboard shell so the A4 document

@@ -423,7 +423,9 @@ export async function createInvoice(
  */
 export async function updateInvoiceStatus(
   id: string,
-  status: string
+  status: string,
+  provider?: PaymentProvider,
+  paymentIntentId?: string
 ): Promise<InvoicingActionState> {
   const auth = await requireInvoicingPermission("invoicing.manage");
   if (!auth.ok) return auth.error;
@@ -441,10 +443,25 @@ export async function updateInvoiceStatus(
   }
 
   const supabase = await createServerClient();
+  const now = new Date().toISOString();
+  const updatePayload: Record<string, any> = {
+    status: parsed.data,
+    updated_at: now,
+  };
+
+  if (parsed.data === "paid") {
+    updatePayload.paid_at = now;
+    if (provider) {
+      updatePayload.payment_provider = provider;
+    }
+    if (paymentIntentId) {
+      updatePayload.payment_intent_id = paymentIntentId;
+    }
+  }
 
   const { data: updated, error } = await supabase
     .from("invoices")
-    .update({ status: parsed.data, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq("id", id)
     .eq("organization_id", auth.organizationId)
     .select("id");

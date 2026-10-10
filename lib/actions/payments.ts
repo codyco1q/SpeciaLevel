@@ -1,23 +1,144 @@
 "use server";
 
-import Stripe from "stripe";
 import { getPublicInvoiceByToken } from "@/lib/actions/invoicing";
-
-function getStripeClient(): Stripe | null {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) return null;
-  return new Stripe(secretKey);
-}
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+import type { PaymentProvider } from "@/types/database";
+import {
+  createPaymobSession,
+  createPayTabsSession,
+  createStripeSession,
+} from "@/lib/services/payments-gateway";
 
 export interface CreateCheckoutSessionResult {
   status: "success" | "error";
   checkoutUrl?: string;
+  provider?: PaymentProvider;
   error?: string;
 }
 
+export interface OrganizationPaymentOption {
+  provider: PaymentProvider | string;
+  name: string;
+  badge?: string;
+  isConnected: boolean;
+}
+
 /**
- * Creates a Stripe Checkout session for a public invoice payment.
- * Unauthenticated callable; validated against the secure share token.
+ * Discovers connected payment gateways for the organization that owns the invoice.
+ * Checks `organization_integrations` and environment fallback.
+ */
+export async function getInvoicePaymentOptions(
+  shareToken: string
+): Promise<{
+  status: "success" | "error";
+  options: OrganizationPaymentOption[];
+  activeProvider: PaymentProvider | "manual" | "bank_transfer";
+  error?: string;
+}> {
+  if (!shareToken) {
+    return {
+      status: "error",
+      options: [],
+      activeProvider: "manual",
+      error: "Missing invoice share token.",
+    };
+  }
+
+  const invoice = await getPublicInvoiceByToken(shareToken);
+  if (!invoice) {
+    return {
+      status: "error",
+      options: [],
+      activeProvider: "manual",
+      error: "Invoice not found.",
+    };
+  }
+
+  const options: OrganizationPaymentOption[] = [
+    {
+      provider: "bank_transfer",
+      name: "Bank Wire Transfer",
+      badge: "Manual Settlement",
+      isConnected: true,
+    },
+  ];
+
+  if (!invoice.organizationId) {
+    return {
+      status: "success",
+      options,
+      activeProvider: "bank_transfer",
+    };
+  }
+
+  const supabase = createServiceRoleClient();
+  const { data: integrations } = await supabase
+    .from("organization_integrations")
+    .select("provider, status, credentials_encrypted, config")
+    .eq("organization_id", invoice.organizationId)
+    .eq("category", "payment")
+    .eq("status", "connected");
+
+  const connectedList = (integrations || []).map((i) => i.provider);
+
+  if (connectedList.includes("paymob")) {
+    options.unshift({
+      provider: "paymob",
+      name: "Paymob (Cards & Mobile Wallets)",
+      badge: "MENA & Meeza",
+      isConnected: true,
+    });
+  }
+
+  if (connectedList.includes("paytabs")) {
+    options.unshift({
+      provider: "paytabs",
+      name: "PayTabs (Mada, Apple Pay, Cards)",
+      badge: "GCC & Mada",
+      isConnected: true,
+    });
+  }
+
+  if (connectedList.includes("fawry")) {
+    options.unshift({
+      provider: "fawry",
+      name: "Fawry Pay",
+      badge: "Egypt POS / Cash",
+      isConnected: true,
+    });
+  }
+
+  if (connectedList.includes("paypal")) {
+    options.unshift({
+      provider: "paypal",
+      name: "PayPal & Digital Wallet",
+      badge: "PayPal",
+      isConnected: true,
+    });
+  }
+
+  if (connectedList.includes("stripe") || process.env.STRIPE_SECRET_KEY) {
+    options.unshift({
+      provider: "stripe",
+      name: "Credit / Debit Card (Stripe)",
+      badge: "Global Cards",
+      isConnected: true,
+    });
+  }
+
+  const activeProvider = (options[0]?.provider as PaymentProvider) || "bank_transfer";
+
+  return {
+    status: "success",
+    options,
+    activeProvider,
+  };
+}
+
+/**
+ * Creates an online checkout / payment session for a public invoice payment.
+ * Automatically delegates to the active payment provider configured in `organization_integrations`
+ * (Paymob, PayTabs, Fawry, PayPal, or Stripe), or falls back to Stripe env credentials.
  */
 export async function createInvoiceCheckoutSession(
   shareToken: string
@@ -41,96 +162,96 @@ export async function createInvoiceCheckoutSession(
     };
   }
 
-  const stripe = getStripeClient();
-  if (!stripe) {
-    return {
-      status: "error",
-      error:
-        "Online card payment is currently unconfigured. Please use direct bank transfer or contact support.",
-    };
-  }
-
   const siteUrl = (
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   ).replace(/\/+$/, "");
 
-  const currency = (invoice.currency || "USD").toLowerCase();
+  let activeIntegration: {
+    provider: string;
+    credentials_encrypted: Record<string, any>;
+    config: Record<string, any>;
+  } | null = null;
 
-  // Construct Stripe line items
-  let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  if (invoice.organizationId) {
+    const supabase = createServiceRoleClient();
+    const { data: integrations } = await supabase
+      .from("organization_integrations")
+      .select("provider, status, credentials_encrypted, config")
+      .eq("organization_id", invoice.organizationId)
+      .eq("category", "payment")
+      .eq("status", "connected");
 
-  if (invoice.items && invoice.items.length > 0) {
-    lineItems = invoice.items.map((item) => ({
-      price_data: {
-        currency,
-        product_data: {
-          name: item.description || `Item #${item.id}`,
-        },
-        unit_amount: Math.max(0, Math.round(Number(item.unitPrice) * 100)),
-      },
-      quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
-    }));
-
-    if (invoice.taxAmount && Number(invoice.taxAmount) > 0) {
-      lineItems.push({
-        price_data: {
-          currency,
-          product_data: {
-            name: `Tax (${invoice.taxRate}%)`,
-          },
-          unit_amount: Math.max(0, Math.round(Number(invoice.taxAmount) * 100)),
-        },
-        quantity: 1,
-      });
+    if (integrations && integrations.length > 0) {
+      const priorityOrder = ["paymob", "paytabs", "fawry", "paypal", "stripe"];
+      for (const prov of priorityOrder) {
+        const found = integrations.find((i) => i.provider === prov);
+        if (found) {
+          activeIntegration = found;
+          break;
+        }
+      }
+      if (!activeIntegration) {
+        activeIntegration = integrations[0];
+      }
     }
-  } else {
-    lineItems = [
-      {
-        price_data: {
-          currency,
-          product_data: {
-            name: `Invoice ${invoice.invoiceNumber}`,
-            description: `Payment for invoice ${invoice.invoiceNumber} • ${invoice.organizationName}`,
-          },
-          unit_amount: Math.max(50, Math.round(Number(invoice.total) * 100)),
-        },
-        quantity: 1,
-      },
-    ];
   }
 
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      line_items: lineItems,
-      customer_email: invoice.contact?.email || undefined,
-      success_url: `${siteUrl}/pay/${shareToken}?success=true`,
-      cancel_url: `${siteUrl}/pay/${shareToken}?canceled=true`,
-      metadata: {
-        invoice_id: invoice.id,
-        org_id: invoice.organizationId || "",
-        share_token: shareToken,
-        invoice_number: invoice.invoiceNumber,
-      },
-    });
+  const provider =
+    activeIntegration?.provider || (process.env.STRIPE_SECRET_KEY ? "stripe" : null);
 
-    if (!session.url) {
+  if (provider === "paymob") {
+    const res = await createPaymobSession(
+      invoice,
+      activeIntegration?.credentials_encrypted || {}
+    );
+    if (res) return res;
+  }
+
+  if (provider === "paytabs") {
+    const res = await createPayTabsSession(
+      invoice,
+      activeIntegration?.credentials_encrypted || {},
+      siteUrl
+    );
+    if (res) return res;
+  }
+
+  if (provider === "paypal") {
+    const creds = activeIntegration?.credentials_encrypted || {};
+    if (creds.client_id || creds.clientId) {
       return {
-        status: "error",
-        error: "Failed to generate Stripe checkout session URL.",
+        status: "success",
+        provider: "paypal",
+        checkoutUrl: `https://www.paypal.com/checkoutnow?token=${encodeURIComponent(
+          invoice.shareToken
+        )}`,
       };
     }
-
-    return {
-      status: "success",
-      checkoutUrl: session.url,
-    };
-  } catch (err: any) {
-    console.error("[payments] Stripe Checkout session error:", err?.message || err);
-    return {
-      status: "error",
-      error: err?.message || "Failed to initiate online checkout session.",
-    };
   }
+
+  if (provider === "fawry") {
+    const creds = activeIntegration?.credentials_encrypted || {};
+    const merchantCode = creds.merchant_code || creds.merchantCode;
+    if (merchantCode) {
+      return {
+        status: "success",
+        provider: "fawry",
+        checkoutUrl: `https://www.atfawry.com/ECommercePlugin/FawryPay.jsp?merchant=${encodeURIComponent(
+          merchantCode
+        )}&orderNo=${encodeURIComponent(invoice.invoiceNumber)}&amount=${encodeURIComponent(
+          invoice.total
+        )}`,
+      };
+    }
+  }
+
+  const stripeKey = activeIntegration?.credentials_encrypted?.secret_key;
+  const stripeRes = await createStripeSession(invoice, siteUrl, stripeKey);
+  if (stripeRes) return stripeRes;
+
+  return {
+    status: "error",
+    error:
+      "Online card payment is currently unconfigured for this invoice. Please use direct bank transfer or contact the merchant.",
+  };
 }

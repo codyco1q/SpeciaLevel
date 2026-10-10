@@ -472,6 +472,16 @@ export async function submitPublicForm(
   const result = data as any;
 
   // Dispatch alert to organization admins/managers
+  // CRM Integration
+  if (result.organization_id && result.submission_id) {
+    await linkSubmissionToContact(result.organization_id, result.submission_id, {
+      name: result.lead_name,
+      email: result.lead_email,
+      phone: result.lead_phone,
+      message: (submissionData.message || submissionData.notes) as string,
+    });
+  }
+
   try {
     if (result.organization_id) {
       await dispatchNotificationToOrgAdmins({
@@ -519,4 +529,75 @@ export async function submitPublicForm(
     successMessage: result.success_message,
   };
 }
+
+// Helper to link form submission to CRM contact
+async function linkSubmissionToContact(
+  orgId: string,
+  submissionId: string,
+  lead: { name?: string; email?: string; phone?: string; message?: string }
+) {
+  if (!lead.email && !lead.phone) return;
+
+  const supabase = await createServerClient();
+  
+  // 1. Search for existing contact
+  let query = supabase
+    .from("crm_contacts")
+    .select("id")
+    .eq("organization_id", orgId);
+    
+  if (lead.email) {
+    query = query.eq("email", lead.email.toLowerCase());
+  } else if (lead.phone) {
+    query = query.eq("phone", lead.phone.replace(/\D/g, ""));
+  }
+
+  const { data: existing, error: searchError } = await query.maybeSingle();
+
+  let contactId = existing?.id;
+
+  // 2. Insert or Update contact
+  if (!contactId) {
+    const { data: newContact, error: insertError } = await supabase
+      .from("crm_contacts")
+      .insert({
+        organization_id: orgId,
+        first_name: lead.name?.split(" ")[0] || "New",
+        last_name: lead.name?.split(" ").slice(1).join(" ") || "Lead",
+        email: lead.email,
+        phone: lead.phone?.replace(/\D/g, ""),
+        source: "lead_form",
+      })
+      .select("id")
+      .single();
+      
+    if (newContact) contactId = newContact.id;
+  } else {
+    await supabase
+      .from("crm_contacts")
+      .update({
+        first_name: lead.name?.split(" ")[0] || "New",
+        last_name: lead.name?.split(" ").slice(1).join(" ") || "Lead",
+      })
+      .eq("id", contactId);
+  }
+
+  // 3. Link submission to contact
+  if (contactId) {
+    await supabase
+      .from("form_submissions")
+      .update({ contact_id: contactId })
+      .eq("id", submissionId);
+      
+    // Append note
+    if (lead.message) {
+      await supabase.from("crm_contact_notes").insert({
+        contact_id: contactId,
+        note: `Form Submission: ${lead.message}`,
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+}
+
 

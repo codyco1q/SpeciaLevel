@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+
 import Link from "next/link";
 import {
   Phone,
@@ -97,20 +99,28 @@ export function PhoneNumbersView({
   const [sms, setSms] = useState(initialSms);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [auditSubTab, setAuditSubTab] = useState<"calls" | "sms">("calls");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
   const [logCallOpen, setLogCallOpen] = useState(false);
   const [sendSmsOpen, setSendSmsOpen] = useState(false);
 
   const [isDeleting, startDeleteTransition] = useTransition();
 
   const handleDeleteNumber = (id: string) => {
-    if (!window.confirm(t.inventory.deleteConfirm)) return;
+    setDeleteTargetId(id);
+  };
+
+  const performDelete = async () => {
+    if (!deleteTargetId) return;
     startDeleteTransition(async () => {
-      const res = await deletePhoneNumber(id);
+      const res = await deletePhoneNumber(deleteTargetId);
       if (res.status === "success") {
-        setNumbersList((prev) => prev.filter((n) => n.id !== id));
+        setNumbersList((prev) => prev.filter((n) => n.id !== deleteTargetId));
       }
+      setDeleteTargetId(null);
     });
   };
+
 
   const refreshAuditLogs = async () => {
     const [nextCalls, nextSms, nextMetrics] = await Promise.all([
@@ -560,7 +570,14 @@ export function PhoneNumbersView({
         onOpenChange={setLogCallOpen}
         contacts={initialContacts}
         onLogged={refreshAuditLogs}
-        platform={platform}
+      />
+
+      <DeleteConfirmationDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open: boolean) => !open && setDeleteTargetId(null)}
+        onConfirm={performDelete}
+        isDeleting={isDeleting}
+        title={t.inventory.deleteConfirm}
       />
 
       <SendSmsDialog

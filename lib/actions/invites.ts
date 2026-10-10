@@ -237,6 +237,20 @@ export async function createInvitation(data: {
     };
   }
 
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+  const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${token}`;
+
+  const admin = createServiceRoleClient();
+  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: inviteRedirectUrl,
+  });
+
+  if (inviteError) {
+    // If the invite email dispatch failed, we still have the row in our DB,
+    // so the admin can copy the link manually, but it's good to log or return a warning.
+    console.error("Supabase inviteUserByEmail error:", inviteError);
+  }
+
   revalidatePath("/employees");
   revalidatePath("/settings");
   return { status: "success" };
@@ -256,6 +270,20 @@ export async function resendInvitation(
   const err = dict.platform.settings.errors;
 
   const admin = createServiceRoleClient();
+  
+  // 1. Fetch invite to get the token and email
+  const { data: invite, error: fetchError } = await admin
+    .from("organization_invitations")
+    .select("email, token")
+    .eq("id", invitationId)
+    .eq("organization_id", auth.organizationId)
+    .single();
+    
+  if (fetchError || !invite) {
+    return { status: "error", error: "Invitation not found." };
+  }
+
+  // 2. Extend expiration
   const newExpiration = new Date(
     Date.now() + 7 * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -275,6 +303,14 @@ export async function resendInvitation(
       error: err.inviteCreateFailed || "Could not resend invitation.",
     };
   }
+
+  // 3. Resend the email
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+  const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${invite.token}`;
+
+  await admin.auth.admin.inviteUserByEmail(invite.email, {
+    redirectTo: inviteRedirectUrl,
+  });
 
   revalidatePath("/employees");
   revalidatePath("/settings");
