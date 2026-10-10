@@ -475,10 +475,18 @@ export async function getMarketingMetrics(): Promise<MarketingMetrics | null> {
   };
 }
 
-export {
-  activateSocialPlannerAddon,
-  getSocialPlannerStatus,
+import {
+  activateSocialPlannerAddon as _activateSocialPlannerAddon,
+  getSocialPlannerStatus as _getSocialPlannerStatus,
 } from "@/lib/actions/marketing-social";
+
+export async function activateSocialPlannerAddon(...args: Parameters<typeof _activateSocialPlannerAddon>) {
+  return _activateSocialPlannerAddon(...args);
+}
+
+export async function getSocialPlannerStatus(...args: Parameters<typeof _getSocialPlannerStatus>) {
+  return _getSocialPlannerStatus(...args);
+}
 
 
 // ============================================================
