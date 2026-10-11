@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { BookmarkPlus, LoaderCircle, Plus, Trash2, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { createInvoice } from "@/lib/actions/invoicing";
+import { NumberStepperInput } from "./components/number-stepper-input";
+import { InvoiceLineItemRow, type LineItemModel } from "./components/invoice-line-item-row";
+import { ProductFormDialog } from "./product-form-dialog";
+import { createInvoice, createProduct } from "@/lib/actions/invoicing";
 import type { InvoiceInput } from "@/lib/validations/invoicing";
+import type { Product } from "@/types/database";
 import { INVOICING_CURRENCIES, estimateTotals, formatCurrency, lineAmount } from "./invoicing-meta";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
@@ -33,18 +37,15 @@ export interface InvoiceContactOption {
   company: string | null;
 }
 
-interface LineItemState {
-  key: string;
-  description: string;
-  quantity: string;
-  unitPrice: string;
-}
+type LineItemState = LineItemModel;
 
-interface CreateInvoiceDialogProps {
+export interface CreateInvoiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Organization contacts (from crm_contacts) for the client selector. */
   contacts: InvoiceContactOption[];
+  products?: Product[];
+  onProductsChange?: (products: Product[]) => void;
   onSaved: () => void;
   /** Localized copy for the current render. */
   platform: Dictionary["platform"];
@@ -54,6 +55,7 @@ interface CreateInvoiceDialogProps {
 function blankItem(): LineItemState {
   return {
     key: Math.random().toString(36).slice(2),
+    title: "",
     description: "",
     quantity: "1",
     unitPrice: "0",
@@ -74,17 +76,21 @@ export function CreateInvoiceDialog({
   open,
   onOpenChange,
   contacts,
+  products = [],
+  onProductsChange,
   onSaved,
   platform,
   locale,
 }: CreateInvoiceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] sm:max-w-4xl lg:max-w-5xl overflow-y-auto">
         <CreateInvoiceForm
           key={open ? "invoice-create-form" : "invoice-create-form-closed"}
           onOpenChange={onOpenChange}
           contacts={contacts}
+          products={products}
+          onProductsChange={onProductsChange}
           onSaved={onSaved}
           platform={platform}
           locale={locale}
@@ -97,6 +103,8 @@ export function CreateInvoiceDialog({
 function CreateInvoiceForm({
   onOpenChange,
   contacts,
+  products = [],
+  onProductsChange,
   onSaved,
   platform,
   locale,
@@ -106,6 +114,10 @@ function CreateInvoiceForm({
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [availableProducts, setAvailableProducts] = useState<Product[]>(products);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [targetItemKeyForProduct, setTargetItemKeyForProduct] = useState<string | null>(null);
 
   const [contactId, setContactId] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -142,22 +154,92 @@ function CreateInvoiceForm({
     );
   }
 
+  function handleProductSelected(itemKey: string, productId: string) {
+    if (productId === "__new__") {
+      setTargetItemKeyForProduct(itemKey);
+      setProductDialogOpen(true);
+      return;
+    }
+    const found = availableProducts.find((p) => p.id === productId);
+    if (!found) return;
+
+    updateItem(itemKey, {
+      title: found.title,
+      description: found.description ?? "",
+      unitPrice: String(found.unit_price ?? "0"),
+    });
+  }
+
+  function handleProductDialogSuccess(newProduct: Product) {
+    const updated = [newProduct, ...availableProducts.filter((p) => p.id !== newProduct.id)];
+    setAvailableProducts(updated);
+    onProductsChange?.(updated);
+
+    if (targetItemKeyForProduct) {
+      updateItem(targetItemKeyForProduct, {
+        title: newProduct.title,
+        description: newProduct.description ?? "",
+        unitPrice: String(newProduct.unit_price ?? "0"),
+      });
+      setTargetItemKeyForProduct(null);
+    } else {
+      setItems((current) => [
+        ...current,
+        {
+          key: Math.random().toString(36).slice(2),
+          title: newProduct.title,
+          description: newProduct.description ?? "",
+          quantity: "1",
+          unitPrice: String(newProduct.unit_price ?? "0"),
+        },
+      ]);
+    }
+  }
+
+  async function handleSaveItemAsProduct(item: LineItemState) {
+    if (!item.title.trim()) {
+      setFormError(t.errors?.itemDescriptionRequired ?? "Product title is required");
+      return;
+    }
+    try {
+      const res = await createProduct({
+        title: item.title.trim(),
+        description: item.description.trim() || undefined,
+        unitPrice: Math.max(0, Number(item.unitPrice) || 0),
+      });
+      if (res.status === "success" && res.data) {
+        const updated = [res.data, ...availableProducts];
+        setAvailableProducts(updated);
+        onProductsChange?.(updated);
+      } else if (res.status === "error") {
+        setServerError(res.error);
+      }
+    } catch {
+      setServerError("Failed to save product");
+    }
+  }
+
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setServerError(null);
     setFormError(null);
 
-    const trimmed = items.map((item) => ({
-      description: item.description.trim(),
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice),
-    }));
+    const trimmed = items.map((item) => {
+      const title = item.title.trim() || item.description.trim();
+      const description = item.description.trim() || item.title.trim();
+      return {
+        title,
+        description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+      };
+    });
 
-    if (trimmed.length === 0 || trimmed.every((item) => item.description === "")) {
+    if (trimmed.length === 0 || trimmed.every((item) => item.title === "")) {
       setFormError(t.errors.itemsRequired);
       return;
     }
-    if (trimmed.some((item) => item.description === "")) {
+    if (trimmed.some((item) => item.title === "")) {
       setFormError(t.errors.itemDescriptionRequired);
       return;
     }
@@ -206,9 +288,9 @@ function CreateInvoiceForm({
         </DialogDescription>
       </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Client + due date */}
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="space-y-6 pt-2">
+          {/* Top metadata grid: 4 columns on large screens */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="grid gap-2">
               <Label htmlFor="invoice-client">{t.createDialog.clientLabel}</Label>
               <Select value={contactId} onValueChange={setContactId}>
@@ -230,6 +312,7 @@ function CreateInvoiceForm({
                 </p>
               )}
             </div>
+
             <div className="grid gap-2">
               <Label htmlFor="invoice-due-date">
                 {t.createDialog.dueDateLabel}
@@ -241,10 +324,7 @@ function CreateInvoiceForm({
                 onChange={(event) => setDueDate(event.target.value)}
               />
             </div>
-          </div>
 
-          {/* Currency + tax rate */}
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="invoice-currency">
                 {t.createDialog.currencyLabel}
@@ -262,18 +342,19 @@ function CreateInvoiceForm({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="grid gap-2">
               <Label htmlFor="invoice-tax-rate">
-                {t.createDialog.taxRateLabel}
+                {t.createDialog.taxRateLabel} (%)
               </Label>
-              <Input
+              <NumberStepperInput
                 id="invoice-tax-rate"
-                type="number"
+                value={taxRate}
+                onChange={setTaxRate}
                 min={0}
                 max={100}
-                step="0.01"
-                value={taxRate}
-                onChange={(event) => setTaxRate(event.target.value)}
+                step={0.5}
+                suffix="%"
               />
             </div>
           </div>
@@ -290,104 +371,66 @@ function CreateInvoiceForm({
             />
           </div>
 
-          {/* Line items */}
-          <div className="grid gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold">
-                {t.createDialog.itemsSection}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setItems((current) => [...current, blankItem()])}
-              >
-                <Plus className="size-4" />
-                {t.createDialog.addItem}
-              </Button>
+          {/* Line items section */}
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {t.createDialog.itemsSection}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t.products?.sectionSubtitle ?? "Add items, pick from saved products, or create products on the fly."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setTargetItemKeyForProduct(null);
+                    setProductDialogOpen(true);
+                  }}
+                  className="gap-1.5 text-xs"
+                >
+                  <PackagePlus className="size-3.5" />
+                  {t.products?.newProduct ?? "New product"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setItems((current) => [...current, blankItem()])}
+                  className="gap-1.5 text-xs"
+                >
+                  <Plus className="size-3.5" />
+                  {t.createDialog.addItem}
+                </Button>
+              </div>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-border">
-              <div className="grid grid-cols-12 gap-2 border-b border-border bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
-                <span className="col-span-5">
-                  {t.createDialog.itemDescription}
-                </span>
-                <span className="col-span-2">{t.createDialog.itemQuantity}</span>
-                <span className="col-span-2">
-                  {t.createDialog.itemUnitPrice}
-                </span>
-                <span className="col-span-2 text-end">
-                  {t.createDialog.itemAmount}
-                </span>
-                <span className="col-span-1" />
-              </div>
-              <div className="divide-y divide-border">
-                {items.map((item) => (
-                  <div
-                    key={item.key}
-                    className="grid grid-cols-12 items-center gap-2 px-3 py-2"
-                  >
-                    <Input
-                      className="col-span-5"
-                      placeholder={t.createDialog.itemDescriptionPlaceholder}
-                      value={item.description}
-                      onChange={(event) =>
-                        updateItem(item.key, {
-                          description: event.target.value,
-                        })
-                      }
-                      aria-label={t.createDialog.itemDescription}
-                    />
-                    <Input
-                      className="col-span-2"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={item.quantity}
-                      onChange={(event) =>
-                        updateItem(item.key, { quantity: event.target.value })
-                      }
-                      aria-label={t.createDialog.itemQuantity}
-                    />
-                    <Input
-                      className="col-span-2"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={item.unitPrice}
-                      onChange={(event) =>
-                        updateItem(item.key, { unitPrice: event.target.value })
-                      }
-                      aria-label={t.createDialog.itemUnitPrice}
-                    />
-                    <span className="col-span-2 truncate text-end text-sm tabular-nums text-foreground">
-                      {formatCurrency(
-                        lineAmount(
-                          Number(item.quantity) || 0,
-                          Number(item.unitPrice) || 0
-                        ),
-                        currency,
-                        locale
-                      )}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="col-span-1 size-7 justify-self-end p-0 text-muted-foreground hover:text-destructive"
-                      disabled={items.length === 1}
-                      onClick={() => removeItem(item.key)}
-                      aria-label={t.createDialog.removeItem}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-3">
+              {items.map((item, idx) => (
+                <InvoiceLineItemRow
+                  key={item.key}
+                  index={idx}
+                  item={item}
+                  currency={currency}
+                  locale={locale}
+                  products={availableProducts}
+                  canDelete={items.length > 1}
+                  onUpdate={(patch) => updateItem(item.key, patch)}
+                  onRemove={() => removeItem(item.key)}
+                  onSelectProduct={(productId) => handleProductSelected(item.key, productId)}
+                  onSaveAsProduct={() => handleSaveItemAsProduct(item)}
+                  platform={platform}
+                />
+              ))}
             </div>
+          </div>
 
             {/* Live totals */}
-            <div className="ms-auto w-full max-w-xs space-y-1 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+            <div className="ms-auto w-full max-w-xs space-y-1.5 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
               <div className="flex items-center justify-between gap-3 text-muted-foreground">
                 <span>{t.createDialog.subtotal}</span>
                 <span className="tabular-nums">
@@ -402,12 +445,11 @@ function CreateInvoiceForm({
               </div>
               <div className="flex items-center justify-between gap-3 border-t border-border pt-1.5 text-sm font-semibold">
                 <span>{t.createDialog.total}</span>
-                <span className="tabular-nums">
+                <span className="tabular-nums text-primary font-bold">
                   {formatCurrency(total, currency, locale)}
                 </span>
               </div>
             </div>
-          </div>
 
           {formError && (
             <p
@@ -426,7 +468,7 @@ function CreateInvoiceForm({
             </p>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-4 border-t border-border">
             <Button
               type="button"
               variant="outline"
@@ -436,11 +478,21 @@ function CreateInvoiceForm({
               {common.cancel}
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
+              {isPending && <LoaderCircle className="h-4 w-4 animate-spin mr-2" />}
               {t.createDialog.create}
             </Button>
           </DialogFooter>
         </form>
+
+        <ProductFormDialog
+          open={productDialogOpen}
+          onOpenChange={setProductDialogOpen}
+          product={null}
+          currency={currency}
+          locale={locale}
+          platform={platform}
+          onSuccess={handleProductDialogSuccess}
+        />
     </>
   );
 }

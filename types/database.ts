@@ -551,11 +551,23 @@ export interface Invoice {
 export interface InvoiceItem {
   id: string;
   invoice_id: string;
+  title?: string | null;
   description: string;
   quantity: string | number;
   unit_price: string | number;
   amount: string | number;
   created_at: string;
+}
+
+export interface Product {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string;
+  unit_price: string | number;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================================

@@ -8,13 +8,15 @@ import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
 import {
   createInvoiceInputSchema,
+  createProductInputSchema,
   invoiceStatusSchema,
   type InvoicingActionState,
   type InvoiceInput,
+  type ProductInput,
 } from "@/lib/validations/invoicing";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { dispatchWorkflowTrigger } from "@/lib/services/workflow-runner";
-import type { InvoiceStatus, PaymentProvider } from "@/types/database";
+import type { InvoiceStatus, PaymentProvider, Product } from "@/types/database";
 
 /**
  * Invoicing server actions.
@@ -39,6 +41,7 @@ export interface InvoiceContact {
 
 export interface InvoiceItemRow {
   id: string;
+  title: string;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -176,6 +179,7 @@ interface InvoiceJoinRow {
   contact: InvoiceContact | null;
   items: {
     id: string;
+    title?: string | null;
     description: string;
     quantity: string | number;
     unit_price: string | number;
@@ -213,7 +217,8 @@ function toInvoiceRow(row: InvoiceJoinRow): InvoiceRow {
       : null,
     items: (row.items ?? []).map((item) => ({
       id: item.id,
-      description: item.description,
+      title: item.title || item.description || "",
+      description: item.description || "",
       quantity: Number(item.quantity) || 0,
       unitPrice: Number(item.unit_price) || 0,
       amount: Number(item.amount) || 0,
@@ -297,7 +302,7 @@ export async function getInvoices(): Promise<InvoicingList | null> {
         share_token,
         is_shareable,
         contact:crm_contacts(id, name, email, company, phone),
-        items:invoice_items(id, description, quantity, unit_price, amount)
+        items:invoice_items(id, title, description, quantity, unit_price, amount)
       `
     )
     .eq("organization_id", organizationId)
@@ -347,7 +352,7 @@ export async function getInvoiceById(id: string): Promise<InvoiceRow | null> {
         share_token,
         is_shareable,
         contact:crm_contacts(id, name, email, company, phone),
-        items:invoice_items(id, description, quantity, unit_price, amount)
+        items:invoice_items(id, title, description, quantity, unit_price, amount)
       `
     )
     .eq("id", id)
@@ -393,7 +398,8 @@ export async function createInvoice(
   // `unit_price` arrives as NULL and the invoice_items insert fails its
   // NOT NULL constraint, so every UI-driven invoice creation would error.
   const rpcItems = parsed.data.items.map((item) => ({
-    description: item.description,
+    title: item.title || item.description || "",
+    description: item.description || item.title || "",
     quantity: item.quantity,
     unit_price: item.unitPrice,
   }));
@@ -560,7 +566,8 @@ export async function updateInvoice(
   const supabase = await createServerClient();
 
   const rpcItems = parsed.data.items.map((item) => ({
-    description: item.description,
+    title: item.title || item.description || "",
+    description: item.description || item.title || "",
     quantity: item.quantity,
     unit_price: item.unitPrice,
   }));
@@ -649,4 +656,152 @@ export async function getPublicInvoiceByToken(
   }
 
   return data as unknown as PublicInvoiceData;
+}
+
+// ============================================================
+// Products Catalog Actions (Milestone 2)
+// ============================================================
+
+/**
+ * Retrieves the organization's reusable product line items.
+ * Requires `invoicing.view` permission.
+ */
+export async function getProducts(): Promise<Product[]> {
+  const auth = await requireInvoicingPermission("invoicing.view");
+  if (!auth.ok) return [];
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, organization_id, title, description, unit_price, created_by, created_at, updated_at")
+    .eq("organization_id", auth.organizationId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[invoicing] getProducts failed:", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    ...row,
+    unit_price: Number(row.unit_price) || 0,
+  })) as Product[];
+}
+
+/**
+ * Creates a reusable product.
+ * Requires `invoicing.manage` permission.
+ */
+export async function createProduct(
+  data: ProductInput
+): Promise<{ status: "success"; data?: Product } | { status: "error"; error: string }> {
+  const auth = await requireInvoicingPermission("invoicing.manage");
+  if (!auth.ok) return { status: "error", error: auth.error.error ?? "Unauthorized" };
+
+  const dict = await getDictionary();
+  const err = dict.platform.invoicing.errors;
+
+  const parsed = createProductInputSchema(err).safeParse(data);
+  if (!parsed.success) {
+    return {
+      status: "error",
+      error: parsed.error.issues[0]?.message ?? err.createFailed,
+    };
+  }
+
+  const supabase = await createServerClient();
+  const { data: created, error } = await supabase
+    .from("products")
+    .insert({
+      organization_id: auth.organizationId,
+      title: parsed.data.title,
+      description: parsed.data.description ?? "",
+      unit_price: parsed.data.unitPrice,
+      created_by: auth.userId,
+    })
+    .select("id, organization_id, title, description, unit_price, created_by, created_at, updated_at")
+    .single();
+
+  if (error || !created) {
+    console.error("[invoicing] product create failed:", error?.message);
+    return { status: "error", error: error?.message ?? err.createFailed };
+  }
+
+  revalidatePath("/invoicing");
+  return {
+    status: "success",
+    data: {
+      ...created,
+      unit_price: Number(created.unit_price) || 0,
+    } as Product,
+  };
+}
+
+/**
+ * Updates an existing reusable product.
+ * Requires `invoicing.manage` permission.
+ */
+export async function updateProduct(
+  id: string,
+  data: ProductInput
+): Promise<{ status: "success" } | { status: "error"; error: string }> {
+  const auth = await requireInvoicingPermission("invoicing.manage");
+  if (!auth.ok) return { status: "error", error: auth.error.error ?? "Unauthorized" };
+
+  const dict = await getDictionary();
+  const err = dict.platform.invoicing.errors;
+
+  const parsed = createProductInputSchema(err).safeParse(data);
+  if (!parsed.success) {
+    return {
+      status: "error",
+      error: parsed.error.issues[0]?.message ?? err.updateFailed,
+    };
+  }
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("products")
+    .update({
+      title: parsed.data.title,
+      description: parsed.data.description ?? "",
+      unit_price: parsed.data.unitPrice,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("organization_id", auth.organizationId);
+
+  if (error) {
+    console.error("[invoicing] product update failed:", error.message);
+    return { status: "error", error: error.message };
+  }
+
+  revalidatePath("/invoicing");
+  return { status: "success" };
+}
+
+/**
+ * Deletes a reusable product. Existing invoices referencing it remain untouched.
+ * Requires `invoicing.manage` permission.
+ */
+export async function deleteProduct(
+  id: string
+): Promise<{ status: "success" } | { status: "error"; error: string }> {
+  const auth = await requireInvoicingPermission("invoicing.manage");
+  if (!auth.ok) return { status: "error", error: auth.error.error ?? "Unauthorized" };
+
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("products")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", auth.organizationId);
+
+  if (error) {
+    console.error("[invoicing] product delete failed:", error.message);
+    return { status: "error", error: error.message };
+  }
+
+  revalidatePath("/invoicing");
+  return { status: "success" };
 }

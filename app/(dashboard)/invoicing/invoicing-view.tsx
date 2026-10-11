@@ -7,7 +7,9 @@ import {
   CircleDollarSign,
   Clock,
   Eye,
+  FileText,
   MoreHorizontal,
+  Package,
   Pencil,
   Plus,
   Share2,
@@ -30,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +43,7 @@ import {
   type InvoiceRow,
   type InvoicingSummary,
 } from "@/lib/actions/invoicing";
+import type { Product } from "@/types/database";
 import {
   INVOICE_STATUS_BADGE_CLASSES,
   formatCurrency,
@@ -52,6 +56,7 @@ import {
 import { EditInvoiceDialog } from "./edit-invoice-dialog";
 import { ShareInvoiceDialog } from "./share-invoice-dialog";
 import { InvoiceDetailDialog } from "./invoice-detail-dialog";
+import { ProductsTab } from "./products-tab";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface MetricCardProps {
@@ -87,6 +92,7 @@ function MetricCard({ icon: Icon, label, value, hint, badge }: MetricCardProps) 
 interface InvoicingViewProps {
   initialInvoices: InvoiceRow[];
   initialSummary: InvoicingSummary;
+  initialProducts?: Product[];
   contacts: InvoiceContactOption[];
   canManage: boolean;
   /** Localized copy for the current render. */
@@ -104,6 +110,7 @@ interface InvoicingViewProps {
 export function InvoicingView({
   initialInvoices,
   initialSummary,
+  initialProducts = [],
   contacts,
   canManage,
   platform,
@@ -113,6 +120,8 @@ export function InvoicingView({
   const common = platform.common;
   const [invoices, setInvoices] = useState<InvoiceRow[]>(initialInvoices);
   const [summary, setSummary] = useState<InvoicingSummary>(initialSummary);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [activeTab, setActiveTab] = useState<string>("invoices");
   const [createOpen, setCreateOpen] = useState(false);
   const [detailInvoice, setDetailInvoice] = useState<InvoiceRow | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null);
@@ -123,12 +132,19 @@ export function InvoicingView({
 
   const searchParams = useSearchParams();
   const urlNew = searchParams.get("new");
+  const urlTab = searchParams.get("tab");
 
   useEffect(() => {
     if (urlNew === "true" || urlNew === "1") {
       setCreateOpen(true);
     }
   }, [urlNew]);
+
+  useEffect(() => {
+    if (urlTab === "products") {
+      setActiveTab("products");
+    }
+  }, [urlTab]);
 
   /** Refetch invoices + summary aggregates. */
   async function refreshAll() {
@@ -202,12 +218,6 @@ export function InvoicingView({
           <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
-        {canManage && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            {t.newInvoice}
-          </Button>
-        )}
       </div>
 
       {actionError && (
@@ -218,6 +228,40 @@ export function InvoicingView({
           {actionError}
         </div>
       )}
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <TabsList className="bg-muted/70 p-1">
+            <TabsTrigger value="invoices" className="gap-2">
+              <FileText className="size-4" />
+              {t.tabs?.invoices ?? "Invoices"}
+              {invoices.length > 0 && (
+                <span className="ms-1 rounded-full bg-background px-1.5 py-0.5 text-[11px] font-medium text-foreground">
+                  {invoices.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="products" className="gap-2">
+              <Package className="size-4" />
+              {t.tabs?.products ?? "Products"}
+              {products.length > 0 && (
+                <span className="ms-1 rounded-full bg-background px-1.5 py-0.5 text-[11px] font-medium text-foreground">
+                  {products.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {activeTab === "invoices" && canManage && (
+            <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Plus className="size-4" />
+              {t.newInvoice}
+            </Button>
+          )}
+        </div>
+
+        <TabsContent value="invoices" className="space-y-6 mt-0">
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -411,12 +455,26 @@ export function InvoicingView({
           </div>
         )}
       </div>
+      </TabsContent>
+
+      <TabsContent value="products" className="mt-0">
+        <ProductsTab
+          products={products}
+          onProductsChange={setProducts}
+          canManage={canManage}
+          platform={platform}
+          locale={locale}
+        />
+      </TabsContent>
+    </Tabs>
 
       {/* Dialogs */}
       <CreateInvoiceDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         contacts={contacts}
+        products={products}
+        onProductsChange={setProducts}
         onSaved={handleSaved}
         platform={platform}
         locale={locale}
@@ -453,6 +511,8 @@ export function InvoicingView({
           }}
           invoice={editingInvoice}
           contacts={contacts}
+          products={products}
+          onProductsChange={setProducts}
           onSaved={async () => {
             setEditingInvoice(null);
             setActionError(null);

@@ -35,11 +35,17 @@ export interface InvoicingValidationMessages {
   dueDateInvalid: string;
   notesMax: string;
   itemsRequired: string;
+  itemTitleRequired?: string;
+  itemTitleMax?: string;
   itemDescriptionRequired: string;
   itemDescriptionMax: string;
   itemQuantityInvalid: string;
   itemUnitPriceInvalid: string;
   cannotEditPaid?: string;
+  productTitleRequired?: string;
+  productTitleMax?: string;
+  productDescriptionMax?: string;
+  productUnitPriceInvalid?: string;
 }
 
 export const DEFAULT_INVOICING_VALIDATION_MESSAGES: InvoicingValidationMessages =
@@ -50,12 +56,18 @@ export const DEFAULT_INVOICING_VALIDATION_MESSAGES: InvoicingValidationMessages 
     dueDateInvalid: "Enter a valid date in YYYY-MM-DD format.",
     notesMax: "Notes must be 4000 characters or fewer.",
     itemsRequired: "Add at least one line item.",
-    itemDescriptionRequired: "Every line item needs a description.",
+    itemTitleRequired: "Every line item needs a title.",
+    itemTitleMax: "Line item title must be 200 characters or fewer.",
+    itemDescriptionRequired: "Every line item needs a description or title.",
     itemDescriptionMax:
-      "Line item descriptions must be 500 characters or fewer.",
+      "Line item descriptions must be 1000 characters or fewer.",
     itemQuantityInvalid: "Enter a valid quantity (0 or more).",
     itemUnitPriceInvalid: "Enter a valid unit price (0 or more).",
     cannotEditPaid: "Paid invoices cannot be edited.",
+    productTitleRequired: "Product title is required.",
+    productTitleMax: "Product title must be 200 characters or fewer.",
+    productDescriptionMax: "Product description must be 1000 characters or fewer.",
+    productUnitPriceInvalid: "Enter a valid unit price (0 or more).",
   };
 
 export function createInvoiceInputSchema(
@@ -92,11 +104,18 @@ export function createInvoiceInputSchema(
     items: z
       .array(
         z.object({
+          title: z
+            .string()
+            .trim()
+            .max(200, messages.itemTitleMax ?? "Line item title must be 200 characters or fewer.")
+            .optional()
+            .default(""),
           description: z
             .string()
             .trim()
-            .min(1, messages.itemDescriptionRequired)
-            .max(500, messages.itemDescriptionMax),
+            .max(1000, messages.itemDescriptionMax)
+            .optional()
+            .default(""),
           quantity: z
             .number({ error: messages.itemQuantityInvalid })
             .min(0, messages.itemQuantityInvalid)
@@ -113,6 +132,35 @@ export function createInvoiceInputSchema(
 }
 
 export type InvoiceInput = z.infer<ReturnType<typeof createInvoiceInputSchema>>;
+
+export function createProductInputSchema(
+  messages: InvoicingValidationMessages = DEFAULT_INVOICING_VALIDATION_MESSAGES
+) {
+  return z.object({
+    title: z
+      .string()
+      .trim()
+      .min(1, messages.productTitleRequired ?? "Product title is required.")
+      .max(200, messages.productTitleMax ?? "Product title must be 200 characters or fewer."),
+    description: z
+      .string()
+      .trim()
+      .max(1000, messages.productDescriptionMax ?? "Description must be 1000 characters or fewer.")
+      .optional()
+      .nullable()
+      .default(""),
+    unitPrice: z
+      .number({ error: messages.productUnitPriceInvalid ?? "Enter a valid unit price (0 or more)." })
+      .min(0, messages.productUnitPriceInvalid ?? "Enter a valid unit price (0 or more).")
+      .max(1_000_000_000, messages.productUnitPriceInvalid ?? "Enter a valid unit price (0 or more)."),
+  });
+}
+
+export type ProductInput = {
+  title: string;
+  description?: string | null;
+  unitPrice: number;
+};
 
 export type InvoiceStatusValue = InvoiceStatus;
 

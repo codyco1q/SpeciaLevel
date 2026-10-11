@@ -289,7 +289,20 @@ export function InvoiceDetailDocument({
             <TableBody className="[&>tr]:border-b">
               {invoice.items.map((item) => (
                 <TableRow key={item.id} className="[&_td]:py-3">
-                  <TableCell>{item.description}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium text-foreground">
+                        {item.title || item.description}
+                      </div>
+                      {item.title &&
+                        item.description &&
+                        item.description !== item.title && (
+                          <div className="text-xs text-muted-foreground whitespace-pre-line mt-0.5">
+                            {item.description}
+                          </div>
+                        )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-end tabular-nums">
                     {item.quantity}
                   </TableCell>

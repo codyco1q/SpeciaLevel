@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
-import { getInvoices } from "@/lib/actions/invoicing";
+import { getInvoices, getProducts } from "@/lib/actions/invoicing";
 import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { InvoicingView } from "./invoicing-view";
@@ -56,7 +56,10 @@ export default async function InvoicingPage() {
     })
   );
 
-  const initialList = await getInvoices();
+  const [initialList, initialProducts] = await Promise.all([
+    getInvoices(),
+    canManage ? getProducts() : Promise.resolve([]),
+  ]);
 
   return (
     <div className="p-8">
@@ -73,6 +76,7 @@ export default async function InvoicingPage() {
             overdueCount: 0,
           }
         }
+        initialProducts={initialProducts}
         contacts={contacts}
         canManage={canManage}
         platform={platform}

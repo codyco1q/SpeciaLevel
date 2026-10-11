@@ -184,7 +184,10 @@ export async function createStripeSession(
       price_data: {
         currency,
         product_data: {
-          name: item.description || `Item #${item.id}`,
+          name: item.title || item.description || `Item #${item.id}`,
+          ...(item.description && item.description !== item.title
+            ? { description: item.description }
+            : {}),
         },
         unit_amount: Math.max(0, Math.round(Number(item.unitPrice) * 100)),
       },
