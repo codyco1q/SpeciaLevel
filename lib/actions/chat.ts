@@ -6,6 +6,8 @@ import { z } from "zod";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { dispatchNotification } from "@/lib/services/notifications";
 import {
   createChannelInputSchema,
   createUpdateChannelInputSchema,
@@ -109,6 +111,7 @@ type ChatAuthResult =
       ok: true;
       organizationId: string;
       userId: string;
+      userName: string;
       permissions: string[];
     }
   | { ok: false; error: string };
@@ -146,6 +149,10 @@ async function requireChatPermission(
     ok: true,
     organizationId,
     userId: userContext.user.id,
+    userName:
+      userContext.profile.full_name ??
+      userContext.user.email?.split("@")[0] ??
+      "A team member",
     permissions: userContext.permissions,
   };
 }
@@ -283,6 +290,159 @@ export type SendMessageResult =
   | { status: "error"; error: string };
 
 /**
+ * Asynchronously detects @user, @department, and @channel mentions in message
+ * content and dispatches system notifications to the target users.
+ */
+async function handleMessageMentions({
+  organizationId,
+  senderId,
+  senderName,
+  channelId,
+  channelName,
+  isPrivate,
+  content,
+}: {
+  organizationId: string;
+  senderId: string;
+  senderName: string;
+  channelId: string;
+  channelName: string;
+  isPrivate: boolean;
+  content: string;
+}) {
+  try {
+    const admin = createServiceRoleClient();
+
+    // 1. Detect if @channel, @here, or @everyone was mentioned
+    const hasChannelMention = /@(channel|everyone|here)\b/i.test(content);
+
+    // 2. Fetch departments in this organization
+    const { data: departments } = await admin
+      .from("departments")
+      .select("id, name")
+      .eq("organization_id", organizationId);
+
+    // 3. Fetch active profiles in this organization
+    const { data: profiles } = await admin
+      .from("profiles")
+      .select("id, full_name, email, department_id")
+      .eq("organization_id", organizationId);
+
+    if (!profiles || profiles.length === 0) return;
+
+    // Set of notified user IDs to prevent duplicate notifications for a single message
+    const notifiedUserIds = new Set<string>();
+
+    // Extract all @token mentions from content (supports @word and @"multi word")
+    const mentionTokens: string[] = [];
+    const tokenRegex = /@(?:"([^"]+)"|([a-zA-Z0-9_\-\.]+))/g;
+    let match: RegExpExecArray | null;
+    while ((match = tokenRegex.exec(content)) !== null) {
+      const token = (match[1] || match[2] || "").trim().toLowerCase();
+      if (token) mentionTokens.push(token);
+    }
+
+    const previewMessage = content.length > 180 ? `${content.slice(0, 177)}...` : content;
+
+    // Priority 1: Direct user mentions (@fullname, @firstname, @username, or @email)
+    for (const profile of profiles) {
+      if (profile.id === senderId) continue;
+
+      const fullName = (profile.full_name ?? "").toLowerCase();
+      const emailPrefix = (profile.email ?? "").split("@")[0]?.toLowerCase() ?? "";
+      const firstName = fullName.split(" ")[0] ?? "";
+
+      const isMentioned =
+        mentionTokens.some((token) => {
+          if (token === emailPrefix && emailPrefix.length > 0) return true;
+          if (token === firstName && firstName.length >= 2) return true;
+          if (token === fullName && fullName.length > 0) return true;
+          if (token === fullName.replace(/\s+/g, "") && fullName.length > 0) return true;
+          return false;
+        }) || (fullName.length > 0 && content.toLowerCase().includes(`@${fullName}`));
+
+      if (isMentioned) {
+        notifiedUserIds.add(profile.id);
+        await dispatchNotification({
+          orgId: organizationId,
+          userId: profile.id,
+          title: `${senderName} mentioned you in #${channelName}`,
+          message: previewMessage,
+          type: "info",
+          link: "/messaging",
+        });
+      }
+    }
+
+    // Priority 2: Department mentions (@departmentName)
+    if (departments && departments.length > 0) {
+      for (const dept of departments) {
+        const deptName = (dept.name ?? "").toLowerCase();
+        const deptSlug = deptName.replace(/\s+/g, "");
+        const deptHyphen = deptName.replace(/\s+/g, "-");
+
+        const isDeptMentioned =
+          mentionTokens.some(
+            (token) => token === deptName || token === deptSlug || token === deptHyphen
+          ) || (deptName.length > 0 && content.toLowerCase().includes(`@${deptName}`));
+
+        if (isDeptMentioned) {
+          const deptMembers = profiles.filter(
+            (p) =>
+              p.department_id === dept.id &&
+              p.id !== senderId &&
+              !notifiedUserIds.has(p.id)
+          );
+
+          for (const member of deptMembers) {
+            notifiedUserIds.add(member.id);
+            await dispatchNotification({
+              orgId: organizationId,
+              userId: member.id,
+              title: `${senderName} mentioned @${dept.name} in #${channelName}`,
+              message: previewMessage,
+              type: "info",
+              link: "/messaging",
+            });
+          }
+        }
+      }
+    }
+
+    // Priority 3: Channel mentions (@channel, @everyone, @here)
+    if (hasChannelMention) {
+      let candidateIds: string[] = [];
+
+      if (isPrivate) {
+        const { data: memberRows } = await admin
+          .from("chat_channel_members")
+          .select("user_id")
+          .eq("channel_id", channelId);
+
+        candidateIds = (memberRows ?? []).map((m) => m.user_id);
+      } else {
+        candidateIds = profiles.map((p) => p.id);
+      }
+
+      for (const targetId of candidateIds) {
+        if (targetId === senderId || notifiedUserIds.has(targetId)) continue;
+        notifiedUserIds.add(targetId);
+        await dispatchNotification({
+          orgId: organizationId,
+          userId: targetId,
+          title: `${senderName} mentioned @channel in #${channelName}`,
+          message: previewMessage,
+          type: "info",
+          link: "/messaging",
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[chat] failed to process mentions notifications:", err);
+  }
+}
+
+/**
  * Inserts a message into the given channel. Requires `chat.view` — any
  * member who can see chat can participate. The message owner (`user_id`)
  * and `organization_id` come from the session; the target channel must
@@ -315,7 +475,7 @@ export async function sendMessage(
   // Verify the target channel belongs to the caller's organization.
   const { data: channel } = await supabase
     .from("chat_channels")
-    .select("id")
+    .select("id, name, is_private")
     .eq("id", channelId)
     .eq("organization_id", auth.organizationId)
     .maybeSingle();
@@ -354,6 +514,17 @@ export async function sendMessage(
       error: err.sendFailed,
     };
   }
+
+  // Process @mentions asynchronously without delaying chat response
+  void handleMessageMentions({
+    organizationId: auth.organizationId,
+    senderId: auth.userId,
+    senderName: auth.userName,
+    channelId,
+    channelName: channel.name,
+    isPrivate: channel.is_private,
+    content: parsed.data,
+  });
 
   return {
     status: "success",

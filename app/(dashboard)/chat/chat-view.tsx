@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AtSign,
+  Building2,
   Download,
   FileText,
   Hash,
@@ -13,6 +15,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,8 +64,10 @@ interface ChatViewProps {
   canManage: boolean;
   /** The signed-in user, used for optimistic sends and "own message" styling. */
   currentUser: ChatPerson;
-  /** Active members in the workspace for channel member management. */
+  /** Active members in the workspace for channel member management and mentions. */
   orgMembers: ChatPerson[];
+  /** Workspace departments for @department mentions. */
+  departments?: { id: string; name: string }[];
   /** Caller's organization, used to scope attachment upload paths. */
   organizationId: string;
   /** Localized copy + formatters for the current render. */
@@ -93,6 +98,7 @@ export function ChatView({
   canManage,
   currentUser,
   orgMembers,
+  departments = [],
   organizationId,
   platform,
   locale,
@@ -114,8 +120,14 @@ export function ChatView({
     Record<string, AttachmentRow[]>
   >({});
 
+  // Mentions autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+
   const feedRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Sender-name cache so realtime messages render names without refetching
   // profiles for senders we've already seen.
@@ -184,7 +196,7 @@ export function ChatView({
     [refreshPerson]
   );
 
-  // Live listener: append INSERT events for the active channel.
+  // Live listener: append INSERT events & broadcast attachments for the active channel.
   useEffect(() => {
     if (!activeChannelId) return;
 
@@ -200,15 +212,140 @@ export function ChatView({
           filter: `channel_id=eq.${activeChannelId}`,
         },
         (payload) => {
-          handleRealtimeMessage(payload.new as RealtimeMessageRow);
+          const row = payload.new as RealtimeMessageRow;
+          handleRealtimeMessage(row);
+
+          // Eagerly poll attachments if message might contain files
+          const isFileOnly =
+            row.content.trim() === t.fileOnlyBody ||
+            row.content.trim().toLowerCase() === "attached file(s)" ||
+            row.content.trim() === "ملفات مرفقة";
+
+          if (isFileOnly) {
+            void getMessageAttachments(row.id).then((res) => {
+              if (res.status === "success" && res.attachments.length > 0) {
+                setAttachmentMap((prev) => ({ ...prev, [row.id]: res.attachments }));
+              }
+            });
+            setTimeout(() => {
+              void getMessageAttachments(row.id).then((res) => {
+                if (res.status === "success" && res.attachments.length > 0) {
+                  setAttachmentMap((prev) => ({ ...prev, [row.id]: res.attachments }));
+                }
+              });
+            }, 800);
+            setTimeout(() => {
+              void getMessageAttachments(row.id).then((res) => {
+                if (res.status === "success" && res.attachments.length > 0) {
+                  setAttachmentMap((prev) => ({ ...prev, [row.id]: res.attachments }));
+                }
+              });
+            }, 2200);
+          }
         }
       )
+      .on("broadcast", { event: "chat_attachment_uploaded" }, (payload) => {
+        const data = (payload.payload ?? {}) as {
+          messageId?: string;
+          attachments?: AttachmentRow[];
+        };
+        if (data.messageId && Array.isArray(data.attachments)) {
+          setAttachmentMap((prev) => ({
+            ...prev,
+            [data.messageId!]: data.attachments!,
+          }));
+        }
+      })
       .subscribe();
 
+    realtimeChannelRef.current = subscription;
+
     return () => {
+      realtimeChannelRef.current = null;
       void supabase.removeChannel(subscription);
     };
-  }, [activeChannelId, handleRealtimeMessage]);
+  }, [activeChannelId, handleRealtimeMessage, t.fileOnlyBody]);
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    const list: { type: "channel" | "dept" | "user"; label: string; insertText: string }[] = [];
+
+    if ("channel".includes(q) || "everyone".includes(q) || "here".includes(q)) {
+      list.push({
+        type: "channel",
+        label: "@channel (Notify all channel members)",
+        insertText: "@channel ",
+      });
+    }
+
+    for (const dept of departments) {
+      if (dept.name.toLowerCase().includes(q)) {
+        list.push({
+          type: "dept",
+          label: `@${dept.name} (Department)`,
+          insertText: `@${dept.name} `,
+        });
+      }
+    }
+
+    for (const member of orgMembers) {
+      const name = member.fullName || member.email?.split("@")[0] || "";
+      if (name.toLowerCase().includes(q)) {
+        list.push({
+          type: "user",
+          label: `@${name}`,
+          insertText: `@${name} `,
+        });
+      }
+    }
+
+    return list.slice(0, 8);
+  }, [mentionQuery, departments, orgMembers]);
+
+  function applyMention(suggestion: { insertText: string }) {
+    if (!composerRef.current) return;
+    const textarea = composerRef.current;
+    const selStart = textarea.selectionStart;
+    const textBeforeCursor = composer.slice(0, selStart);
+    const lastAt = textBeforeCursor.lastIndexOf("@");
+    if (lastAt === -1) return;
+
+    const newText =
+      composer.slice(0, lastAt) +
+      suggestion.insertText +
+      composer.slice(selStart);
+    setComposer(newText);
+    setMentionQuery(null);
+
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = lastAt + suggestion.insertText.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  }
+
+  function handleComposerChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setComposer(val);
+
+    const selStart = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, selStart);
+    const lastAt = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAt !== -1) {
+      const charBeforeAt = lastAt > 0 ? textBeforeCursor[lastAt - 1] : " ";
+      if (charBeforeAt === " " || charBeforeAt === "\n") {
+        const query = textBeforeCursor.slice(lastAt + 1);
+        if (!query.includes(" ") && query.length < 20) {
+          setMentionQuery(query.toLowerCase());
+          setMentionIndex(0);
+          return;
+        }
+      }
+    }
+    setMentionQuery(null);
+  }
+
 
   async function handleSelectChannel(channelId: string) {
     if (channelId === activeChannelId) return;
@@ -239,7 +376,34 @@ export function ChatView({
       user: currentUser,
     };
 
+    // Instant optimistic attachments for the sender so file cards render immediately
+    const optimisticAttachments: AttachmentRow[] = files.map((pending) => ({
+      id: pending.id,
+      taskId: null,
+      messageId: optimisticId,
+      fileName: pending.file.name,
+      fileSize: pending.file.size,
+      fileType: pending.file.type || "application/octet-stream",
+      storagePath: "",
+      isClientVisible: true,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: {
+        id: currentUser.id,
+        fullName: currentUser.fullName,
+        email: currentUser.email,
+      },
+      downloadUrl: URL.createObjectURL(pending.file),
+    }));
+
+    if (optimisticAttachments.length > 0) {
+      setAttachmentMap((prev) => ({
+        ...prev,
+        [optimisticId]: optimisticAttachments,
+      }));
+    }
+
     setComposer("");
+    setMentionQuery(null);
     setPendingFiles([]);
     setSendError(null);
     setSendPending(true);
@@ -250,6 +414,11 @@ export function ChatView({
     if (result.status === "error") {
       setSendError(result.error ?? t.errors.sendFailed);
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setAttachmentMap((prev) => {
+        const next = { ...prev };
+        delete next[optimisticId];
+        return next;
+      });
       setComposer(content);
       setPendingFiles(files);
       setSendPending(false);
@@ -260,6 +429,18 @@ export function ChatView({
     setMessages((prev) =>
       prev.map((m) => (m.id === optimisticId ? persisted : m))
     );
+
+    if (optimisticAttachments.length > 0) {
+      setAttachmentMap((prev) => {
+        const next = { ...prev };
+        next[persisted.id] = optimisticAttachments.map((a) => ({
+          ...a,
+          messageId: persisted.id,
+        }));
+        delete next[optimisticId];
+        return next;
+      });
+    }
 
     // Upload any queued files and link them to the persisted message. A
     // failure here never unsends the message — it only surfaces an error.
@@ -309,8 +490,18 @@ export function ChatView({
       } else if (uploads.length > 0) {
         setAttachmentMap((prev) => ({
           ...prev,
-          [persisted.id]: [...(prev[persisted.id] ?? []), ...uploads],
+          [persisted.id]: uploads,
         }));
+
+        // Broadcast uploaded attachments immediately to all active channel peers
+        void realtimeChannelRef.current?.send({
+          type: "broadcast",
+          event: "chat_attachment_uploaded",
+          payload: {
+            messageId: persisted.id,
+            attachments: uploads,
+          },
+        });
       }
     }
 
@@ -384,6 +575,29 @@ export function ChatView({
   }
 
   function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionSuggestions.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % mentionSuggestions.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        applyMention(mentionSuggestions[mentionIndex]);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void handleSend();
@@ -391,7 +605,7 @@ export function ChatView({
   }
 
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full w-full border rounded-xl bg-card overflow-hidden shadow-sm">
       {/* Channel sidebar */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -503,7 +717,7 @@ export function ChatView({
 
         <div
           ref={feedRef}
-          className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
+          className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3 bg-muted/5 scrollbar-thin"
         >
           {feedLoading ? (
             <div className="flex h-full items-center justify-center">
@@ -535,8 +749,43 @@ export function ChatView({
             </div>
           )}
         </div>
-{/* Composer */}
-        <div className="border-t border-border p-3">
+
+        {/* Composer */}
+        <div className="relative border-t border-border p-3">
+          {/* Mentions autocomplete dropdown */}
+          {mentionSuggestions.length > 0 && (
+            <div className="absolute bottom-full mb-1 left-3 right-3 max-h-48 overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-30 p-1 divide-y divide-border/50">
+              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Mentions (Use ↑↓ and Enter/Tab)
+              </div>
+              {mentionSuggestions.map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    applyMention(item);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left rounded-md transition-colors",
+                    idx === mentionIndex
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "hover:bg-muted text-foreground"
+                  )}
+                >
+                  {item.type === "channel" ? (
+                    <Hash className="h-3.5 w-3.5 shrink-0" />
+                  ) : item.type === "dept" ? (
+                    <Building2 className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <AtSign className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  <span className="truncate">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <form onSubmit={handleFormSubmit} className="grid gap-2">
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -569,8 +818,9 @@ export function ChatView({
             )}
             <div className="flex items-end gap-1.5">
               <Textarea
+                ref={composerRef}
                 value={composer}
-                onChange={(event) => setComposer(event.target.value)}
+                onChange={handleComposerChange}
                 onKeyDown={handleComposerKeyDown}
                 placeholder={
                   activeChannel
@@ -664,6 +914,23 @@ interface MessageBubbleProps {
   locale: Locale;
 }
 
+function renderContentWithMentions(content: string) {
+  const parts = content.split(/(@(?:"[^"]+"|[a-zA-Z0-9_\-\.]+))/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("@") && part.length > 1) {
+      return (
+        <span
+          key={index}
+          className="inline-block bg-primary/15 text-primary font-semibold rounded px-1.5 py-0.5 mx-0.5 text-xs font-mono select-all shadow-2xs"
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 /** Single chat message: avatar, sender name + time, content bubble, and attachment cards. */
 function MessageBubble({
   message,
@@ -684,6 +951,11 @@ function MessageBubble({
       onRequestAttachments(message.id);
     }
   }, [attachments, message.id, onRequestAttachments]);
+
+  const isFileOnly =
+    message.content.trim() === t.fileOnlyBody ||
+    message.content.trim().toLowerCase() === "attached file(s)" ||
+    message.content.trim() === "ملفات مرفقة";
 
   return (
     <div className={cn("flex items-start gap-3", isOwn && "flex-row-reverse")}>
@@ -707,14 +979,32 @@ function MessageBubble({
             {formatMessageTime(message.createdAt, locale)}
           </time>
         </div>
-        <p
-          className={cn(
-            "mt-1 inline-block rounded-lg border px-3 py-2 text-sm whitespace-pre-wrap break-words text-left",
-            isOwn ? "border-transparent bg-primary/10" : "border-border bg-card"
-          )}
-        >
-          {message.content}
-        </p>
+
+        {/* When a message consists purely of file attachments, render file cards directly without raw text */}
+        {isFileOnly ? (
+          (!attachments || attachments.length === 0) && (
+            <div
+              className={cn(
+                "mt-1 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs",
+                isOwn ? "border-transparent bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"
+              )}
+            >
+              <FileText className="h-4 w-4 animate-pulse shrink-0" />
+              <span className="font-medium animate-pulse">
+                {locale === "ar" ? "جاري تجهيز المرفق..." : "Attaching file..."}
+              </span>
+            </div>
+          )
+        ) : (
+          <p
+            className={cn(
+              "mt-1 inline-block rounded-lg border px-3 py-2 text-sm whitespace-pre-wrap break-words text-left",
+              isOwn ? "border-transparent bg-primary/10" : "border-border bg-card"
+            )}
+          >
+            {renderContentWithMentions(message.content)}
+          </p>
+        )}
 
         {attachments && attachments.length > 0 && (
           <div className={cn("mt-1.5 flex flex-col gap-1.5", isOwn && "items-end")}>

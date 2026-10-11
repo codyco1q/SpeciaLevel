@@ -19,6 +19,7 @@ interface MessagingViewProps {
   canManageChat: boolean;
   currentUser: ChatPerson;
   orgMembers: ChatPerson[];
+  departments?: { id: string; name: string }[];
   // External inbox props
   initialThreads: ExternalThreadItem[];
   phoneNumbers: PhoneNumberWithAgent[];
@@ -36,6 +37,7 @@ export function MessagingView({
   canManageChat,
   currentUser,
   orgMembers,
+  departments = [],
   initialThreads,
   phoneNumbers,
   carrierSettings,
@@ -87,7 +89,7 @@ export function MessagingView({
 
       {/* Internal Channels Content */}
       {activeTab === "internal" && (
-        <div className="min-h-[600px]">
+        <div className="h-[calc(100vh-14rem)] min-h-[500px]">
           <ChatView
             channels={channels}
             initialMessages={initialMessages}
@@ -95,6 +97,7 @@ export function MessagingView({
             canManage={canManageChat}
             currentUser={currentUser}
             orgMembers={orgMembers}
+            departments={departments}
             organizationId={organizationId}
             platform={platform}
             locale={locale}

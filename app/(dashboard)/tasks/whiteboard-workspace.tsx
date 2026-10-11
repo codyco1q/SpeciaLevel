@@ -137,6 +137,7 @@ export function WhiteboardWorkspace({
   const [pencilColor, setPencilColor] = useState("#3b82f6");
   const [pencilWidth, setPencilWidth] = useState(3);
   const [strokeWidth, setStrokeWidth] = useState(2);
+  const [fontSize, setFontSize] = useState<number>(20);
 
   // History
   const [history, setHistory] = useState<WhiteboardElement[][]>([activeBoard?.elements_json ?? []]);
@@ -145,7 +146,11 @@ export function WhiteboardWorkspace({
   // Refs
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const currentBoardIdRef = useRef<string | null>(activeBoardId);
+  const loadedBoardIdRef = useRef<string | null>(null);
+  const elementsRef = useRef<WhiteboardElement[]>(elements);
+  elementsRef.current = elements;
+  const viewportRef = useRef<WhiteboardViewport>(viewport);
+  viewportRef.current = viewport;
   const pendingSaveRef = useRef<{ id: string; elements: WhiteboardElement[]; viewport: WhiteboardViewport } | null>(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
@@ -170,6 +175,21 @@ export function WhiteboardWorkspace({
     return map;
   }, [elements]);
 
+  // Cleanup pending saves on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      if (pendingSaveRef.current) {
+        const { id, elements: els, viewport: vp } = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        void saveWhiteboard(id, els, vp);
+      }
+    };
+  }, []);
+
   // Sync when active board changes from prop
   useEffect(() => {
     if (activeBoardIdProp && activeBoardIdProp !== activeBoardId) {
@@ -177,42 +197,45 @@ export function WhiteboardWorkspace({
     }
   }, [activeBoardIdProp, activeBoardId]);
 
+  // Sync initial boards if empty
   useEffect(() => {
-    setBoards(initialWhiteboards);
+    if (boards.length === 0 && initialWhiteboards.length > 0) {
+      setBoards(initialWhiteboards);
+    }
     if (!activeBoardId && initialWhiteboards.length > 0) {
       setActiveBoardId(initialWhiteboards[0].id);
     }
-  }, [initialWhiteboards, activeBoardId]);
+  }, [initialWhiteboards, activeBoardId, boards.length]);
 
-  // Sync when switching active board
+  // Sync when switching active board - only run when activeBoardId actually changes
   useEffect(() => {
-    if (currentBoardIdRef.current && currentBoardIdRef.current !== activeBoardId) {
-      // Flush pending save for previous board
-      if (pendingSaveRef.current && saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        const { id, elements: els, viewport: vp } = pendingSaveRef.current;
-        pendingSaveRef.current = null;
-        void saveWhiteboard(id, els, vp);
-      }
+    if (!activeBoardId) return;
+    if (loadedBoardIdRef.current === activeBoardId) return;
+
+    // Flush pending save for previous board
+    if (pendingSaveRef.current) {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      const { id, elements: els, viewport: vp } = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      void saveWhiteboard(id, els, vp);
     }
 
-    currentBoardIdRef.current = activeBoardId;
+    loadedBoardIdRef.current = activeBoardId;
 
-    if (activeBoard) {
-      const boardElements = Array.isArray(activeBoard.elements_json) ? activeBoard.elements_json : [];
-      const boardViewport = activeBoard.viewport || { x: 0, y: 0, zoom: 1 };
+    const targetBoard = boards.find((b) => b.id === activeBoardId);
+    if (targetBoard) {
+      const boardElements = Array.isArray(targetBoard.elements_json) ? targetBoard.elements_json : [];
+      const boardViewport = targetBoard.viewport || { x: 0, y: 0, zoom: 1 };
       setElements(boardElements);
       setViewport(boardViewport);
-      setBoardName(activeBoard.name || "Whiteboard");
+      setBoardName(targetBoard.name || "Whiteboard");
       setSelectedElementIds([]);
       setEditingElementId(null);
       setHistory([boardElements]);
       setHistoryIndex(0);
       setSaveStatus("idle");
-    } else if (!activeBoardId && boards.length > 0) {
-      setActiveBoardId(boards[0].id);
     }
-  }, [activeBoardId, activeBoard, boards]);
+  }, [activeBoardId, boards]);
 
   // Push to history
   const pushHistory = useCallback((newElements: WhiteboardElement[]) => {
@@ -277,7 +300,7 @@ export function WhiteboardWorkspace({
         } else {
           setSaveStatus("idle");
         }
-      }, 1200);
+      }, 1000);
     },
     [activeBoardId]
   );
@@ -287,11 +310,16 @@ export function WhiteboardWorkspace({
       setElements((prev) => {
         const next = updater(prev);
         if (addToHistory) pushHistory(next);
-        triggerAutoSave(next, viewport);
+        triggerAutoSave(next, viewportRef.current);
+        if (activeBoardId) {
+          setBoards((prevBoards) =>
+            prevBoards.map((b) => (b.id === activeBoardId ? { ...b, elements_json: next } : b))
+          );
+        }
         return next;
       });
     },
-    [pushHistory, triggerAutoSave, viewport]
+    [activeBoardId, pushHistory, triggerAutoSave]
   );
 
   // Board CRUD
@@ -757,25 +785,37 @@ export function WhiteboardWorkspace({
     }
   };
 
-  // Zoom handlers
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-      const nextZoom = Math.min(Math.max(viewport.zoom * zoomFactor, 0.1), 5);
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const newX = mouseX - ((mouseX - viewport.x) * nextZoom) / viewport.zoom;
-      const newY = mouseY - ((mouseY - viewport.y) * nextZoom) / viewport.zoom;
-      const newViewport = { x: newX, y: newY, zoom: nextZoom };
-      setViewport(newViewport);
-      triggerAutoSave(elements, newViewport);
-    } else {
-      setViewport((prev) => ({ ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
-    }
-  };
+  // Canvas zoom & pan via native wheel listener (non-passive so e.preventDefault() blocks browser-level page zoom)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+        const rect = (svgRef.current || container).getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        setViewport((prev) => {
+          const nextZoom = Math.min(Math.max(Number((prev.zoom * zoomFactor).toFixed(3)), 0.1), 5);
+          const newX = mouseX - ((mouseX - prev.x) * nextZoom) / prev.zoom;
+          const newY = mouseY - ((mouseY - prev.y) * nextZoom) / prev.zoom;
+          const newViewport = { x: newX, y: newY, zoom: nextZoom };
+          triggerAutoSave(elementsRef.current, newViewport);
+          return newViewport;
+        });
+      } else {
+        setViewport((prev) => ({ ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
+      }
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+    };
+  }, [triggerAutoSave]);
 
   const handleZoom = (direction: "in" | "out" | "reset") => {
     setViewport((prev) => {
@@ -784,7 +824,7 @@ export function WhiteboardWorkspace({
       if (direction === "out") nextZoom = Math.max(prev.zoom / 1.2, 0.1);
       if (direction === "reset") return { x: 0, y: 0, zoom: 1 };
       const newViewport = { ...prev, zoom: nextZoom };
-      triggerAutoSave(elements, newViewport);
+      triggerAutoSave(elementsRef.current, newViewport);
       return newViewport;
     });
   };
@@ -962,7 +1002,13 @@ export function WhiteboardWorkspace({
                   setEditingElementId(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") setEditingElementId(null);
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleUpdateElement(el.id, { text: e.currentTarget.value });
+                    setEditingElementId(null);
+                  } else if (e.key === "Escape") {
+                    setEditingElementId(null);
+                  }
                 }}
                 className="w-full h-full bg-transparent resize-none border-none outline-none font-sans text-xs text-neutral-900 leading-relaxed pointer-events-auto p-0"
               />
@@ -991,6 +1037,7 @@ export function WhiteboardWorkspace({
           strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
           strokeDasharray={el.strokeStyle === "dashed" ? "6 4" : el.strokeStyle === "dotted" ? "2 3" : undefined}
           data-element-id={el.id}
+          pointerEvents="all"
           className="cursor-move"
         />
       );
@@ -1011,6 +1058,7 @@ export function WhiteboardWorkspace({
           strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
           strokeDasharray={el.strokeStyle === "dashed" ? "6 4" : el.strokeStyle === "dotted" ? "2 3" : undefined}
           data-element-id={el.id}
+          pointerEvents="all"
           className="cursor-move"
         />
       );
@@ -1028,6 +1076,7 @@ export function WhiteboardWorkspace({
           stroke={isSelected ? "#3b82f6" : el.strokeColor || "#a855f7"}
           strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
           data-element-id={el.id}
+          pointerEvents="all"
           className="cursor-move"
         />
       );
@@ -1035,6 +1084,11 @@ export function WhiteboardWorkspace({
 
     if (el.type === "text") {
       const isEditing = editingElementId === el.id;
+      const fs = el.fontSize || 20;
+      const lines = (el.text || "Text").split("\n");
+      const estimatedWidth = Math.max(...lines.map((l) => l.length * fs * 0.65), 80) + 20;
+      const estimatedHeight = Math.max(lines.length * (fs * 1.3) + 16, 36);
+
       return (
         <g
           key={el.id}
@@ -1046,9 +1100,19 @@ export function WhiteboardWorkspace({
             setEditingElementId(el.id);
           }}
         >
+          {/* Transparent hit area so small text is easy to click anywhere */}
+          <rect
+            x={-6}
+            y={-6}
+            width={estimatedWidth}
+            height={estimatedHeight}
+            fill="transparent"
+            pointerEvents="all"
+            data-element-id={el.id}
+          />
           {isEditing ? (
-            <foreignObject x={0} y={0} width={300} height={100}>
-              <input
+            <foreignObject x={0} y={0} width={Math.max(estimatedWidth + 60, 260)} height={Math.max(estimatedHeight + 40, 90)}>
+              <textarea
                 autoFocus
                 defaultValue={el.text}
                 onBlur={(e) => {
@@ -1056,25 +1120,36 @@ export function WhiteboardWorkspace({
                   setEditingElementId(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "Escape") setEditingElementId(null);
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleUpdateElement(el.id, { text: e.currentTarget.value });
+                    setEditingElementId(null);
+                  } else if (e.key === "Escape") {
+                    setEditingElementId(null);
+                  }
                 }}
-                style={{ fontSize: `${el.fontSize || 20}px`, color: el.color || "#ffffff" }}
-                className="bg-transparent border-b border-primary outline-none font-sans font-medium w-full"
+                style={{ fontSize: `${fs}px`, color: el.color || "#ffffff" }}
+                className="bg-transparent border-b border-primary outline-none font-sans font-medium w-full resize-none p-0 leading-normal"
+                rows={Math.max(lines.length, 1)}
               />
             </foreignObject>
           ) : (
             <text
               x={0}
-              y={el.fontSize || 20}
+              y={fs}
               fill={el.color || "#ffffff"}
-              fontSize={el.fontSize || 20}
+              fontSize={fs}
               fontWeight={el.fontWeight || "normal"}
               fontStyle={el.fontStyle || "normal"}
               fontFamily="sans-serif"
               data-element-id={el.id}
-              className={cn("select-none", isSelected && "underline decoration-primary")}
+              className={cn("select-none pointer-events-none", isSelected && "underline decoration-primary")}
             >
-              {el.text || "Text"}
+              {lines.map((line, i) => (
+                <tspan key={i} x={0} dy={i === 0 ? 0 : fs * 1.25}>
+                  {line || " "}
+                </tspan>
+              ))}
             </text>
           )}
         </g>
@@ -1093,6 +1168,17 @@ export function WhiteboardWorkspace({
 
       return (
         <g key={el.id} data-element-id={el.id} className="cursor-move">
+          {/* Thick transparent hit target */}
+          <path
+            d={pathData}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={Math.max((el.strokeWidth || 2) + 24, 28)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            pointerEvents="stroke"
+            data-element-id={el.id}
+          />
           <path
             d={pathData}
             fill="none"
@@ -1110,18 +1196,29 @@ export function WhiteboardWorkspace({
       if (pts.length < 2) return null;
       const d = `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ");
       return (
-        <path
-          key={el.id}
-          d={d}
-          fill="none"
-          stroke={el.strokeColor || "#3b82f6"}
-          strokeWidth={el.strokeWidth || (el.type === "highlighter" ? 14 : 3)}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={el.type === "highlighter" ? 0.45 : 1}
-          data-element-id={el.id}
-          className="cursor-move"
-        />
+        <g key={el.id} data-element-id={el.id} className="cursor-move">
+          {/* Thick transparent hit target */}
+          <path
+            d={d}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={Math.max((el.strokeWidth || 3) + 22, 26)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            pointerEvents="stroke"
+            data-element-id={el.id}
+          />
+          <path
+            d={d}
+            fill="none"
+            stroke={el.strokeColor || "#3b82f6"}
+            strokeWidth={el.strokeWidth || (el.type === "highlighter" ? 14 : 3)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={el.type === "highlighter" ? 0.45 : 1}
+            data-element-id={el.id}
+          />
+        </g>
       );
     }
 
@@ -1307,6 +1404,8 @@ export function WhiteboardWorkspace({
             setShapeStrokeColor={setShapeStrokeColor}
             textColor={textColor}
             setTextColor={setTextColor}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
             pencilColor={pencilColor}
             setPencilColor={setPencilColor}
             pencilWidth={pencilWidth}
@@ -1323,7 +1422,6 @@ export function WhiteboardWorkspace({
         {/* Interactive SVG Canvas */}
         <div
           ref={containerRef}
-          onWheel={handleWheel}
           onContextMenu={(e) => e.preventDefault()}
           className={cn(
             "flex-1 relative overflow-hidden bg-background select-none cursor-default",

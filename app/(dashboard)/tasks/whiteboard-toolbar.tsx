@@ -12,12 +12,14 @@ import {
   MousePointer,
   Minus,
   Pencil,
+  Plus,
   Square,
   StickyNote,
   Trash2,
   Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { WhiteboardElement, WhiteboardTool } from "@/types/database";
 import {
@@ -41,6 +43,8 @@ interface WhiteboardToolbarProps {
   setShapeStrokeColor: (color: string) => void;
   textColor: string;
   setTextColor: (color: string) => void;
+  fontSize?: number;
+  setFontSize?: (size: number) => void;
   pencilColor: string;
   setPencilColor: (color: string) => void;
   pencilWidth: number;
@@ -66,6 +70,8 @@ export function WhiteboardToolbar({
   setShapeStrokeColor,
   textColor,
   setTextColor,
+  fontSize = 20,
+  setFontSize,
   pencilColor,
   setPencilColor,
   pencilWidth,
@@ -247,21 +253,72 @@ export function WhiteboardToolbar({
                 title="Text Color"
               />
               <div className="h-4 w-[1px] bg-border mx-1" />
+              <span className="text-muted-foreground font-semibold text-[11px]">Size:</span>
+              <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/60">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    const current = selectedElement?.fontSize || fontSize;
+                    const next = Math.max(current - 2, 8);
+                    setFontSize?.(next);
+                    if (selectedElement) onUpdateSelected({ fontSize: next });
+                  }}
+                  title="Decrease font size"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <div className="flex items-center">
+                  <Input
+                    type="number"
+                    min={8}
+                    max={120}
+                    value={selectedElement?.fontSize || fontSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 8 && val <= 144) {
+                        setFontSize?.(val);
+                        if (selectedElement) onUpdateSelected({ fontSize: val });
+                      }
+                    }}
+                    className="h-6 w-12 px-1 text-center text-xs font-semibold bg-background border-none shadow-none focus-visible:ring-1"
+                  />
+                  <span className="text-[10px] text-muted-foreground pe-1">px</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    const current = selectedElement?.fontSize || fontSize;
+                    const next = Math.min(current + 2, 120);
+                    setFontSize?.(next);
+                    if (selectedElement) onUpdateSelected({ fontSize: next });
+                  }}
+                  title="Increase font size"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
               {[14, 20, 32, 48].map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => {
+                    setFontSize?.(s);
                     if (selectedElement) onUpdateSelected({ fontSize: s });
                   }}
                   className={cn(
                     "px-1.5 py-0.5 rounded text-[11px] font-medium border transition",
-                    (selectedElement?.fontSize || 20) === s
+                    (selectedElement?.fontSize || fontSize) === s
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-muted text-muted-foreground border-border hover:text-foreground"
                   )}
                 >
-                  {s}px
+                  {s}
                 </button>
               ))}
             </>

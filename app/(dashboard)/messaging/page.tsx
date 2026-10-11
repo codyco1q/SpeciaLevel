@@ -69,11 +69,18 @@ export default async function MessagingPage() {
     email: userContext.user.email,
   };
 
-  const { data: profileRows } = await supabase
-    .from("profiles")
-    .select("id, full_name, email")
-    .eq("organization_id", userContext.organization.id)
-    .order("full_name", { ascending: true });
+  const [{ data: profileRows }, { data: departmentRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("organization_id", userContext.organization.id)
+      .order("full_name", { ascending: true }),
+    supabase
+      .from("departments")
+      .select("id, name")
+      .eq("organization_id", userContext.organization.id)
+      .order("name", { ascending: true }),
+  ]);
 
   const orgMembers: ChatPerson[] = (
     (profileRows as unknown as { id: string; full_name: string | null; email: string | null }[]) ?? []
@@ -81,6 +88,13 @@ export default async function MessagingPage() {
     id: p.id,
     fullName: p.full_name,
     email: p.email,
+  }));
+
+  const departments: { id: string; name: string }[] = (
+    (departmentRows as unknown as { id: string; name: string }[]) ?? []
+  ).map((d) => ({
+    id: d.id,
+    name: d.name,
   }));
 
   return (
@@ -92,6 +106,7 @@ export default async function MessagingPage() {
         canManageChat={hasPermission("chat.manage", userContext.permissions)}
         currentUser={currentUser}
         orgMembers={orgMembers}
+        departments={departments}
         initialThreads={externalThreads ?? []}
         phoneNumbers={phoneNumbers ?? []}
         carrierSettings={carrierSettings}
