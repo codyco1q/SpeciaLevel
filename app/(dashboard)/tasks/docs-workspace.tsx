@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -954,57 +955,59 @@ export function DocsWorkspace({
                 </div>
               </div>
 
-            <div className="flex-1 overflow-y-auto px-6 sm:px-12 py-8 max-w-4xl mx-auto w-full space-y-6">
-              <div className="space-y-3">
-                <div className="relative inline-block">
-                  <button
-                    type="button"
-                    onClick={() => setShowIconPicker(!showIconPicker)}
-                    className="text-4xl hover:scale-110 transition p-1 rounded-lg hover:bg-muted/50 select-none"
-                    title="Change icon"
-                  >
-                    {icon}
-                  </button>
+            <ScrollArea className="flex-1">
+              <div className="px-6 sm:px-12 py-8 max-w-4xl mx-auto w-full space-y-6">
+                <div className="space-y-3">
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowIconPicker(!showIconPicker)}
+                      className="text-4xl hover:scale-110 transition p-1 rounded-lg hover:bg-muted/50 select-none"
+                      title="Change icon"
+                    >
+                      {icon}
+                    </button>
 
-                  {showIconPicker && (
-                    <div className="absolute top-12 left-0 z-50 p-2 rounded-xl border border-border bg-popover shadow-xl grid grid-cols-6 gap-1 w-56">
-                      {DOC_ICONS.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          className="h-8 w-8 text-xl flex items-center justify-center rounded hover:bg-muted"
-                          onClick={() => handleIconSelect(emoji)}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                    {showIconPicker && (
+                      <div className="absolute top-12 left-0 z-50 p-2 rounded-xl border border-border bg-popover shadow-xl grid grid-cols-6 gap-1 w-56">
+                        {DOC_ICONS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            className="h-8 w-8 text-xl flex items-center justify-center rounded hover:bg-muted"
+                            onClick={() => handleIconSelect(emoji)}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    placeholder={dw.untitled}
+                    className="w-full text-3xl sm:text-4xl font-extrabold tracking-tight bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground/40"
+                  />
                 </div>
 
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder={dw.untitled}
-                  className="w-full text-3xl sm:text-4xl font-extrabold tracking-tight bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground/40"
-                />
+                <div className="pt-2">
+                  <BlockEditor
+                    key={activeDocId}
+                    blocks={blocks}
+                    onChange={handleBlocksChange}
+                    readOnly={false}
+                    placeholder="Type '/' for commands or start writing notes..."
+                    availableDocs={docs}
+                    availableWhiteboards={initialWhiteboards}
+                    onOpenDoc={(docId) => setActiveDocId(docId)}
+                    onOpenWhiteboard={onOpenWhiteboard}
+                  />
+                </div>
               </div>
-
-              <div className="pt-2">
-                <BlockEditor
-                  key={activeDocId}
-                  blocks={blocks}
-                  onChange={handleBlocksChange}
-                  readOnly={false}
-                  placeholder="Type '/' for commands or start writing notes..."
-                  availableDocs={docs}
-                  availableWhiteboards={initialWhiteboards}
-                  onOpenDoc={(docId) => setActiveDocId(docId)}
-                  onOpenWhiteboard={onOpenWhiteboard}
-                />
-              </div>
-            </div>
+            </ScrollArea>
           </>
         )) : (
           // ================= EMPTY STATE =================

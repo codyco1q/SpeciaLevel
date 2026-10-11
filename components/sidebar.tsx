@@ -38,6 +38,7 @@ export interface SidebarProps {
   permissions: string[];
   organizationName?: string;
   logoUrl?: string | null;
+  avatarUrl?: string | null;
   userFullName?: string;
   userEmail?: string;
   locale: Locale;
@@ -51,6 +52,7 @@ export default function Sidebar({
   permissions,
   organizationName,
   logoUrl,
+  avatarUrl,
   userFullName,
   userEmail,
   locale,
@@ -227,12 +229,12 @@ export default function Sidebar({
       {/* Logo */}
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
         {logoUrl ? (
-          <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/80 bg-background/80 shadow-xs">
+          <div className="relative flex size-9 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-lg border border-border/80 bg-background/80 shadow-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoUrl}
               alt={organizationName || "Logo"}
-              className="h-full w-full object-contain p-0.5"
+              className="size-full aspect-square object-cover"
             />
           </div>
         ) : (
@@ -300,9 +302,20 @@ export default function Sidebar({
         </div>
 
         <div className="mb-2 mt-3 flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-            {(userFullName || userEmail || t.user).charAt(0).toUpperCase()}
-          </div>
+          {avatarUrl ? (
+            <div className="relative flex size-8 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-full border border-border/80 bg-background shadow-xs">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={avatarUrl}
+                alt={userFullName || "Avatar"}
+                className="size-full aspect-square object-cover"
+              />
+            </div>
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+              {(userFullName || userEmail || t.user).charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
               {userFullName || t.user}

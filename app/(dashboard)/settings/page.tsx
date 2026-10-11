@@ -52,6 +52,7 @@ export default async function SettingsPage() {
         profile={{
           fullName: userContext.profile.full_name,
           jobTitle: userContext.profile.job_title,
+          avatarUrl: userContext.profile.avatar_url,
         }}
         userEmail={userContext.user.email}
         canManage={canManage}

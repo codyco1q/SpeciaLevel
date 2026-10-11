@@ -45,6 +45,7 @@ export default async function DashboardLayout({
         permissions={userContext.permissions}
         organizationName={userContext.organization?.name}
         logoUrl={userContext.organization?.logo_url}
+        avatarUrl={userContext.profile.avatar_url}
         userFullName={userContext.profile.full_name ?? undefined}
         userEmail={userContext.user.email}
         locale={locale}

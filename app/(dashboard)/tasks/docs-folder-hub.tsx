@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Folder, FolderPlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { BlockEditor } from "./block-editor";
@@ -98,8 +99,9 @@ export function DocsFolderHub({
       </div>
 
       {/* Folder Content Area */}
-      <div className="flex-1 overflow-y-auto px-6 sm:px-12 py-8 max-w-4xl mx-auto w-full space-y-6">
-        {/* Title Header */}
+      <ScrollArea className="flex-1">
+        <div className="px-6 sm:px-12 py-8 max-w-4xl mx-auto w-full space-y-6">
+          {/* Title Header */}
         <div className="flex items-start gap-4 pb-2 border-b border-border/50">
           <div
             className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-xs"
@@ -294,7 +296,8 @@ export function DocsFolderHub({
         </div>
           </div>
         </div>
-      </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 }

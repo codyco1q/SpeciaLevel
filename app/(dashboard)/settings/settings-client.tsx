@@ -10,7 +10,11 @@ import { ProfileTab } from "./profile-tab";
 
 export interface SettingsClientProps {
   organization: Organization;
-  profile: { fullName: string | null; jobTitle: string | null };
+  profile: {
+    fullName: string | null;
+    jobTitle: string | null;
+    avatarUrl?: string | null;
+  };
   userEmail: string;
   canManage: boolean;
   platform: Dictionary["platform"];

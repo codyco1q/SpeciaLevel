@@ -146,6 +146,7 @@ export interface SettingsActionState {
   error?: string | null;
   fieldErrors?: Record<string, string[] | undefined>;
   logoUrl?: string | null;
+  avatarUrl?: string | null;
 }
 
 export const initialSettingsActionState: SettingsActionState = {
