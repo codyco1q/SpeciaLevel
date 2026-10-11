@@ -38,6 +38,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+
 import { cn } from "@/lib/utils";
 import {
   deleteCampaign,
@@ -155,25 +157,21 @@ export function MarketingView({
     void refreshAll();
   }
 
-  /** Row-level two-step delete: first click arms, second click deletes. */
-  function handleRowDeleteClick(row: MarketingCampaignRow) {
+  function handleDelete(id: string) {
     setActionError(null);
-    if (confirmDeleteId === row.id) {
-      setConfirmDeleteId(null);
-      startTransition(async () => {
-        const result = await deleteCampaign(row.id);
-        if (result.status === "error") {
-          setActionError(result.error);
-          return;
-        }
-        setCampaigns((current) =>
-          current.filter((item) => item.id !== row.id)
-        );
-        void refreshAll();
-      });
-    } else {
-      setConfirmDeleteId(row.id);
-    }
+    startTransition(async () => {
+      const result = await deleteCampaign(id);
+      if (result.status === "error") {
+        setActionError(result.error);
+        return;
+      }
+      setCampaigns((current) => current.filter((item) => item.id !== id));
+      void refreshAll();
+    });
+  }
+
+  function handleRowDeleteClick(row: MarketingCampaignRow) {
+    setConfirmDeleteId(row.id);
   }
 
   const visibleCampaigns =
@@ -489,9 +487,7 @@ export function MarketingView({
                                 onSelect={() => handleRowDeleteClick(campaign)}
                               >
                                 <Trash2 />
-                                {confirmDeleteId === campaign.id
-                                  ? common.confirmDelete
-                                  : common.delete}
+                                {common.delete}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -505,14 +501,20 @@ export function MarketingView({
           </Table>
         </div>
       )}
-
-      {confirmDeleteId && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          {t.errors.deleteConfirmBody}
-        </p>
-      )}
         </>
       )}
+
+      <DeleteConfirmationDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+        title={common.confirmDelete}
+        description={t.errors.deleteConfirmBody || "Are you sure you want to delete this? This action cannot be undone."}
+        onConfirm={() => {
+          if (confirmDeleteId) handleDelete(confirmDeleteId);
+        }}
+      />
 
       <MarketingDialog
         open={dialogOpen}

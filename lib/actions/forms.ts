@@ -562,8 +562,7 @@ async function linkSubmissionToContact(
       .from("crm_contacts")
       .insert({
         organization_id: orgId,
-        first_name: lead.name?.split(" ")[0] || "New",
-        last_name: lead.name?.split(" ").slice(1).join(" ") || "Lead",
+        name: lead.name || "New Lead",
         email: lead.email,
         phone: lead.phone?.replace(/\D/g, ""),
         source: "lead_form",
@@ -571,15 +570,21 @@ async function linkSubmissionToContact(
       .select("id")
       .single();
       
+    if (insertError) {
+      console.error("[forms] Contact insert error:", insertError.message);
+    }
     if (newContact) contactId = newContact.id;
   } else {
-    await supabase
+    const { error: updateError } = await supabase
       .from("crm_contacts")
       .update({
-        first_name: lead.name?.split(" ")[0] || "New",
-        last_name: lead.name?.split(" ").slice(1).join(" ") || "Lead",
+        name: lead.name || undefined,
       })
       .eq("id", contactId);
+      
+    if (updateError) {
+      console.error("[forms] Contact update error:", updateError.message);
+    }
   }
 
   // 3. Link submission to contact
@@ -601,3 +606,59 @@ async function linkSubmissionToContact(
 }
 
 
+
+export async function getAllFormSubmissions(): Promise<FormSubmissionRow[] | null> {
+  const userContext = await getCurrentUserContext();
+  if (
+    !userContext ||
+    !userContext.organization ||
+    !hasPermission("forms.view", userContext.permissions)
+  ) {
+    return null;
+  }
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("inbound_form_submissions")
+    .select(
+      `
+      id,
+      form_id,
+      organization_id,
+      data,
+      contact_id,
+      deal_id,
+      ip_hash,
+      created_at,
+      crm_contacts(id, name, email, company, phone),
+      inbound_forms(id, title)
+    `
+    )
+    .eq("organization_id", userContext.organization.id)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.map((row: any) => ({
+    id: row.id,
+    formId: row.form_id,
+    organizationId: row.organization_id,
+    data: row.data,
+    contactId: row.contact_id,
+    dealId: row.deal_id,
+    ipHash: row.ip_hash,
+    createdAt: row.created_at,
+    contact: row.crm_contacts
+      ? {
+          id: row.crm_contacts.id,
+          name: row.crm_contacts.name,
+          email: row.crm_contacts.email,
+          company: row.crm_contacts.company,
+          phone: row.crm_contacts.phone,
+        }
+      : undefined,
+    form: row.inbound_forms ? { id: row.inbound_forms.id, title: row.inbound_forms.title } : undefined,
+  }));
+}

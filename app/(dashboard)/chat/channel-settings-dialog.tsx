@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -241,6 +243,7 @@ function ChannelSettingsContent({
   });
 
   return (
+    <>
     <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
       <DialogHeader className="p-6 pb-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
@@ -651,39 +654,6 @@ function ChannelSettingsContent({
                       {t.errors.noPermissionManage}
                     </p>
                   </div>
-                ) : confirmDelete ? (
-                  <div className="pt-3 border-t border-destructive/20 space-y-3">
-                    <p className="text-xs font-medium text-destructive">
-                      {s?.deleteChannelConfirmBody ??
-                        "Are you sure you want to delete this channel? All messages and attachments will be permanently deleted. This action cannot be undone."}
-                    </p>
-                    <div className="flex items-center gap-2 justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={deletePending}
-                        onClick={() => setConfirmDelete(false)}
-                        className="text-xs"
-                      >
-                        {s?.cancel ?? "Cancel"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        disabled={deletePending}
-                        onClick={handleDeleteChannel}
-                        className="text-xs min-w-[120px]"
-                      >
-                        {deletePending ? (
-                          <LoaderCircle className="h-4 w-4 animate-spin" />
-                        ) : (
-                          s?.confirmDelete ?? "Yes, delete channel"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
                 ) : (
                   <div className="pt-2 flex justify-end">
                     <Button
@@ -703,6 +673,18 @@ function ChannelSettingsContent({
           </div>
         </Tabs>
       </DialogContent>
+
+      <DeleteConfirmationDialog
+        open={confirmDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(false);
+        }}
+        title={s?.deleteChannel ?? "Delete Channel"}
+        description={s?.deleteChannelConfirmBody ?? "Are you sure you want to delete this channel? All messages and attachments will be permanently deleted. This action cannot be undone."}
+        onConfirm={handleDeleteChannel}
+        isDeleting={deletePending}
+      />
+    </>
   );
 }
 

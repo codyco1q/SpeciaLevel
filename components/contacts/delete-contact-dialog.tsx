@@ -1,18 +1,9 @@
 "use client";
 
 import { useTransition } from "react";
-import { LoaderCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { deleteContact, type ContactSummaryRow } from "@/lib/actions/contacts";
 import type { Dictionary } from "@/lib/i18n/get-dictionary";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 
 interface DeleteContactDialogProps {
   open: boolean;
@@ -45,35 +36,13 @@ export function DeleteContactDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t.deleteContactDialog.title}</DialogTitle>
-          <DialogDescription>
-            {t.deleteContactDialog.description.replace("{name}", contact.name)}
-          </DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isPending}
-          >
-            {common.cancel}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={isPending}
-          >
-            {isPending && <LoaderCircle className="me-2 size-4 animate-spin" />}
-            {common.delete}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <DeleteConfirmationDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t.deleteContactDialog.title}
+      description={t.deleteContactDialog.description.replace("{name}", contact.name)}
+      onConfirm={handleDelete}
+      isDeleting={isPending}
+    />
   );
 }

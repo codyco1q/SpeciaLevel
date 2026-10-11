@@ -18,6 +18,8 @@ import {
   Search,
   Clock,
 } from "lucide-react";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -392,38 +394,14 @@ export function AutomationsView({
         locale={locale}
       />
 
-      {/* Delete Confirmation Modal */}
-      <Dialog
+      <DeleteConfirmationDialog
         open={Boolean(deleteConfirmId)}
-        onOpenChange={(op) => !op && setDeleteConfirmId(null)}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold">
-              {t.errors.deleteConfirmTitle}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {t.errors.deleteConfirmBody}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmId(null)}
-              disabled={isDeleting}
-            >
-              {platform.common.cancel}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? vb.saving : platform.common.delete}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+        title={t.errors.deleteConfirmTitle}
+        description={t.errors.deleteConfirmBody}
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

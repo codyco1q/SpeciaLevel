@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth/session";
+import { getForms, getAllFormSubmissions } from "@/lib/actions/forms";
 import { hasPermission } from "@/lib/auth/rbac";
-import { getForms } from "@/lib/actions/forms";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { FormsView } from "./forms-view";
 import { ShieldAlert } from "lucide-react";
@@ -43,11 +43,13 @@ export default async function FormsPage() {
 
   const forms = (await getForms()) ?? [];
   const canManage = hasPermission("forms.manage", userContext.permissions);
+  const submissions = (await getAllFormSubmissions()) ?? [];
 
   return (
     <div className="p-6 md:p-8">
       <FormsView
         initialForms={forms}
+        initialSubmissions={submissions}
         canManage={canManage}
         locale={locale}
         dictionary={formsDictionary}

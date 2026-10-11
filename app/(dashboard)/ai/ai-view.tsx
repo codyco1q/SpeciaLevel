@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+
 import { cn } from "@/lib/utils"
 import {
   deleteAiPrompt,
@@ -577,11 +579,10 @@ export function AiView({
     })
   }
 
-  function confirmDeletePrompt(row: AiPromptRow) {
+  function handleDelete(id: string) {
     setActionError(null)
-    setConfirmDeleteId(null)
     startTransition(async () => {
-      const result = await deleteAiPrompt(row.id)
+      const result = await deleteAiPrompt(id)
       if (result.status === "error") {
         setActionError(result.error)
         return
@@ -796,35 +797,6 @@ export function AiView({
                       )}
                     </div>
                   </div>
-
-                  {confirmDeleteId === prompt.id && (
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-                      <p className="text-sm text-destructive">
-                        {t.errors.deleteConfirmBody}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setConfirmDeleteId(null)}
-                          disabled={isPending}
-                        >
-                          {platform.common.cancel}
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => confirmDeletePrompt(prompt)}
-                          disabled={isPending}
-                        >
-                          {isPending && (
-                            <LoaderCircle className="size-4 animate-spin" />
-                          )}
-                          {platform.common.delete}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -875,6 +847,19 @@ export function AiView({
         platform={platform}
         locale={locale}
         onSelectPrompt={handleSelectFromHistory}
+      />
+
+      <DeleteConfirmationDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+        title={platform.common.confirmDelete}
+        description={t.errors.deleteConfirmBody}
+        onConfirm={() => {
+          if (confirmDeleteId) handleDelete(confirmDeleteId);
+        }}
+        isDeleting={isPending}
       />
     </div>
   )

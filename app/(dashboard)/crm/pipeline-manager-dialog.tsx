@@ -17,6 +17,8 @@ import {
   Trophy,
   XCircle,
 } from "lucide-react";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+
 import {
   Dialog,
   DialogContent,
@@ -371,6 +373,7 @@ export function PipelineManagerDialog({
   const selectedPipe = pipelines.find((p) => p.id === selectedPipeId);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl lg:max-w-6xl w-[96vw] sm:w-[92vw] max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
@@ -1030,41 +1033,7 @@ export function PipelineManagerDialog({
               </p>
             )}
 
-            {/* Delete Pipeline Confirmation */}
-            {confirmDeleteId && (
-              <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5 space-y-3">
-                <h5 className="text-xs font-bold text-destructive flex items-center gap-1.5">
-                  <AlertTriangle className="size-4" />
-                  {pDict.deletePipeline}
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  {pDict.deletePipelineConfirm}
-                </p>
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setConfirmDeleteId(null)}
-                    disabled={isPending}
-                  >
-                    {common.cancel}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => handleDeletePipeline(confirmDeleteId)}
-                    disabled={isPending}
-                  >
-                    {isPending && <LoaderCircle className="size-3 animate-spin me-1" />}
-                    {pDict.deletePipeline}
-                  </Button>
-                </div>
-              </div>
-            )}
+
           </div>
         </div>
 
@@ -1111,6 +1080,20 @@ export function PipelineManagerDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+      <DeleteConfirmationDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+        title={pDict.deletePipeline}
+        description={pDict.deletePipelineConfirm}
+        onConfirm={() => {
+          if (confirmDeleteId) handleDeletePipeline(confirmDeleteId);
+        }}
+        isDeleting={isPending}
+      />
+    </>
   );
 }
 

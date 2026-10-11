@@ -10,6 +10,8 @@ import {
   Trash2,
   User,
 } from "lucide-react";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,6 +94,7 @@ export function EventDetailDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -158,7 +161,7 @@ export function EventDetailDialog({
             </Button>
           )}
 
-          {canDelete && !confirmingDelete && (
+          {canDelete && (
             <Button
               variant="outline"
               className="text-destructive hover:text-destructive"
@@ -168,31 +171,6 @@ export function EventDetailDialog({
               <Trash2 />
               Delete
             </Button>
-          )}
-
-          {canDelete && confirmingDelete && (
-            <>
-              <span className="text-sm text-muted-foreground">
-                Delete this event?
-              </span>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isPending}
-              >
-                {isPending && (
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                )}
-                Yes, delete
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setConfirmingDelete(false)}
-                disabled={isPending}
-              >
-                Cancel
-              </Button>
-            </>
           )}
 
           <Button
@@ -210,5 +188,17 @@ export function EventDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    
+      <DeleteConfirmationDialog
+        open={confirmingDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingDelete(false);
+        }}
+        title="Delete Event"
+        description="Are you sure you want to delete this event? This action cannot be undone."
+        onConfirm={handleDelete}
+        isDeleting={isPending}
+      />
+    </>
   );
 }

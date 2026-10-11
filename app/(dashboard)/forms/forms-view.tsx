@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import {
   Dialog,
   DialogContent,
@@ -39,12 +40,13 @@ import {
 import { FormBuilderDialog } from "./form-builder-dialog";
 import { SubmissionsDialog } from "./submissions-drawer";
 import { deleteForm, toggleFormPublished } from "@/lib/actions/forms";
-import type { FormRow } from "@/lib/validations/forms";
+import type { FormRow, FormSubmissionRow } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import Link from "next/link";
 
 interface FormsViewProps {
   initialForms: FormRow[];
+  initialSubmissions?: FormSubmissionRow[];
   canManage: boolean;
   dictionary: Dictionary["platform"]["forms"];
   locale: Locale;
@@ -52,6 +54,7 @@ interface FormsViewProps {
 
 export function FormsView({
   initialForms,
+  initialSubmissions = [],
   canManage,
   dictionary,
   locale,
@@ -197,7 +200,74 @@ export function FormsView({
         </div>
       </div>
 
-      {/* Forms Table */}
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-4 border-b border-border">
+        <button
+          onClick={() => setActiveTab("forms")}
+          className={`px-4 py-2 text-sm transition-colors ${activeTab === "forms" ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          {t.title}
+        </button>
+        <button
+          onClick={() => setActiveTab("submissions")}
+          className={`px-4 py-2 text-sm transition-colors ${activeTab === "submissions" ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          {t.table.submissions}
+        </button>
+      </div>
+
+      {activeTab === "submissions" ? (
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          {initialSubmissions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <Inbox className="size-12 text-muted-foreground/40 mb-3" />
+              <h3 className="text-base font-semibold">{t.submissions.noSubmissions}</h3>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t.table.title}</TableHead>
+                    <TableHead>{t.submissions.contactLinked}</TableHead>
+                    <TableHead>{t.submissions.submittedAt}</TableHead>
+                    <TableHead className="text-right">{t.table.actions}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {initialSubmissions.map((sub) => (
+                    <TableRow key={sub.id}>
+                      <TableCell className="font-medium text-sm">
+                        {sub.form?.title || sub.formId}
+                      </TableCell>
+                      <TableCell>
+                        {sub.contact ? (
+                          <Link href={`/contacts/${sub.contact.id}`} className="text-primary hover:underline font-medium">
+                            {sub.contact.name}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Guest</span>
+                        )}
+                        {sub.contact?.email && <p className="text-xs text-muted-foreground">{sub.contact.email}</p>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(sub.createdAt).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/contacts/${sub.contact?.id || ''}`} className="text-xs">
+                            View details
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         {filteredForms.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
@@ -360,6 +430,7 @@ export function FormsView({
           </div>
         )}
       </div>
+      )}
 
       {/* Builder Dialog */}
       <FormBuilderDialog
@@ -391,56 +462,17 @@ export function FormsView({
         locale={locale}
       />
 
-        <div className="flex items-center gap-1 mb-4 border-b border-border">
-          <button
-            onClick={() => setActiveTab("forms")}
-            className={`px-4 py-2 text-sm ${activeTab === "forms" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
-          >
-            {t.title}
-          </button>
-          <button
-            onClick={() => setActiveTab("submissions")}
-            className={`px-4 py-2 text-sm ${activeTab === "submissions" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
-          >
-            {t.submissions.title}
-          </button>
-        </div>
+
 
       {/* Delete Confirmation Alert */}
-      <Dialog
+      <DeleteConfirmationDialog
         open={!!deletingForm}
         onOpenChange={(open: boolean) => !open && setDeletingForm(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t.builder.confirmDelete}</DialogTitle>
-            <DialogDescription>
-              {t.builder.deleteConfirmBody}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeletingForm(null)}
-              disabled={isPending}
-            >
-              {t.builder.cancel}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <LoaderCircle className="size-4 animate-spin mr-1 rtl:mr-0 rtl:ml-1" />
-              ) : null}
-              {t.builder.confirmDelete}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title={t.builder.confirmDelete}
+        description={t.builder.deleteConfirmBody}
+        onConfirm={handleDelete}
+        isDeleting={isPending}
+      />
     </div>
   );
 }

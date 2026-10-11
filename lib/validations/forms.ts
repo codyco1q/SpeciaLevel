@@ -70,6 +70,10 @@ export interface FormSubmissionRow {
     currency: string;
     stage: string;
   } | null;
+  form?: {
+    id: string;
+    title: string;
+  } | null;
 }
 
 export interface PublicFormData {

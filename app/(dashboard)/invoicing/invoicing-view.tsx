@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { cn } from "@/lib/utils";
 import {
   deleteInvoice,
@@ -186,13 +187,8 @@ export function InvoicingView({
     void refreshAll();
   }
 
-  /** Row-level two-step delete: first click arms, second click deletes. */
   function handleRowDeleteClick(id: string) {
-    if (confirmDeleteId === id) {
-      handleDelete(id);
-    } else {
-      setConfirmDeleteId(id);
-    }
+    setConfirmDeleteId(id);
   }
 
   const canMarkPaidRow = (invoice: InvoiceRow) =>
@@ -400,9 +396,7 @@ export function InvoicingView({
                                   onSelect={() => handleRowDeleteClick(invoice.id)}
                                 >
                                   <Trash2 className="size-4" />
-                                  {confirmDeleteId === invoice.id
-                                    ? t.detail.confirmDelete
-                                    : common.delete}
+                                  {common.delete}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -498,6 +492,19 @@ export function InvoicingView({
           }}
         />
       )}
+
+      <DeleteConfirmationDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+        title="Delete Invoice"
+        description="Are you sure you want to delete this invoice? This action cannot be undone."
+        onConfirm={() => {
+          if (confirmDeleteId) handleDelete(confirmDeleteId);
+        }}
+        isDeleting={isPending}
+      />
     </div>
   );
 }

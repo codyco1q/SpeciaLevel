@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/sidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CommandPalette } from "@/components/command-palette";
 import { FloatingDialer } from "@/components/dialer/floating-dialer";
@@ -62,9 +64,11 @@ export default async function DashboardLayout({
           organizationName={userContext.organization?.name}
           logoUrl={userContext.organization?.logo_url}
         />
-        <main className="flex-1 overflow-y-auto bg-background print:h-auto print:overflow-visible print:bg-white">
-          {children}
-        </main>
+        <ScrollArea className="flex-1 bg-background print:h-auto print:overflow-visible print:bg-white">
+          <main className="size-full">
+            {children}
+          </main>
+        </ScrollArea>
       </div>
       <CommandPalette
         platform={dict.platform}
