@@ -8,7 +8,16 @@ export type FormFieldType =
   | "select"
   | "number"
   | "multiselect"
-  | "custom_html";
+  | "custom_html"
+  | "product_select";
+
+export interface FormProductItem {
+  id: string;
+  title: string;
+  description?: string;
+  unitPrice: number;
+  imageUrl?: string | null;
+}
 
 export interface FormField {
   id: string;
@@ -19,6 +28,8 @@ export interface FormField {
   options?: string[];
   helpText?: string;
   customHtml?: string;
+  products?: FormProductItem[];
+  allowMultiple?: boolean;
 }
 
 export type DealStage = "lead" | "contacted" | "proposal" | "won" | "lost";
@@ -103,6 +114,14 @@ export interface FormValidationErrors {
   redirectUrlInvalid?: string;
 }
 
+export const formProductItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  unitPrice: z.number().min(0),
+  imageUrl: z.string().nullable().optional(),
+});
+
 export const formFieldSchema = z.object({
   id: z.string().min(1),
   label: z.string().trim().min(1, { message: "Field label is required" }),
@@ -115,12 +134,15 @@ export const formFieldSchema = z.object({
     "number",
     "multiselect",
     "custom_html",
+    "product_select",
   ]),
   required: z.boolean().default(false),
   placeholder: z.string().optional(),
   options: z.array(z.string()).optional(),
   helpText: z.string().optional(),
   customHtml: z.string().optional(),
+  products: z.array(formProductItemSchema).optional(),
+  allowMultiple: z.boolean().optional(),
 });
 
 export const formSettingsSchema = z.object({

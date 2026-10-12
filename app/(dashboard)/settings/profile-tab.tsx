@@ -300,7 +300,7 @@ export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabP
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="profile-timezone">{t.timezoneLabel ?? "Timezone"}</Label>
+            <Label htmlFor="profile-timezone">{t.timezoneLabel ?? t.timezone ?? "Timezone"}</Label>
             <Controller
               name="timezone"
               control={control}

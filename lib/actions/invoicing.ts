@@ -6,6 +6,7 @@ import { z } from "zod";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { createServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
   createInvoiceInputSchema,
   createProductInputSchema,
@@ -673,7 +674,7 @@ export async function getProducts(): Promise<Product[]> {
   const supabase = await createServerClient();
   const { data, error } = await supabase
     .from("products")
-    .select("id, organization_id, title, description, unit_price, created_by, created_at, updated_at")
+    .select("id, organization_id, title, description, unit_price, image_url, created_by, created_at, updated_at")
     .eq("organization_id", auth.organizationId)
     .order("created_at", { ascending: false });
 
@@ -686,6 +687,69 @@ export async function getProducts(): Promise<Product[]> {
     ...row,
     unit_price: Number(row.unit_price) || 0,
   })) as Product[];
+}
+
+/**
+ * Uploads a product featured image to the organization-assets bucket.
+ * Requires `invoicing.manage` permission.
+ */
+export async function uploadProductImage(
+  formData: FormData
+): Promise<{ status: "success"; imageUrl: string } | { status: "error"; error: string }> {
+  const auth = await requireInvoicingPermission("invoicing.manage");
+  if (!auth.ok) return { status: "error", error: auth.error.error ?? "Unauthorized" };
+
+  const file = formData.get("file");
+  if (!file || !(file instanceof Blob) || typeof (file as File).name !== "string") {
+    return { status: "error", error: "Please select an image file to upload." };
+  }
+
+  const fileObj = file as File;
+  if (fileObj.size > 5 * 1024 * 1024) {
+    return { status: "error", error: "Image file size must be under 5MB." };
+  }
+
+  const allowedTypes = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/gif",
+    "image/svg+xml",
+  ];
+  if (!allowedTypes.includes(fileObj.type)) {
+    return {
+      status: "error",
+      error: "Unsupported image format. Please upload PNG, JPG, WebP, GIF, or SVG.",
+    };
+  }
+
+  const extension = fileObj.name.split(".").pop()?.toLowerCase() || "png";
+  const storagePath = `products/${auth.organizationId}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${extension}`;
+
+  const admin = createServiceRoleClient();
+  const fileBuffer = await fileObj.arrayBuffer();
+
+  const { error: uploadError } = await admin.storage
+    .from("organization-assets")
+    .upload(storagePath, fileBuffer, {
+      contentType: fileObj.type,
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error("[invoicing] product image upload failed:", uploadError.message);
+    return {
+      status: "error",
+      error: `Could not upload product image: ${uploadError.message}`,
+    };
+  }
+
+  const { data: publicUrlData } = admin.storage
+    .from("organization-assets")
+    .getPublicUrl(storagePath);
+
+  return { status: "success", imageUrl: publicUrlData.publicUrl };
 }
 
 /**
@@ -717,9 +781,10 @@ export async function createProduct(
       title: parsed.data.title,
       description: parsed.data.description ?? "",
       unit_price: parsed.data.unitPrice,
+      image_url: parsed.data.imageUrl || null,
       created_by: auth.userId,
     })
-    .select("id, organization_id, title, description, unit_price, created_by, created_at, updated_at")
+    .select("id, organization_id, title, description, unit_price, image_url, created_by, created_at, updated_at")
     .single();
 
   if (error || !created) {
@@ -766,6 +831,7 @@ export async function updateProduct(
       title: parsed.data.title,
       description: parsed.data.description ?? "",
       unit_price: parsed.data.unitPrice,
+      image_url: parsed.data.imageUrl || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

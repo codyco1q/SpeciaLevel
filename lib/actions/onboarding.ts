@@ -130,10 +130,20 @@ export async function createOrganization(
   // 4. Link the creator's profile to the new organization.
   const { error: profileError } = await admin
     .from("profiles")
-    .update({ organization_id: organizationId })
-    .eq("id", user.id);
+    .upsert(
+      {
+        id: user.id,
+        organization_id: organizationId,
+        full_name:
+          (user.user_metadata?.full_name as string) ||
+          user.email?.split("@")[0] ||
+          "User",
+      },
+      { onConflict: "id" }
+    );
 
   if (profileError) {
+    console.error("[onboarding] Profile link error:", profileError);
     return {
       status: "error",
       error: "Your organization was created but your profile could not be linked. Please try again.",
@@ -149,13 +159,17 @@ export async function createOrganization(
     .maybeSingle();
 
   if (ownerRole) {
-    const { error: roleError } = await admin.from("user_roles").insert({
-      user_id: user.id,
-      role_id: ownerRole.id,
-      organization_id: organizationId,
-    });
+    const { error: roleError } = await admin.from("user_roles").upsert(
+      {
+        user_id: user.id,
+        role_id: ownerRole.id,
+        organization_id: organizationId,
+      },
+      { onConflict: "user_id,organization_id" }
+    );
 
     if (roleError) {
+      console.error("[onboarding] Owner role assignment error:", roleError);
       return {
         status: "error",
         error: "Your organization was created but the owner role could not be assigned. Please try again.",
@@ -163,28 +177,27 @@ export async function createOrganization(
     }
   }
 
-  // 5b. Seed the default #general channel. `chat_channels.created_by` is
-  // NOT NULL and no profiles exist when the seed_organization() trigger
-  // fires, so brand-new organizations get their channel here (the creator
-  // is the user who just onboarded). Idempotent via the
-  // (organization_id, name) unique constraint.
-  const { error: channelError } = await admin
-    .from("chat_channels")
-    .upsert(
+  // 5b. Seed the default channels now that profile is linked.
+  const { error: channelError } = await admin.from("chat_channels").upsert(
+    [
       {
         organization_id: organizationId,
         name: "general",
         description: "General discussion for your team.",
         created_by: user.id,
       },
-      { onConflict: "organization_id,name", ignoreDuplicates: true }
-    );
+      {
+        organization_id: organizationId,
+        name: "project-xyz",
+        description: "Collaboration channel for Project XYZ.",
+        created_by: user.id,
+      },
+    ],
+    { onConflict: "organization_id,name", ignoreDuplicates: true }
+  );
 
   if (channelError) {
-    return {
-      status: "error",
-      error: "Your organization was created but the default channel could not be set up. Please try again.",
-    };
+    console.warn("[onboarding] Warning: chat channel seed failed:", channelError);
   }
 
   // 6. Bust cached route data so the redirect to /dashboard renders with a

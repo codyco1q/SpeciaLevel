@@ -168,7 +168,20 @@ export function ProductsTab({
               {filteredProducts.map((prod) => (
                 <TableRow key={prod.id}>
                   <TableCell className="font-medium text-foreground">
-                    {prod.title}
+                    <div className="flex items-center gap-3">
+                      {prod.image_url ? (
+                        <img
+                          src={prod.image_url}
+                          alt={prod.title}
+                          className="size-9 rounded-md object-cover border border-border shrink-0 bg-muted/20"
+                        />
+                      ) : (
+                        <div className="size-9 rounded-md border border-dashed border-border bg-muted/20 flex items-center justify-center shrink-0 text-muted-foreground/50">
+                          <Package className="size-4" />
+                        </div>
+                      )}
+                      <span className="truncate">{prod.title}</span>
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {prod.description || <span className="text-muted-foreground/50 italic">—</span>}

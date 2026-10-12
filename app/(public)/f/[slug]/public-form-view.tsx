@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Monogram } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, CheckCircle2, LoaderCircle, Send } from "lucide-react";
+import { Check, CheckCircle2, LoaderCircle, Send, Package, AlertCircle } from "lucide-react";
 import { submitPublicForm } from "@/lib/actions/forms";
 import type { PublicFormData } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
@@ -34,6 +35,9 @@ export function PublicFormView({
   langSwitcher,
   locale,
 }: PublicFormViewProps) {
+  const searchParams = useSearchParams();
+  const paymentStatus = searchParams.get("payment_status");
+
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -42,6 +46,18 @@ export function PublicFormView({
   const [isPending, startTransition] = useTransition();
 
   const t = dictionary.public;
+
+  const selectedProductsTotal = useMemo(() => {
+    return form.fields.reduce((acc, field) => {
+      if (field.type !== "product_select" || !field.products) return acc;
+      const rawVal = formData[field.id];
+      const ids = Array.isArray(rawVal) ? rawVal : rawVal ? [rawVal] : [];
+      const fieldSum = field.products
+        .filter((p) => ids.includes(p.id))
+        .reduce((sum, p) => sum + (Number(p.unitPrice) || 0), 0);
+      return acc + fieldSum;
+    }, 0);
+  }, [form.fields, formData]);
 
   const handleFieldChange = (fieldId: string, value: any) => {
     setFormData((prev) => ({ ...prev, [fieldId]: value }));
@@ -88,6 +104,16 @@ export function PublicFormView({
       if (field.type === "multiselect") {
         const selectedOptions = Array.isArray(rawVal) ? rawVal : [];
         if (field.required && selectedOptions.length === 0) {
+          newErrors[field.id] = t.requiredFieldError;
+        }
+        continue;
+      }
+
+      if (field.type === "product_select") {
+        const selected = Array.isArray(rawVal)
+          ? rawVal.length > 0
+          : Boolean(rawVal);
+        if (field.required && !selected) {
           newErrors[field.id] = t.requiredFieldError;
         }
         continue;
@@ -189,6 +215,25 @@ export function PublicFormView({
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
+                {paymentStatus === "success" && (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3 text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="size-5 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold">Payment Completed Successfully</p>
+                      <p className="text-xs mt-0.5 opacity-90">Thank you! Your payment and submission have been recorded.</p>
+                    </div>
+                  </div>
+                )}
+                {paymentStatus === "canceled" && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3 text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="size-5 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold">Payment Canceled</p>
+                      <p className="text-xs mt-0.5 opacity-90">Your payment was not completed. You can re-submit the form below to proceed.</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Form Header */}
                 <div className="border-b border-border pb-5">
                   <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
@@ -313,6 +358,94 @@ export function PublicFormView({
                             })}
                           </div>
                         </div>
+                      ) : field.type === "product_select" ? (
+                        <div className="space-y-2.5 pt-1">
+                          <div className="grid grid-cols-1 gap-2.5">
+                            {(field.products || []).map((prod) => {
+                              const isSelected = field.allowMultiple
+                                ? Array.isArray(formData[field.id]) &&
+                                  (formData[field.id] as string[]).includes(prod.id)
+                                : formData[field.id] === prod.id;
+
+                              const handleProductToggle = () => {
+                                if (field.allowMultiple) {
+                                  const current: string[] = Array.isArray(formData[field.id])
+                                    ? [...(formData[field.id] as string[])]
+                                    : [];
+                                  const idx = current.indexOf(prod.id);
+                                  if (idx > -1) current.splice(idx, 1);
+                                  else current.push(prod.id);
+                                  handleFieldChange(field.id, current);
+                                } else {
+                                  handleFieldChange(
+                                    field.id,
+                                    formData[field.id] === prod.id ? undefined : prod.id
+                                  );
+                                }
+                              };
+
+                              return (
+                                <button
+                                  key={prod.id}
+                                  type="button"
+                                  onClick={handleProductToggle}
+                                  className={cn(
+                                    "flex items-center gap-3.5 p-3 rounded-xl border text-start transition-all cursor-pointer select-none",
+                                    isSelected
+                                      ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                                      : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:bg-muted/30",
+                                    errors[field.id] ? "border-destructive" : ""
+                                  )}
+                                >
+                                  <div
+                                    className={cn(
+                                      "size-5 flex items-center justify-center transition-colors shrink-0",
+                                      field.allowMultiple ? "rounded-md" : "rounded-full",
+                                      isSelected
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border border-muted-foreground/40 bg-background"
+                                    )}
+                                  >
+                                    {isSelected &&
+                                      (field.allowMultiple ? (
+                                        <Check className="size-3.5 stroke-[3]" />
+                                      ) : (
+                                        <div className="size-2 rounded-full bg-primary-foreground" />
+                                      ))}
+                                  </div>
+
+                                  {prod.imageUrl ? (
+                                    <img
+                                      src={prod.imageUrl}
+                                      alt={prod.title}
+                                      className="size-12 rounded-lg object-cover border border-border shrink-0 bg-muted/20"
+                                    />
+                                  ) : (
+                                    <div className="size-12 rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center shrink-0 text-muted-foreground/60">
+                                      <Package className="size-5" />
+                                    </div>
+                                  )}
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-semibold text-foreground text-sm">
+                                        {prod.title}
+                                      </span>
+                                      <span className="font-mono font-bold text-foreground text-sm shrink-0">
+                                        ${Number(prod.unitPrice).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    {prod.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-normal">
+                                        {prod.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       ) : (
                         <Input
                           id={field.id}
@@ -352,6 +485,23 @@ export function PublicFormView({
                 })}
                 </div>
 
+                {/* Selected Order Total */}
+                {selectedProductsTotal > 0 && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center justify-between shadow-xs">
+                    <div>
+                      <p className="text-xs font-semibold text-primary uppercase tracking-wider">
+                        Order Total
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Includes selected products & packages
+                      </p>
+                    </div>
+                    <div className="text-xl font-bold font-mono text-foreground">
+                      ${selectedProductsTotal.toFixed(2)}
+                    </div>
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 <div className="pt-2">
                   <Button
@@ -367,7 +517,10 @@ export function PublicFormView({
                     ) : (
                       <>
                         <span>
-                          {form.settings.submitButtonText || t.submit}
+                          {form.settings.submitButtonText ||
+                            (selectedProductsTotal > 0
+                              ? `Pay & Submit ($${selectedProductsTotal.toFixed(2)})`
+                              : t.submit)}
                         </span>
                         <Send className="size-4 rtl:rotate-180" />
                       </>

@@ -7,6 +7,7 @@ import {
   createPaymobSession,
   createPayTabsSession,
   createStripeSession,
+  createFormStripeSession,
 } from "@/lib/services/payments-gateway";
 
 export interface CreateCheckoutSessionResult {
@@ -253,5 +254,66 @@ export async function createInvoiceCheckoutSession(
     status: "error",
     error:
       "Online card payment is currently unconfigured for this invoice. Please use direct bank transfer or contact the merchant.",
+  };
+}
+
+export async function createFormProductCheckoutSession({
+  organizationId,
+  formTitle,
+  formSlug,
+  submissionId,
+  customerEmail,
+  products,
+}: {
+  organizationId: string;
+  formTitle: string;
+  formSlug: string;
+  submissionId: string;
+  customerEmail?: string;
+  products: {
+    id: string;
+    title: string;
+    description?: string;
+    unitPrice: number;
+    imageUrl?: string | null;
+    quantity?: number;
+  }[];
+}): Promise<CreateCheckoutSessionResult> {
+  const siteUrl = (
+    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  ).replace(/\/+$/, "");
+
+  let customKey: string | undefined;
+
+  if (organizationId) {
+    const supabase = createServiceRoleClient();
+    const { data: stripeIntegration } = await supabase
+      .from("organization_integrations")
+      .select("credentials_encrypted")
+      .eq("organization_id", organizationId)
+      .eq("provider", "stripe")
+      .eq("status", "connected")
+      .maybeSingle();
+
+    if (stripeIntegration?.credentials_encrypted?.secret_key) {
+      customKey = stripeIntegration.credentials_encrypted.secret_key;
+    }
+  }
+
+  const res = await createFormStripeSession({
+    formTitle,
+    formSlug,
+    submissionId,
+    customerEmail,
+    products,
+    siteUrl,
+    customKey,
+  });
+
+  if (res) return res;
+
+  return {
+    status: "error",
+    error: "Payment gateway is not currently configured for this organization.",
   };
 }

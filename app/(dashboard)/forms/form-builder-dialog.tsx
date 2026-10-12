@@ -39,17 +39,21 @@ import {
   Code2,
   X,
   GripVertical,
+  Package,
 } from "lucide-react";
 import { FormPreviewPane } from "./form-preview-pane";
+import { FieldProductsManager } from "./field-products-manager";
 import { cn } from "@/lib/utils";
 import { createForm, updateForm } from "@/lib/actions/forms";
 import type {
   FormRow,
   FormField,
   FormFieldType,
+  FormProductItem,
   DealStage,
 } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
+import type { Product } from "@/types/database";
 
 interface FieldOptionsManagerProps {
   options: string[];
@@ -195,6 +199,7 @@ interface FormBuilderDialogProps {
   initialTab?: "fields" | "settings" | "share";
   onOpenChange: (open: boolean) => void;
   onSaved?: (form: FormRow) => void;
+  products?: Product[];
   dictionary: Dictionary["platform"]["forms"];
   locale: Locale;
 }
@@ -245,6 +250,7 @@ export function FormBuilderDialog({
   initialTab,
   onOpenChange,
   onSaved,
+  products = [],
   dictionary,
   locale,
 }: FormBuilderDialogProps) {
@@ -364,6 +370,9 @@ export function FormBuilderDialog({
       case "number":
         defaultLabel = "Quantity / Budget";
         defaultPlaceholder = "100";
+        break;
+      case "product_select":
+        defaultLabel = "Select Product / Package";
         break;
       case "custom_html":
         defaultLabel = "Custom Section";
@@ -698,6 +707,16 @@ export function FormBuilderDialog({
                         <Code2 className="size-3 text-primary" />{" "}
                         {t.fieldsTab.types.custom_html}
                       </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addFieldOfType("product_select")}
+                        className="text-xs justify-start gap-1.5 h-8 font-normal"
+                      >
+                        <Package className="size-3 text-primary" />{" "}
+                        {t.fieldsTab.types.product_select || "Product Catalog"}
+                      </Button>
                     </div>
                   </div>
 
@@ -854,6 +873,9 @@ export function FormBuilderDialog({
                                 <SelectItem value="custom_html">
                                   {t.fieldsTab.types.custom_html}
                                 </SelectItem>
+                                <SelectItem value="product_select">
+                                  {t.fieldsTab.types.product_select || "Product Catalog"}
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -907,7 +929,7 @@ export function FormBuilderDialog({
                           </div>
                         ) : null}
 
-                        {field.type !== "custom_html" && (
+                        {field.type !== "custom_html" && field.type !== "product_select" && (
                           <div className="space-y-1">
                             <Label className="text-[11px] text-muted-foreground">
                               {t.fieldsTab.fieldPlaceholder}
@@ -923,6 +945,22 @@ export function FormBuilderDialog({
                               className="h-8 text-xs"
                             />
                           </div>
+                        )}
+
+                        {field.type === "product_select" && (
+                          <FieldProductsManager
+                            products={field.products || []}
+                            allowMultiple={field.allowMultiple}
+                            catalogProducts={products}
+                            onChange={(updatedProducts) =>
+                              handleUpdateField(idx, {
+                                products: updatedProducts,
+                              })
+                            }
+                            onAllowMultipleChange={(allowMultiple) =>
+                              handleUpdateField(idx, { allowMultiple })
+                            }
+                          />
                         )}
 
                         {(field.type === "select" ||

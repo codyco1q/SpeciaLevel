@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth/session";
 import { getForms, getAllFormSubmissions } from "@/lib/actions/forms";
+import { getProducts } from "@/lib/actions/invoicing";
 import { hasPermission } from "@/lib/auth/rbac";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { FormsView } from "./forms-view";
@@ -44,6 +45,7 @@ export default async function FormsPage() {
   const forms = (await getForms()) ?? [];
   const canManage = hasPermission("forms.manage", userContext.permissions);
   const submissions = (await getAllFormSubmissions()) ?? [];
+  const products = (await getProducts()) ?? [];
 
   return (
     <div className="p-6 md:p-8">
@@ -53,6 +55,7 @@ export default async function FormsPage() {
         canManage={canManage}
         locale={locale}
         dictionary={formsDictionary}
+        products={products}
       />
     </div>
   );

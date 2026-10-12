@@ -1850,6 +1850,7 @@
       "defaultCurrency": "Base Currency",
       "dateFormat": "Date Format",
       "timezone": "Timezone",
+      "timezoneLabel": "Timezone",
       "selectTimezone": "Select a timezone",
       "noManageNote": "You can view these settings, but don't have permission to change them.",
       "orgSaved": "Organization settings saved.",
@@ -2259,7 +2260,8 @@
             "select": "Dropdown Select",
             "number": "Number",
             "multiselect": "Multi-Select Checkboxes",
-            "custom_html": "Custom HTML / Embed"
+            "custom_html": "Custom HTML / Embed",
+            "product_select": "Product Catalog"
           }
         },
         "preview": {

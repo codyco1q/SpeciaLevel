@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, Eye, Monitor, Send, Smartphone } from "lucide-react";
+import { Check, Eye, Monitor, Send, Smartphone, Package } from "lucide-react";
 import { Monogram } from "@/components/brand";
 import type { FormField } from "@/lib/validations/forms";
 import type { Dictionary } from "@/lib/i18n/get-dictionary";
@@ -231,6 +231,105 @@ export function FormPreviewPane({
                             </button>
                           );
                         })}
+                      </div>
+                    ) : field.type === "product_select" ? (
+                      <div className="space-y-2 pt-0.5">
+                        {(!field.products || field.products.length === 0) ? (
+                          <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                            No products added to this selection yet.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-2">
+                            {field.products.map((prod) => {
+                              const isSelected = field.allowMultiple
+                                ? Array.isArray(previewData[field.id]) &&
+                                  previewData[field.id].includes(prod.id)
+                                : previewData[field.id] === prod.id;
+
+                              const handleToggle = () => {
+                                if (field.allowMultiple) {
+                                  const current: string[] = Array.isArray(
+                                    previewData[field.id]
+                                  )
+                                    ? [...previewData[field.id]]
+                                    : [];
+                                  const idx = current.indexOf(prod.id);
+                                  if (idx > -1) current.splice(idx, 1);
+                                  else current.push(prod.id);
+                                  setPreviewData((prev) => ({
+                                    ...prev,
+                                    [field.id]: current,
+                                  }));
+                                } else {
+                                  setPreviewData((prev) => ({
+                                    ...prev,
+                                    [field.id]:
+                                      prev[field.id] === prod.id ? undefined : prod.id,
+                                  }));
+                                }
+                              };
+
+                              return (
+                                <button
+                                  key={prod.id}
+                                  type="button"
+                                  onClick={handleToggle}
+                                  className={cn(
+                                    "flex items-start gap-2.5 p-2.5 rounded-lg border text-xs text-start transition-all cursor-pointer select-none",
+                                    isSelected
+                                      ? "border-primary bg-primary/10 text-foreground font-medium shadow-xs"
+                                      : "border-border bg-card/60 text-muted-foreground hover:border-primary/40 hover:bg-muted/40"
+                                  )}
+                                >
+                                  <div
+                                    className={cn(
+                                      "size-4 mt-0.5 flex items-center justify-center transition-colors shrink-0",
+                                      field.allowMultiple ? "rounded" : "rounded-full",
+                                      isSelected
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border border-muted-foreground/40 bg-background"
+                                    )}
+                                  >
+                                    {isSelected &&
+                                      (field.allowMultiple ? (
+                                        <Check className="size-2.5 stroke-[3]" />
+                                      ) : (
+                                        <div className="size-1.5 rounded-full bg-primary-foreground" />
+                                      ))}
+                                  </div>
+
+                                  {prod.imageUrl ? (
+                                    <img
+                                      src={prod.imageUrl}
+                                      alt={prod.title}
+                                      className="size-10 rounded-md object-cover border border-border shrink-0 bg-muted/20"
+                                    />
+                                  ) : (
+                                    <div className="size-10 rounded-md border border-dashed border-border bg-muted/20 flex items-center justify-center shrink-0 text-muted-foreground/60">
+                                      <Package className="size-4" />
+                                    </div>
+                                  )}
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-semibold text-foreground truncate">
+                                        {prod.title}
+                                      </span>
+                                      <span className="font-mono font-semibold text-primary shrink-0">
+                                        ${Number(prod.unitPrice).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    {prod.description && (
+                                      <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                        {prod.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <Input

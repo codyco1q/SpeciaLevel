@@ -42,6 +42,7 @@ import { SubmissionsDialog } from "./submissions-drawer";
 import { deleteForm, toggleFormPublished } from "@/lib/actions/forms";
 import type { FormRow, FormSubmissionRow } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
+import type { Product } from "@/types/database";
 import Link from "next/link";
 
 interface FormsViewProps {
@@ -50,6 +51,7 @@ interface FormsViewProps {
   canManage: boolean;
   dictionary: Dictionary["platform"]["forms"];
   locale: Locale;
+  products?: Product[];
 }
 
 export function FormsView({
@@ -58,6 +60,7 @@ export function FormsView({
   canManage,
   dictionary,
   locale,
+  products = [],
 }: FormsViewProps) {
   const [forms, setForms] = useState<FormRow[]>(initialForms);
   const [submissionsForm, setSubmissionsForm] = useState<FormRow | null>(null);
@@ -437,6 +440,7 @@ export function FormsView({
         form={editingForm}
         open={builderOpen}
         initialTab={builderTab}
+        products={products}
         onOpenChange={setBuilderOpen}
         onSaved={(saved: FormRow) => {
           setForms((prev) => {

@@ -1850,6 +1850,7 @@
       "defaultCurrency": "العملة الأساسية",
       "dateFormat": "تنسيق التاريخ",
       "timezone": "المنطقة الزمنية",
+      "timezoneLabel": "المنطقة الزمنية",
       "selectTimezone": "اختر منطقة زمنية",
       "noManageNote": "يمكنك عرض هذه الإعدادات، لكن لا تملك صلاحية تغييرها.",
       "orgSaved": "تم حفظ إعدادات المؤسسة بنجاح.",
@@ -2259,7 +2260,8 @@
             "select": "قائمة منسدلة",
             "number": "رقم",
             "multiselect": "اختيار متعدد (مربعات اختيار)",
-            "custom_html": "تضمين كود HTML مخصص"
+            "custom_html": "تضمين كود HTML مخصص",
+            "product_select": "كتالوج المنتجات"
           }
         },
         "preview": {

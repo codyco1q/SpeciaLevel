@@ -249,9 +249,90 @@ export async function createStripeSession(
     console.error("[payments] Stripe Checkout error:", err?.message || err);
     return {
       status: "error",
-      error: err?.message || "Failed to initiate online checkout session.",
+      provider: "stripe",
+      error: err?.message || "Failed to initiate Stripe session",
     };
   }
 
-  return null;
+  return {
+    status: "error",
+    provider: "stripe",
+    error: "Stripe did not return a checkout URL",
+  };
+}
+
+export async function createFormStripeSession({
+  formTitle,
+  formSlug,
+  submissionId,
+  customerEmail,
+  products,
+  siteUrl,
+  customKey,
+  currency = "usd",
+}: {
+  formTitle: string;
+  formSlug: string;
+  submissionId: string;
+  customerEmail?: string;
+  products: {
+    id: string;
+    title: string;
+    description?: string;
+    unitPrice: number;
+    imageUrl?: string | null;
+    quantity?: number;
+  }[];
+  siteUrl: string;
+  customKey?: string;
+  currency?: string;
+}): Promise<CheckoutResult | null> {
+  const stripe = getStripeClient(customKey);
+  if (!stripe) return null;
+
+  const cur = currency.toLowerCase();
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = products.map((item) => ({
+    price_data: {
+      currency: cur,
+      product_data: {
+        name: item.title || `Product #${item.id}`,
+        ...(item.description ? { description: item.description } : {}),
+        ...(item.imageUrl ? { images: [item.imageUrl] } : {}),
+      },
+      unit_amount: Math.max(50, Math.round(Number(item.unitPrice) * 100)),
+    },
+    quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+  }));
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: lineItems,
+      customer_email: customerEmail || undefined,
+      success_url: `${siteUrl}/f/${formSlug}?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/f/${formSlug}?payment_status=canceled`,
+      metadata: {
+        form_title: formTitle,
+        form_slug: formSlug,
+        submission_id: submissionId,
+        type: "form_submission",
+      },
+    });
+
+    if (session.url) {
+      return {
+        status: "success",
+        checkoutUrl: session.url,
+        provider: "stripe",
+      };
+    }
+    return null;
+  } catch (err: unknown) {
+    console.error("[payments-gateway] Stripe form session failed:", err);
+    return {
+      status: "error",
+      error: err instanceof Error ? err.message : "Failed to create Stripe checkout session",
+    };
+  }
 }

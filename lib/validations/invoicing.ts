@@ -149,6 +149,13 @@ export function createProductInputSchema(
       .optional()
       .nullable()
       .default(""),
+    imageUrl: z
+      .string()
+      .trim()
+      .url("Must be a valid image URL")
+      .or(z.literal(""))
+      .optional()
+      .nullable(),
     unitPrice: z
       .number({ error: messages.productUnitPriceInvalid ?? "Enter a valid unit price (0 or more)." })
       .min(0, messages.productUnitPriceInvalid ?? "Enter a valid unit price (0 or more).")
@@ -160,6 +167,7 @@ export type ProductInput = {
   title: string;
   description?: string | null;
   unitPrice: number;
+  imageUrl?: string | null;
 };
 
 export type InvoiceStatusValue = InvoiceStatus;

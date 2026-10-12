@@ -11,10 +11,12 @@ import { getDictionary, type Locale } from "@/lib/i18n/get-dictionary";
 import {
   createFormInputSchema,
   type CreateFormInput,
+  type FormField,
   type FormRow,
   type FormSubmissionRow,
   type PublicFormData,
 } from "@/lib/validations/forms";
+import { createFormProductCheckoutSession } from "@/lib/actions/payments";
 
 interface ActionResult<T = undefined> {
   status: "success" | "error";
@@ -521,6 +523,59 @@ export async function submitPublicForm(
     }
   } catch (err) {
     console.error("[forms] Failed to dispatch lead notification / workflow:", err);
+  }
+
+  // Check for product selection & Stripe checkout redirection
+  try {
+    const { data: formRecord } = await supabase
+      .from("inbound_forms")
+      .select("id, title, fields, organization_id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (formRecord?.fields && Array.isArray(formRecord.fields)) {
+      const fields = formRecord.fields as unknown as FormField[];
+      const productField = fields.find((f) => f.type === "product_select");
+      if (productField && productField.products && productField.products.length > 0) {
+        const rawValue = submissionData[productField.id];
+        const selectedIds: string[] = Array.isArray(rawValue)
+          ? rawValue.map(String)
+          : rawValue
+          ? [String(rawValue)]
+          : [];
+
+        const chosenProducts = productField.products.filter((p) =>
+          selectedIds.includes(p.id)
+        );
+
+        const payableProducts = chosenProducts.filter((p) => Number(p.unitPrice) > 0);
+
+        if (payableProducts.length > 0) {
+          const checkout = await createFormProductCheckoutSession({
+            organizationId: formRecord.organization_id,
+            formTitle: formRecord.title || slug,
+            formSlug: slug,
+            submissionId: result.submission_id,
+            customerEmail:
+              (submissionData.email as string) ||
+              (submissionData.work_email as string) ||
+              result.lead_email ||
+              undefined,
+            products: payableProducts,
+          });
+
+          if (checkout.status === "success" && checkout.checkoutUrl) {
+            return {
+              status: "success",
+              redirectUrl: checkout.checkoutUrl,
+              successMessage: "Redirecting to payment checkout...",
+            };
+          }
+        }
+      }
+    }
+  } catch (checkoutErr) {
+    console.warn("[forms] Warning: Failed to initialize checkout session:", checkoutErr);
   }
 
   return {
