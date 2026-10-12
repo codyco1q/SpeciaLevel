@@ -99,25 +99,50 @@ export async function createOrganization(
   const baseSlug = slugify(organizationName);
   let organizationId: string | null = null;
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${randomSuffix()}`;
-    const { data, error } = await admin
-      .from("organizations")
-      .insert({ name: organizationName, slug })
-      .select("id")
-      .single();
+  // Check if an organization with user.id already exists (e.g. from an aborted onboarding attempt)
+  const { data: existingOrg } = await admin
+    .from("organizations")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
 
-    if (error) {
-      if (error.code === "23505" && attempt < 2) {
-        continue; // slug collision — try again with a suffix
+  if (existingOrg?.id) {
+    organizationId = existingOrg.id;
+  } else {
+    // We explicitly supply `id: user.id`. The PostgreSQL `seed_organization()`
+    // trigger creates chat_channels with `created_by = new.id`. Because `chat_channels.created_by`
+    // has a foreign key to `profiles.id`, providing the creator's user/profile ID ensures
+    // the trigger insert satisfies the foreign key constraint.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const slug = attempt === 0 ? baseSlug : `${baseSlug}-${randomSuffix()}`;
+      const { data, error } = await admin
+        .from("organizations")
+        .insert({ id: user.id, name: organizationName, slug })
+        .select("id")
+        .single();
+
+      if (error) {
+        console.error(`[onboarding] Org insert attempt ${attempt} failed:`, error);
+        if (error.code === "23505") {
+          if (error.message?.toLowerCase().includes("slug") || error.details?.toLowerCase().includes("slug")) {
+            continue;
+          }
+          if (error.message?.toLowerCase().includes("pkey") || error.details?.toLowerCase().includes("pkey")) {
+            organizationId = user.id;
+            break;
+          }
+          continue;
+        }
+
+        return {
+          status: "error",
+          error: "Could not create your organization right now. Please try again.",
+        };
       }
-      return {
-        status: "error",
-        error: "Could not create your organization right now. Please try again.",
-      };
+
+      organizationId = data?.id ?? null;
+      break;
     }
-    organizationId = data.id;
-    break;
   }
 
   if (!organizationId) {
@@ -151,12 +176,32 @@ export async function createOrganization(
   }
 
   // 5. Assign the Owner role (seeded by the on_organization_created trigger).
-  const { data: ownerRole } = await admin
+  let { data: ownerRole } = await admin
     .from("roles")
     .select("id")
     .eq("organization_id", organizationId)
     .eq("key", "owner")
     .maybeSingle();
+
+  if (!ownerRole) {
+    const { data: createdRole, error: createRoleError } = await admin
+      .from("roles")
+      .insert({
+        organization_id: organizationId,
+        name: "Owner",
+        key: "owner",
+        description: "Full control over the organization.",
+        is_system: true,
+      })
+      .select("id")
+      .single();
+
+    if (createRoleError) {
+      console.error("[onboarding] Create owner role error:", createRoleError);
+    } else {
+      ownerRole = createdRole;
+    }
+  }
 
   if (ownerRole) {
     const { error: roleError } = await admin.from("user_roles").upsert(
@@ -165,7 +210,7 @@ export async function createOrganization(
         role_id: ownerRole.id,
         organization_id: organizationId,
       },
-      { onConflict: "user_id,organization_id" }
+      { onConflict: "user_id,role_id" }
     );
 
     if (roleError) {
