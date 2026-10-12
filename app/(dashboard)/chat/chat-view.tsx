@@ -8,11 +8,13 @@ import {
   FileText,
   Hash,
   LoaderCircle,
+  Mail,
   MessageSquare,
   Paperclip,
   Plus,
   Send,
   Settings,
+  Smile,
   X,
 } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -20,6 +22,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createBrowserClient } from "@/lib/supabase/client";
 import {
   getMessages,
@@ -76,6 +84,13 @@ interface ChatViewProps {
 }
 
 /** A file queued in the composer, pending upload once the message sends. */
+const POPULAR_EMOJIS = [
+  "👍", "❤️", "😊", "🎉", "🔥",
+  "🚀", "👀", "👏", "💯", "✅",
+  "💡", "⚡️", "🤝", "🙏", "🎯",
+  "📌", "💬", "⚠️", "🛠️", "✨",
+];
+
 interface PendingFile {
   id: string;
   file: File;
@@ -158,7 +173,7 @@ export function ChatView({
     const supabase = createBrowserClient();
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, avatar_url")
       .eq("id", userId)
       .maybeSingle();
 
@@ -166,6 +181,7 @@ export function ChatView({
       id: userId,
       fullName: data?.full_name ?? null,
       email: data?.email ?? null,
+      avatarUrl: data?.avatar_url ?? null,
     };
     personCache.current.set(userId, person);
     setMessages((prev) =>
@@ -324,6 +340,41 @@ export function ChatView({
     }, 0);
   }
 
+  function insertEmoji(emoji: string) {
+    if (!composerRef.current) {
+      setComposer((prev) => prev + emoji);
+      return;
+    }
+    const textarea = composerRef.current;
+    const selStart = textarea.selectionStart ?? composer.length;
+    const selEnd = textarea.selectionEnd ?? composer.length;
+    const newText = composer.slice(0, selStart) + emoji + composer.slice(selEnd);
+    setComposer(newText);
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = selStart + emoji.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  }
+
+  function handleMentionUser(name: string) {
+    const mentionText = `@${name} `;
+    if (!composerRef.current) {
+      setComposer((prev) => prev + mentionText);
+      return;
+    }
+    const textarea = composerRef.current;
+    const selStart = textarea.selectionStart ?? composer.length;
+    const selEnd = textarea.selectionEnd ?? composer.length;
+    const newText = composer.slice(0, selStart) + mentionText + composer.slice(selEnd);
+    setComposer(newText);
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = selStart + mentionText.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  }
+
   function handleComposerChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value;
     setComposer(val);
@@ -408,6 +459,9 @@ export function ChatView({
     setSendError(null);
     setSendPending(true);
     setMessages((prev) => [...prev, optimistic]);
+    setTimeout(() => {
+      composerRef.current?.focus();
+    }, 0);
 
     const result = await sendMessage(activeChannelId, content);
 
@@ -422,6 +476,9 @@ export function ChatView({
       setComposer(content);
       setPendingFiles(files);
       setSendPending(false);
+      setTimeout(() => {
+        composerRef.current?.focus();
+      }, 0);
       return;
     }
 
@@ -506,6 +563,9 @@ export function ChatView({
     }
 
     setSendPending(false);
+    setTimeout(() => {
+      composerRef.current?.focus();
+    }, 0);
   }
 
   function handleChannelCreated(channel: ChatChannelRow) {
@@ -742,6 +802,7 @@ export function ChatView({
                   isOwn={message.userId === currentUser.id}
                   attachments={attachmentMap[message.id]}
                   onRequestAttachments={requestAttachments}
+                  onMentionUser={handleMentionUser}
                   platform={platform}
                   locale={locale}
                 />
@@ -832,6 +893,38 @@ export function ChatView({
                 disabled={!activeChannel || sendPending}
                 className="min-h-0 flex-1"
               />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={!activeChannel || sendPending}
+                    aria-label="Add emoji"
+                    title="Add emoji"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                  >
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="p-2 w-56">
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pb-1.5">
+                    {locale === "ar" ? "رموز تعبيرية سريعة" : "Quick Reactions"}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {POPULAR_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => insertEmoji(emoji)}
+                        className="h-8 w-8 flex items-center justify-center text-lg rounded-md hover:bg-muted transition-colors active:scale-95 cursor-pointer"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 type="button"
                 variant="ghost"
@@ -909,6 +1002,7 @@ interface MessageBubbleProps {
   isOwn: boolean;
   attachments?: AttachmentRow[];
   onRequestAttachments?: (messageId: string) => void;
+  onMentionUser?: (name: string) => void;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
@@ -937,6 +1031,7 @@ function MessageBubble({
   isOwn,
   attachments,
   onRequestAttachments,
+  onMentionUser,
   platform,
   locale,
 }: MessageBubbleProps) {
@@ -959,15 +1054,96 @@ function MessageBubble({
 
   return (
     <div className={cn("flex items-start gap-3", isOwn && "flex-row-reverse")}>
-      <div
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-          isOwn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-        )}
-        aria-hidden="true"
-      >
-        {initials}
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="rounded-full shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+            aria-label={senderName}
+          >
+            <Avatar className="h-8 w-8 text-xs font-semibold shadow-xs">
+              {message.user.avatarUrl && (
+                <AvatarImage src={message.user.avatarUrl} alt={senderName} />
+              )}
+              <AvatarFallback
+                className={
+                  isOwn
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }
+              >
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={isOwn ? "end" : "start"}
+          className="w-64 p-3 space-y-3"
+        >
+          <div className="flex items-center gap-3">
+            <Avatar className="h-11 w-11 text-sm font-semibold shrink-0 shadow-xs">
+              {message.user.avatarUrl && (
+                <AvatarImage src={message.user.avatarUrl} alt={senderName} />
+              )}
+              <AvatarFallback
+                className={
+                  isOwn
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }
+              >
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold truncate leading-tight">
+                  {senderName}
+                </p>
+                {isOwn && (
+                  <Badge variant="secondary" className="px-1 py-0 text-[10px] h-4">
+                    {locale === "ar" ? "أنت" : "You"}
+                  </Badge>
+                )}
+              </div>
+              {message.user.email && (
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {message.user.email}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2 border-t border-border">
+            {message.user.fullName && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs h-7 gap-1"
+                onClick={() => onMentionUser?.(message.user.fullName!)}
+              >
+                <AtSign className="h-3 w-3" />
+                {locale === "ar" ? "إشارة" : "Mention"}
+              </Button>
+            )}
+            {message.user.email && (
+              <Button
+                asChild
+                size="sm"
+                variant="ghost"
+                className="flex-1 text-xs h-7 gap-1"
+              >
+                <a href={`mailto:${message.user.email}`}>
+                  <Mail className="h-3 w-3" />
+                  {locale === "ar" ? "بريد" : "Email"}
+                </a>
+              </Button>
+            )}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <div className={cn("min-w-0 max-w-[75%]", isOwn && "text-right")}>
         <div className={cn("flex items-baseline gap-2", isOwn && "justify-end")}>
           <span className="text-sm font-semibold">{senderName}</span>

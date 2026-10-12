@@ -14,6 +14,7 @@ export interface SettingsClientProps {
     fullName: string | null;
     jobTitle: string | null;
     avatarUrl?: string | null;
+    timezone?: string | null;
   };
   userEmail: string;
   canManage: boolean;

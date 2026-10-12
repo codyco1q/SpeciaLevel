@@ -17,7 +17,12 @@ import { MessagingView } from "./messaging-view";
 
 export const dynamic = "force-dynamic";
 
-export default async function MessagingPage() {
+interface MessagingPageProps {
+  searchParams?: Promise<{ tab?: string; channel?: string }>;
+}
+
+export default async function MessagingPage({ searchParams }: MessagingPageProps) {
+  const params = searchParams ? await searchParams : undefined;
   const userContext = await getCurrentUserContext();
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
@@ -58,21 +63,26 @@ export default async function MessagingPage() {
     createServerClient(),
   ]);
 
-  const activeChannelId = channels?.[0]?.id ?? null;
-  const initialMessages = activeChannelId
-    ? (await getMessages(activeChannelId)) ?? []
+  const targetChannelId =
+    params?.channel && channels?.some((c) => c.id === params.channel)
+      ? params.channel
+      : (channels?.[0]?.id ?? null);
+
+  const initialMessages = targetChannelId
+    ? (await getMessages(targetChannelId)) ?? []
     : [];
 
   const currentUser: ChatPerson = {
     id: userContext.user.id,
     fullName: userContext.profile.full_name ?? null,
     email: userContext.user.email,
+    avatarUrl: userContext.profile.avatar_url ?? null,
   };
 
   const [{ data: profileRows }, { data: departmentRows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, avatar_url")
       .eq("organization_id", userContext.organization.id)
       .order("full_name", { ascending: true }),
     supabase
@@ -83,11 +93,12 @@ export default async function MessagingPage() {
   ]);
 
   const orgMembers: ChatPerson[] = (
-    (profileRows as unknown as { id: string; full_name: string | null; email: string | null }[]) ?? []
+    (profileRows as unknown as { id: string; full_name: string | null; email: string | null; avatar_url: string | null }[]) ?? []
   ).map((p) => ({
     id: p.id,
     fullName: p.full_name,
     email: p.email,
+    avatarUrl: p.avatar_url,
   }));
 
   const departments: { id: string; name: string }[] = (
@@ -97,12 +108,14 @@ export default async function MessagingPage() {
     name: d.name,
   }));
 
+  const initialTab = params?.tab || (params?.channel ? "internal" : "external");
+
   return (
     <div className="p-6 md:p-8">
       <MessagingView
         channels={channels ?? []}
         initialMessages={initialMessages}
-        activeChannelId={activeChannelId}
+        activeChannelId={targetChannelId}
         canManageChat={hasPermission("chat.manage", userContext.permissions)}
         currentUser={currentUser}
         orgMembers={orgMembers}
@@ -110,6 +123,7 @@ export default async function MessagingPage() {
         initialThreads={externalThreads ?? []}
         phoneNumbers={phoneNumbers ?? []}
         carrierSettings={carrierSettings}
+        initialTab={initialTab}
         organizationId={userContext.organization.id}
         platform={platform}
         locale={locale}

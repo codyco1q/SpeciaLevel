@@ -994,7 +994,13 @@ export function WhiteboardWorkspace({
           >
             {isEditing ? (
               <textarea
-                autoFocus
+                ref={(node) => {
+                  if (node) {
+                    node.focus();
+                    const len = node.value.length;
+                    node.setSelectionRange(len, len);
+                  }
+                }}
                 defaultValue={el.text}
                 data-element-id={el.id}
                 onBlur={(e) => {
@@ -1113,7 +1119,13 @@ export function WhiteboardWorkspace({
           {isEditing ? (
             <foreignObject x={0} y={0} width={Math.max(estimatedWidth + 60, 260)} height={Math.max(estimatedHeight + 40, 90)}>
               <textarea
-                autoFocus
+                ref={(node) => {
+                  if (node) {
+                    node.focus();
+                    const len = node.value.length;
+                    node.setSelectionRange(len, len);
+                  }
+                }}
                 defaultValue={el.text}
                 onBlur={(e) => {
                   handleUpdateElement(el.id, { text: e.target.value });

@@ -62,6 +62,7 @@ export interface Profile {
   status: string;
   /** UI locale the user chose ('en' | 'ar'); read by getLocale() when no cookie is set. */
   preferred_language: string;
+  timezone?: string | null;
   created_at: string;
   updated_at: string;
 }

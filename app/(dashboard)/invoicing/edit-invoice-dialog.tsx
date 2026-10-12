@@ -419,7 +419,7 @@ function EditInvoiceForm({
         />
       </div>
 
-      <DialogFooter className="gap-2 sm:gap-0">
+      <DialogFooter className="flex flex-row items-center justify-end gap-3 pt-4 border-t border-border">
         <Button
           type="button"
           variant="outline"

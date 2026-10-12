@@ -31,6 +31,7 @@ function parseFieldErrors(
 export async function updateProfile(data: {
   full_name: string;
   job_title?: string;
+  timezone?: string;
 }): Promise<SettingsActionState> {
   const userContext = await getCurrentUserContext();
   const dict = await getDictionary();
@@ -58,6 +59,7 @@ export async function updateProfile(data: {
     .update({
       full_name: parsed.data.full_name,
       job_title: parsed.data.job_title?.trim() ? parsed.data.job_title : null,
+      timezone: parsed.data.timezone?.trim() ? parsed.data.timezone : null,
     })
     .eq("id", userContext.user.id);
 

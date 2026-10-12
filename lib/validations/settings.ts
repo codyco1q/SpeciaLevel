@@ -30,6 +30,12 @@ export function createProfileSchema(
       .max(100, messages.jobTitleMax)
       .optional()
       .or(z.literal("")),
+    timezone: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .or(z.literal("")),
   });
 }
 

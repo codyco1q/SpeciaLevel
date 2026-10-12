@@ -38,6 +38,7 @@ export interface ChatPerson {
   id: string;
   fullName: string | null;
   email: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface ChatChannelRow {
@@ -77,8 +78,8 @@ interface ChatMessageJoinRow {
   content: string;
   created_at: string;
   user:
-    | { id: string; full_name: string | null; email: string | null }
-    | { id: string; full_name: string | null; email: string | null }[]
+    | { id: string; full_name: string | null; email: string | null; avatar_url?: string | null }
+    | { id: string; full_name: string | null; email: string | null; avatar_url?: string | null }[]
     | null;
 }
 
@@ -101,8 +102,8 @@ interface ChannelMemberSelectRow {
   role: string;
   created_at: string;
   user:
-    | { id: string; full_name: string | null; email: string | null }
-    | { id: string; full_name: string | null; email: string | null }[]
+    | { id: string; full_name: string | null; email: string | null; avatar_url?: string | null }
+    | { id: string; full_name: string | null; email: string | null; avatar_url?: string | null }[]
     | null;
 }
 
@@ -198,8 +199,9 @@ function toChatMessageRow(row: ChatMessageJoinRow): ChatMessageRow {
           id: sender.id,
           fullName: sender.full_name ?? null,
           email: sender.email ?? null,
+          avatarUrl: sender.avatar_url ?? null,
         }
-      : { id: row.user_id, fullName: null, email: null },
+      : { id: row.user_id, fullName: null, email: null, avatarUrl: null },
   };
 }
 
@@ -269,7 +271,7 @@ export async function getMessages(
         user_id,
         content,
         created_at,
-        user:profiles!fk_chat_messages_user(id, full_name, email)
+        user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)
       `
     )
     .eq("organization_id", organizationId)
@@ -369,7 +371,7 @@ async function handleMessageMentions({
           title: `${senderName} mentioned you in #${channelName}`,
           message: previewMessage,
           type: "info",
-          link: "/messaging",
+          link: `/messaging?tab=internal&channel=${channelId}`,
         });
       }
     }
@@ -402,7 +404,7 @@ async function handleMessageMentions({
               title: `${senderName} mentioned @${dept.name} in #${channelName}`,
               message: previewMessage,
               type: "info",
-              link: "/messaging",
+              link: `/messaging?tab=internal&channel=${channelId}`,
             });
           }
         }
@@ -433,7 +435,7 @@ async function handleMessageMentions({
           title: `${senderName} mentioned @channel in #${channelName}`,
           message: previewMessage,
           type: "info",
-          link: "/messaging",
+          link: `/messaging?tab=internal&channel=${channelId}`,
         });
       }
     }
@@ -502,7 +504,7 @@ export async function sendMessage(
         user_id,
         content,
         created_at,
-        user:profiles!fk_chat_messages_user(id, full_name, email)
+        user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)
       `
     )
     .single();
@@ -827,7 +829,7 @@ export async function getChannelMembers(
       channel_id,
       role,
       created_at,
-      user:profiles!fk_chat_channel_members_user(id, full_name, email)
+      user:profiles!fk_chat_channel_members_user(id, full_name, email, avatar_url)
     `)
     .eq("organization_id", auth.organizationId)
     .eq("channel_id", channelId)
@@ -853,8 +855,9 @@ export async function getChannelMembers(
             id: userObj.id,
             fullName: userObj.full_name ?? null,
             email: userObj.email ?? null,
+            avatarUrl: userObj.avatar_url ?? null,
           }
-        : { id: row.user_id, fullName: null, email: null },
+        : { id: row.user_id, fullName: null, email: null, avatarUrl: null },
     };
   });
 

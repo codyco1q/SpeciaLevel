@@ -24,6 +24,7 @@ interface MessagingViewProps {
   initialThreads: ExternalThreadItem[];
   phoneNumbers: PhoneNumberWithAgent[];
   carrierSettings: PhoneCarrierSettings | null;
+  initialTab?: string;
   // Shared
   organizationId: string;
   platform: Dictionary["platform"];
@@ -41,11 +42,14 @@ export function MessagingView({
   initialThreads,
   phoneNumbers,
   carrierSettings,
+  initialTab,
   organizationId,
   platform,
   locale,
 }: MessagingViewProps) {
-  const [activeTab, setActiveTab] = useState<string>("external");
+  const [activeTab, setActiveTab] = useState<string>(
+    initialTab === "internal" ? "internal" : "external"
+  );
   const t = platform.messaging;
 
   return (

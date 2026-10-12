@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Circle as CircleIcon,
@@ -103,6 +104,24 @@ export function WhiteboardToolbar({
   const isText = selectedElement?.type === "text";
   const isArrow = selectedElement?.type === "arrow";
   const isPencil = selectedElement && ["pencil", "highlighter", "pen"].includes(selectedElement.type);
+
+  const currentFontSize = selectedElement?.fontSize || fontSize;
+  const [sizeInput, setSizeInput] = useState(String(currentFontSize));
+
+  useEffect(() => {
+    setSizeInput(String(currentFontSize));
+  }, [currentFontSize]);
+
+  const commitFontSize = (raw: string) => {
+    let parsed = parseInt(raw, 10);
+    if (isNaN(parsed)) {
+      parsed = currentFontSize;
+    }
+    const clamped = Math.max(8, Math.min(144, parsed));
+    setSizeInput(String(clamped));
+    setFontSize?.(clamped);
+    if (selectedElement) onUpdateSelected({ fontSize: clamped });
+  };
 
   return (
     <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-auto">
@@ -261,10 +280,8 @@ export function WhiteboardToolbar({
                   size="icon"
                   className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                   onClick={() => {
-                    const current = selectedElement?.fontSize || fontSize;
-                    const next = Math.max(current - 2, 8);
-                    setFontSize?.(next);
-                    if (selectedElement) onUpdateSelected({ fontSize: next });
+                    const next = Math.max(currentFontSize - 2, 8);
+                    commitFontSize(String(next));
                   }}
                   title="Decrease font size"
                 >
@@ -274,13 +291,14 @@ export function WhiteboardToolbar({
                   <Input
                     type="number"
                     min={8}
-                    max={120}
-                    value={selectedElement?.fontSize || fontSize}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      if (!isNaN(val) && val >= 8 && val <= 144) {
-                        setFontSize?.(val);
-                        if (selectedElement) onUpdateSelected({ fontSize: val });
+                    max={144}
+                    value={sizeInput}
+                    onChange={(e) => setSizeInput(e.target.value)}
+                    onBlur={() => commitFontSize(sizeInput)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitFontSize(sizeInput);
                       }
                     }}
                     className="h-6 w-12 px-1 text-center text-xs font-semibold bg-background border-none shadow-none focus-visible:ring-1"
@@ -293,10 +311,8 @@ export function WhiteboardToolbar({
                   size="icon"
                   className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                   onClick={() => {
-                    const current = selectedElement?.fontSize || fontSize;
-                    const next = Math.min(current + 2, 120);
-                    setFontSize?.(next);
-                    if (selectedElement) onUpdateSelected({ fontSize: next });
+                    const next = Math.min(currentFontSize + 2, 144);
+                    commitFontSize(String(next));
                   }}
                   title="Increase font size"
                 >
@@ -308,12 +324,11 @@ export function WhiteboardToolbar({
                   key={s}
                   type="button"
                   onClick={() => {
-                    setFontSize?.(s);
-                    if (selectedElement) onUpdateSelected({ fontSize: s });
+                    commitFontSize(String(s));
                   }}
                   className={cn(
                     "px-1.5 py-0.5 rounded text-[11px] font-medium border transition",
-                    (selectedElement?.fontSize || fontSize) === s
+                    currentFontSize === s
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-muted text-muted-foreground border-border hover:text-foreground"
                   )}

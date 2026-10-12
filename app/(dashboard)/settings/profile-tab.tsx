@@ -2,7 +2,7 @@
 
 import { useEffect, useActionState, useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, Save, Upload, Trash2, Camera, User } from "lucide-react";
 
@@ -16,12 +16,20 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DashboardLocaleSwitcher } from "@/components/dashboard/locale-switcher";
 import { updateProfile, uploadProfileAvatar, removeProfileAvatar } from "@/lib/actions/settings";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import {
   initialSettingsActionState,
   profileSchema,
+  TIMEZONE_OPTIONS,
   type ProfileSettingsValues,
   type SettingsActionState,
 } from "@/lib/validations/settings";
@@ -31,6 +39,7 @@ interface ProfileTabProps {
     fullName: string | null;
     jobTitle: string | null;
     avatarUrl?: string | null;
+    timezone?: string | null;
   };
   userEmail: string;
   /** Localized copy + formatters for the current render. */
@@ -58,12 +67,14 @@ export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabP
       updateProfile({
         full_name: String(formData.get("full_name") ?? ""),
         job_title: String(formData.get("job_title") ?? "") || undefined,
+        timezone: String(formData.get("timezone") ?? "") || undefined,
       }),
     initialSettingsActionState
   );
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -72,6 +83,7 @@ export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabP
     defaultValues: {
       full_name: profile.fullName ?? "",
       job_title: profile.jobTitle ?? "",
+      timezone: profile.timezone ?? "",
     },
   });
 
@@ -80,9 +92,10 @@ export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabP
       reset({
         full_name: profile.fullName ?? "",
         job_title: profile.jobTitle ?? "",
+        timezone: profile.timezone ?? "",
       });
     }
-  }, [state.status, profile.fullName, profile.jobTitle, reset]);
+  }, [state.status, profile.fullName, profile.jobTitle, profile.timezone, reset]);
 
   const fullNameError =
     errors.full_name?.message ?? state.fieldErrors?.full_name?.[0];
@@ -152,6 +165,7 @@ export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabP
     const formData = new FormData();
     formData.set("full_name", values.full_name);
     formData.set("job_title", values.job_title ?? "");
+    formData.set("timezone", values.timezone ?? "");
     formAction(formData);
   }
 
@@ -283,6 +297,36 @@ export function ProfileTab({ profile, userEmail, platform, locale }: ProfileTabP
                 {jobTitleError}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-timezone">{t.timezoneLabel ?? "Timezone"}</Label>
+            <Controller
+              name="timezone"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value || undefined}
+                  onValueChange={field.onChange}
+                >
+                  <SelectTrigger id="profile-timezone" className="w-full">
+                    <SelectValue placeholder={t.selectTimezone ?? "Select timezone"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {TIMEZONE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <p className="text-xs text-muted-foreground">
+              {locale === "ar"
+                ? "تحديد منطقتك الزمنية لعرض الأوقات والتواريخ بدقة عبر المنصة."
+                : "Used for scheduling appointments, calendar events, and displaying localized timestamps."}
+            </p>
           </div>
 
           {state.error && (

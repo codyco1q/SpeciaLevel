@@ -30,6 +30,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "./chat-meta";
 import {
   updateChannel,
   deleteChannel,
@@ -560,6 +562,17 @@ function ChannelSettingsContent({
                                     "Member"
                                   }
                                 />
+                                <Avatar className="h-7 w-7 text-[10px] shrink-0">
+                                  {member.avatarUrl && (
+                                    <AvatarImage
+                                      src={member.avatarUrl}
+                                      alt={member.fullName || member.email || ""}
+                                    />
+                                  )}
+                                  <AvatarFallback>
+                                    {getInitials(member.fullName || member.email || "?")}
+                                  </AvatarFallback>
+                                </Avatar>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <p className="text-xs font-medium truncate">
