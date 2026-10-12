@@ -442,6 +442,14 @@ export function CrmView({
     searchParams.get("tab") === "leads" && canManage ? "leads" : "pipeline"
   );
 
+  useEffect(() => {
+    setDeals(initialDeals);
+  }, [initialDeals]);
+
+  useEffect(() => {
+    setPipelines(initialPipelines);
+  }, [initialPipelines]);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [convertingLead, setConvertingLead] = useState<MarketingLeadRow | null>(null);
@@ -556,12 +564,104 @@ export function CrmView({
     (d) => !d.pipelineId || (activePipeline && d.pipelineId === activePipeline.id)
   );
 
+  const resolveStageForDeal = useCallback(
+    (deal: DealRow, stages: PipelineStageRow[]): PipelineStageRow | undefined => {
+      if (!stages || stages.length === 0) return undefined;
+
+      // 1. Direct stage ID match
+      if (deal.stageId) {
+        const matchedById = stages.find((s) => s.id === deal.stageId);
+        if (matchedById) return matchedById;
+      }
+
+      const normStage = (deal.stage || "").trim().toLowerCase();
+
+      // 2. Direct exact name match (case-insensitive)
+      const exactName = stages.find((s) => s.name.trim().toLowerCase() === normStage);
+      if (exactName) return exactName;
+
+      // 3. Alphanumeric match (ignoring dashes, slashes, spaces)
+      const cleanStage = normStage.replace(/[^a-z0-9]/g, "");
+      const cleanName = stages.find(
+        (s) => s.name.toLowerCase().replace(/[^a-z0-9]/g, "") === cleanStage
+      );
+      if (cleanName) return cleanName;
+
+      // 4. Semantic / keyword match
+      if (normStage === "won" || normStage.includes("won") || deal.wonReason) {
+        const wonStage = stages.find(
+          (s) => s.stageType === "won" || s.probability === 100 || s.name.toLowerCase().includes("won")
+        );
+        if (wonStage) return wonStage;
+      }
+
+      if (normStage === "lost" || normStage.includes("lost") || deal.lostReason) {
+        const lostStage = stages.find(
+          (s) => s.stageType === "lost" || s.probability === 0 || s.name.toLowerCase().includes("lost")
+        );
+        if (lostStage) return lostStage;
+      }
+
+      if (
+        normStage === "proposal" ||
+        normStage.includes("propos") ||
+        normStage.includes("quote") ||
+        normStage.includes("contract")
+      ) {
+        const propStage = stages.find(
+          (s) =>
+            s.name.toLowerCase().includes("propos") ||
+            s.name.toLowerCase().includes("quote") ||
+            s.name.toLowerCase().includes("negotiat")
+        );
+        if (propStage) return propStage;
+      }
+
+      if (
+        normStage === "contacted" ||
+        normStage.includes("contact") ||
+        normStage.includes("qualif")
+      ) {
+        const contStage = stages.find(
+          (s) =>
+            s.name.toLowerCase().includes("contact") ||
+            s.name.toLowerCase().includes("qualif") ||
+            s.name.toLowerCase().includes("discover")
+        );
+        if (contStage) return contStage;
+      }
+
+      if (
+        normStage === "lead" ||
+        normStage.includes("lead") ||
+        normStage.includes("inbound") ||
+        normStage.includes("new")
+      ) {
+        const leadStage = stages.find(
+          (s) =>
+            s.name.toLowerCase().includes("lead") ||
+            s.name.toLowerCase().includes("inbound") ||
+            s.name.toLowerCase().includes("new") ||
+            s.orderIndex === 0
+        );
+        if (leadStage) return leadStage;
+      }
+
+      // 5. Ultimate fallback: if deal represents won, return last stage; otherwise first stage
+      if (normStage === "won" || deal.wonReason) {
+        return stages[stages.length - 1];
+      }
+      return stages[0];
+    },
+    []
+  );
+
   const totalPipelineValue = pipelineDeals
     .filter((d) => d.stage.toLowerCase() !== "lost" && !d.lostReason)
     .reduce((sum, d) => sum + (Number(d.value) || 0), 0);
 
   const weightedValue = pipelineDeals.reduce((sum, d) => {
-    const stage = activeStages.find((s) => s.id === d.stageId) || d.stageObj;
+    const stage = resolveStageForDeal(d, activeStages) || d.stageObj;
     const prob = stage
       ? stage.probability
       : d.stage.toLowerCase() === "won"
@@ -573,14 +673,18 @@ export function CrmView({
   }, 0);
 
   const activeDealsCount = pipelineDeals.filter((d) => {
-    const stage = activeStages.find((s) => s.id === d.stageId) || d.stageObj;
+    const stage = resolveStageForDeal(d, activeStages) || d.stageObj;
     const isClosed =
       d.closedAt !== null ||
       d.wonReason !== null ||
       d.lostReason !== null ||
       d.stage.toLowerCase() === "won" ||
       d.stage.toLowerCase() === "lost" ||
-      (stage && (stage.probability === 100 || stage.probability === 0));
+      (stage &&
+        (stage.probability === 100 ||
+          stage.probability === 0 ||
+          stage.stageType === "won" ||
+          stage.stageType === "lost"));
     return !isClosed;
   }).length;
 
@@ -592,8 +696,8 @@ export function CrmView({
 
   const getDealsForStage = (stage: PipelineStageRow) => {
     return pipelineDeals.filter((d) => {
-      if (d.stageId) return d.stageId === stage.id;
-      return d.stage.toLowerCase() === stage.name.toLowerCase();
+      const target = resolveStageForDeal(d, activeStages);
+      return target?.id === stage.id;
     });
   };
 

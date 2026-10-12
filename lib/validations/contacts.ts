@@ -128,6 +128,9 @@ export const importContactItemSchema = z.object({
   address: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().optional().or(z.literal("")),
   tags: z.array(z.string().trim()).default([]),
+  deal_title: z.string().trim().optional().or(z.literal("")),
+  deal_value: z.union([z.number(), z.string()]).optional(),
+  deal_stage: z.string().trim().optional().or(z.literal("")),
 });
 
 export type ImportContactItem = z.infer<typeof importContactItemSchema>;
@@ -139,6 +142,7 @@ export const importContactsInputSchema = z.object({
     .min(1, "At least one contact row is required to import."),
   duplicateStrategy: duplicateStrategySchema.default("update"),
   batchTags: z.array(z.string().trim()).default([]),
+  generateDeals: z.boolean().default(false),
 });
 
 export type ImportContactsInput = z.infer<typeof importContactsInputSchema>;

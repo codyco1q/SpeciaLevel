@@ -21,6 +21,10 @@ const FIELD_OPTIONS: { key: ContactFieldKey; label: string }[] = [
   { key: "address", label: "Address" },
   { key: "notes", label: "Notes" },
   { key: "tags", label: "Tags (comma-separated)" },
+  { key: "deal_title", label: "Deal Title (CRM)" },
+  { key: "deal_value", label: "Deal Value / Amount (CRM)" },
+  { key: "deal_stage", label: "Deal Stage (CRM)" },
+
 ];
 
 interface ImportStepMappingProps {

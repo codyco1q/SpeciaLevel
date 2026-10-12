@@ -159,21 +159,26 @@ export async function createEmployee(
     };
   }
 
-  // 2. Create the profile ("Add Employee" always starts Active; the form's
-  //    status field is honored here if a non-active initial status is given).
+  // 2. Create / update the profile. Since the `on_auth_user_created` trigger
+  //    on auth.users automatically inserts a bare profile row with null organization_id,
+  //    we must upsert onConflict: "id" so the employee profile is reliably populated.
   const { error: profileError } = await admin
     .from("profiles")
-    .insert({
-      id: authUser.user.id,
-      organization_id: auth.organizationId,
-      full_name: parsed.data.fullName,
-      email: parsed.data.email,
-      job_title: parsed.data.jobTitle || null,
-      department_id: parsed.data.departmentId || null,
-      status: parsed.data.status,
-    });
+    .upsert(
+      {
+        id: authUser.user.id,
+        organization_id: auth.organizationId,
+        full_name: parsed.data.fullName,
+        email: parsed.data.email,
+        job_title: parsed.data.jobTitle || null,
+        department_id: parsed.data.departmentId || null,
+        status: parsed.data.status,
+      },
+      { onConflict: "id" }
+    );
 
   if (profileError) {
+    console.error("[employees] profile upsert error:", profileError);
     // Roll back the auth user so we don't leave a dangling account.
     await admin.auth.admin.deleteUser(authUser.user.id);
     return {
@@ -387,13 +392,53 @@ export async function deleteEmployee(
 
   const admin = createServiceRoleClient();
 
-  const { error } = await admin.auth.admin.deleteUser(employeeId);
+  // 1. Unlink, reassign, and clean up dependent records to avoid foreign key
+  //    violations or orphaned resources when deleting the employee.
+  await Promise.allSettled([
+    admin.from("user_roles").delete().eq("user_id", employeeId),
+    admin.from("chat_channel_members").delete().eq("user_id", employeeId),
+    admin.from("ai_prompts").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("ai_executions").update({ executed_by: auth.currentUserId }).eq("executed_by", employeeId),
+    admin.from("automations").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("marketing_campaigns").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("marketing_social_posts").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("marketing_email_templates").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("tasks").update({ assigned_to: null }).eq("assigned_to", employeeId),
+    admin.from("tasks").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("crm_deals").update({ assigned_to: null }).eq("assigned_to", employeeId),
+    admin.from("crm_deals").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("invoices").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("calendar_events").update({ assigned_user_id: null }).eq("assigned_user_id", employeeId),
+    admin.from("calendar_appointments").update({ host_user_id: auth.currentUserId }).eq("host_user_id", employeeId),
+    admin.from("phone_numbers").update({ assigned_user_id: null }).eq("assigned_user_id", employeeId),
+    admin.from("telecom_calls").update({ agent_id: null }).eq("agent_id", employeeId),
+    admin.from("organization_invitations").update({ invited_by: auth.currentUserId }).eq("invited_by", employeeId),
+    admin.from("workspace_docs").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("workspace_whiteboards").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("crm_contacts").update({ created_by: auth.currentUserId }).eq("created_by", employeeId),
+    admin.from("time_entries").delete().eq("user_id", employeeId),
+  ]);
 
-  if (error) {
+  // 2. Explicitly delete the profile row to ensure it is completely removed
+  //    from the organization even if auth user deletion fails or is orphaned.
+  const { error: profileDeleteError } = await admin
+    .from("profiles")
+    .delete()
+    .eq("id", employeeId)
+    .eq("organization_id", auth.organizationId);
+
+  if (profileDeleteError) {
+    console.error("[employees] profile deletion error:", profileDeleteError);
     return {
       status: "error",
       error: "Could not delete the employee. Please try again.",
     };
+  }
+
+  // 3. Remove the Auth user (ignore "User not found" if they were not registered in auth.users)
+  const { error: authError } = await admin.auth.admin.deleteUser(employeeId);
+  if (authError && !authError.message?.toLowerCase().includes("not found")) {
+    console.warn("[employees] auth deleteUser warning:", authError.message);
   }
 
   revalidatePath("/employees");

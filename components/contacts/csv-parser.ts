@@ -14,7 +14,10 @@ export type ContactFieldKey =
   | "title"
   | "address"
   | "notes"
-  | "tags";
+  | "tags"
+  | "deal_title"
+  | "deal_value"
+  | "deal_stage";
 
 export function detectDelimiter(sample: string): string {
   const commaCount = (sample.match(/,/g) || []).length;
@@ -108,6 +111,10 @@ export function autoDetectFieldMapping(
 
   const fieldPatterns: Record<Exclude<ContactFieldKey, "__ignore__">, RegExp> =
     {
+      deal_title: /(deal[_\s-]?title|deal[_\s-]?name|^deal$|صفقة|عنوان الصفقة)/i,
+      deal_value: /(deal[_\s-]?value|deal[_\s-]?amount|deal[_\s-]?val|قيمة الصفقة|مبلغ الصفقة)/i,
+      deal_stage: /(deal[_\s-]?stage|deal[_\s-]?status|مرحلة الصفقة)/i,
+
       name: /(full[_\s-]?name|contact[_\s-]?name|first[_\s-]?name|^name$|الاسم|اسم)/i,
       email: /(e[_\s-]?mail|email[_\s-]?address|^mail$|البريد|الايميل)/i,
       phone: /(phone|mobile|tel|telephone|cell|هاتف|جوال|رقم)/i,
@@ -151,6 +158,10 @@ export function generateCsvTemplate(): string {
     "Address",
     "Notes",
     "Tags",
+    "Deal Title",
+    "Deal Value",
+    "Deal Stage",
+
   ];
   const sampleRows = [
     [
@@ -162,6 +173,10 @@ export function generateCsvTemplate(): string {
       "742 Evergreen Terrace, Springfield",
       "Key enterprise account sponsor",
       "enterprise, q1-priority",
+      "Enterprise Cloud Migration",
+      "45000",
+      "proposal",
+
     ],
     [
       "Omar Al-Mansoor",
@@ -172,6 +187,9 @@ export function generateCsvTemplate(): string {
       "Dubai Internet City, Bldg 3",
       "Interested in custom API integrations",
       "partner, tech-lead",
+      "API Integration Package",
+      "12500",
+      "lead",
     ],
   ];
 

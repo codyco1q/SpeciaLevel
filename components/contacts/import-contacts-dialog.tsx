@@ -55,6 +55,8 @@ export function ImportContactsDialog({
   const [tagInput, setTagInput] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const [importResult, setImportResult] = useState<ContactImportResult | null>(null);
+  const [generateDeals, setGenerateDeals] = useState(false);
+
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const resetState = () => {
@@ -65,6 +67,8 @@ export function ImportContactsDialog({
     setBatchTags([]);
     setTagInput("");
     setImportResult(null);
+    setGenerateDeals(false);
+
     setUploadError(null);
   };
 
@@ -134,6 +138,10 @@ export function ImportContactsDialog({
         address: record.address || undefined,
         notes: record.notes || undefined,
         tags: record.tags || [],
+        deal_title: record.deal_title || undefined,
+        deal_value: record.deal_value || undefined,
+        deal_stage: record.deal_stage || undefined,
+
       };
     });
   };
@@ -148,6 +156,8 @@ export function ImportContactsDialog({
         contacts: records,
         duplicateStrategy: strategy,
         batchTags,
+        generateDeals,
+
       });
       setImportResult(res);
       if (res.status === "success") {
@@ -204,6 +214,9 @@ export function ImportContactsDialog({
               onTagInputChange={setTagInput}
               onAddBatchTag={handleAddBatchTag}
               onRemoveBatchTag={(tag) => setBatchTags((prev) => prev.filter((t) => t !== tag))}
+              generateDeals={generateDeals}
+              onGenerateDealsChange={setGenerateDeals}
+
               t={t}
             />
           )}

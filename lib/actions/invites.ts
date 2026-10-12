@@ -39,8 +39,104 @@ function generateInviteToken(length = 32): string {
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
+function getCanonicalSiteUrl(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "");
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`.replace(/\/+$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/+$/, "");
+  }
+  return "http://localhost:3000";
+}
+
+/**
+ * Dispatches an invitation email using the primary outbound auth mailer
+ * and outbound notification webhooks.
+ */
+async function dispatchInvitationEmail({
+  email,
+  token,
+  organizationId,
+  roleName,
+  orgName,
+}: {
+  email: string;
+  token: string;
+  organizationId: string;
+  roleName?: string;
+  orgName?: string;
+}) {
+  const siteUrl = getCanonicalSiteUrl();
+  const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${token}`;
+  const admin = createServiceRoleClient();
+
+  // 1. Primary outbound mailer dispatch via Supabase Auth
+  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: inviteRedirectUrl,
+    data: {
+      organization_id: organizationId,
+      invite_token: token,
+      role_name: roleName,
+      org_name: orgName,
+    },
+  });
+
+  if (inviteError) {
+    console.warn("[invites] Supabase inviteUserByEmail primary attempt:", inviteError.message);
+    try {
+      // Fallback link generation if the user is already registered in auth or needs recovery
+      const { error: linkErr } = await admin.auth.admin.generateLink({
+        type: "invite",
+        email,
+        options: {
+          redirectTo: inviteRedirectUrl,
+          data: { organization_id: organizationId, invite_token: token },
+        },
+      });
+
+      if (linkErr) {
+        await admin.auth.admin.generateLink({
+          type: "magiclink",
+          email,
+          options: { redirectTo: inviteRedirectUrl },
+        });
+      }
+    } catch (genErr) {
+      console.warn("[invites] Fallback invite link generation:", genErr);
+    }
+  }
+
+  // 2. Outbound webhook notification for external email deliverability
+  const webhookUrl = process.env.ORGANIZATION_WEBHOOK_URL || process.env.MARKETING_LEADS_WEBHOOK_URL;
+  if (webhookUrl) {
+    try {
+      void fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "employee.invitation_sent",
+          recipient_email: email,
+          organization_id: organizationId,
+          organization_name: orgName,
+          role_name: roleName,
+          invite_link: inviteRedirectUrl,
+          token,
+          timestamp: new Date().toISOString(),
+        }),
+      }).catch((webhookErr) => {
+        console.warn("[invites] Webhook email notification error:", webhookErr);
+      });
+    } catch {
+      // non-blocking
+    }
+  }
+}
+
 async function requireInviteManage(): Promise<
-  | { ok: true; organizationId: string; userId: string }
+  | { ok: true; organizationId: string; userId: string; orgName?: string }
   | { ok: false; error: InviteActionState }
 > {
   const userContext = await getCurrentUserContext();
@@ -85,7 +181,12 @@ async function requireInviteManage(): Promise<
     };
   }
 
-  return { ok: true, organizationId, userId: userContext.user.id };
+  return {
+    ok: true,
+    organizationId,
+    userId: userContext.user.id,
+    orgName: userContext.organization?.name,
+  };
 }
 /**
  * Create a member invitation for the current organization.
@@ -137,7 +238,7 @@ export async function createInvitation(data: {
   // The role must belong to the current organization.
   const { data: role } = await supabase
     .from("roles")
-    .select("id")
+    .select("id, name")
     .eq("id", role_id)
     .eq("organization_id", auth.organizationId)
     .maybeSingle();
@@ -237,19 +338,14 @@ export async function createInvitation(data: {
     };
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
-  const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${token}`;
-
-  const admin = createServiceRoleClient();
-  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: inviteRedirectUrl,
+  // Deliver the invitation email using the primary outbound mail setup.
+  await dispatchInvitationEmail({
+    email,
+    token,
+    organizationId: auth.organizationId,
+    roleName: role.name,
+    orgName: auth.orgName,
   });
-
-  if (inviteError) {
-    // If the invite email dispatch failed, we still have the row in our DB,
-    // so the admin can copy the link manually, but it's good to log or return a warning.
-    console.error("Supabase inviteUserByEmail error:", inviteError);
-  }
 
   revalidatePath("/employees");
   revalidatePath("/settings");
@@ -271,10 +367,15 @@ export async function resendInvitation(
 
   const admin = createServiceRoleClient();
   
-  // 1. Fetch invite to get the token and email
+  // 1. Fetch invite to get the token, email, role, and organization
   const { data: invite, error: fetchError } = await admin
     .from("organization_invitations")
-    .select("email, token")
+    .select(`
+      email,
+      token,
+      role:roles(name),
+      organization:organizations(name)
+    `)
     .eq("id", invitationId)
     .eq("organization_id", auth.organizationId)
     .single();
@@ -304,12 +405,18 @@ export async function resendInvitation(
     };
   }
 
-  // 3. Resend the email
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
-  const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${invite.token}`;
+  // 3. Deliver the renewed invitation email using the primary outbound mail setup
+  const roleRecord = invite.role as unknown as { name?: string } | { name?: string }[] | null;
+  const roleName = Array.isArray(roleRecord) ? roleRecord[0]?.name : roleRecord?.name;
+  const orgRecord = invite.organization as unknown as { name?: string } | { name?: string }[] | null;
+  const orgName = Array.isArray(orgRecord) ? orgRecord[0]?.name : orgRecord?.name;
 
-  await admin.auth.admin.inviteUserByEmail(invite.email, {
-    redirectTo: inviteRedirectUrl,
+  await dispatchInvitationEmail({
+    email: invite.email,
+    token: invite.token,
+    organizationId: auth.organizationId,
+    roleName,
+    orgName: orgName || auth.orgName,
   });
 
   revalidatePath("/employees");

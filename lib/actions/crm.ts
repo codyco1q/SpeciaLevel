@@ -971,7 +971,7 @@ export async function getDeals(pipelineId?: string): Promise<DealRow[] | null> {
     .eq("organization_id", auth.organizationId);
 
   if (pipelineId) {
-    query = query.eq("pipeline_id", pipelineId);
+    query = query.or(`pipeline_id.eq.${pipelineId},pipeline_id.is.null`);
   }
 
   const { data, error } = await query.order("created_at", { ascending: false });

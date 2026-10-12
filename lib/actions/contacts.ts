@@ -741,6 +741,81 @@ export async function importContactsAction(
   revalidatePath("/contacts");
   revalidatePath("/crm");
 
+  // If requested, generate associated CRM deals for imported contacts
+  if (parsed.data.generateDeals && parsed.data.contacts.length > 0) {
+    try {
+      const { data: defaultPipe } = await supabase
+        .from("crm_pipelines")
+        .select("id, stages:crm_pipeline_stages(id, name, order_index)")
+        .eq("organization_id", auth.organizationId)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const defaultPipeId = defaultPipe?.id ?? null;
+      const pipeStages = ((defaultPipe?.stages as unknown) as Array<{ id: string; name: string; order_index: number }>) ?? [];
+      pipeStages.sort((a, b) => a.order_index - b.order_index);
+
+      const importedEmails = parsed.data.contacts
+        .map((c) => c.email?.trim().toLowerCase())
+        .filter(Boolean) as string[];
+
+      const contactMap = new Map<string, string>();
+      if (importedEmails.length > 0) {
+        const { data: contactRows } = await supabase
+          .from("crm_contacts")
+          .select("id, email")
+          .eq("organization_id", auth.organizationId)
+          .in("email", importedEmails);
+
+        contactRows?.forEach((r) => {
+          if (r.email) contactMap.set(r.email.toLowerCase(), r.id);
+        });
+      }
+
+      const dealsToInsert = parsed.data.contacts.map((item) => {
+        const emailKey = item.email?.trim().toLowerCase();
+        const contactId = emailKey ? contactMap.get(emailKey) : null;
+        const dealTitle =
+          item.deal_title?.trim() ||
+          (item.company?.trim() ? `${item.company.trim()} Deal` : `${item.name.trim()} Deal`);
+        const dealValue = Number(item.deal_value) || 0;
+        const rawStage = (item.deal_stage?.trim().toLowerCase() || "lead");
+
+        let matchedStageId: string | null = null;
+        if (pipeStages.length > 0) {
+          const found =
+            pipeStages.find((s) => s.name.toLowerCase().includes(rawStage)) ||
+            pipeStages[0];
+          matchedStageId = found?.id ?? null;
+        }
+
+        const validStage =
+          rawStage === "won" || rawStage === "lost" || rawStage === "proposal" || rawStage === "contacted"
+            ? rawStage
+            : "lead";
+
+        return {
+          organization_id: auth.organizationId,
+          contact_id: contactId ?? null,
+          pipeline_id: defaultPipeId,
+          stage_id: matchedStageId,
+          title: dealTitle,
+          value: dealValue,
+          currency: "USD",
+          stage: validStage,
+          created_by: auth.userId,
+        };
+      });
+
+      if (dealsToInsert.length > 0) {
+        await supabase.from("crm_deals").insert(dealsToInsert);
+      }
+    } catch (dealErr) {
+      console.warn("[contacts] Failed to generate associated deals:", dealErr);
+    }
+  }
+
   const rpcResult = (result as {
     success?: boolean;
     created_count?: number;

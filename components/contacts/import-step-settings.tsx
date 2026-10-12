@@ -1,6 +1,8 @@
 "use client";
 
 import { X, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +20,9 @@ interface ImportStepSettingsProps {
   onTagInputChange: (val: string) => void;
   onAddBatchTag: () => void;
   onRemoveBatchTag: (tag: string) => void;
+  generateDeals: boolean;
+  onGenerateDealsChange: (val: boolean) => void;
+
   t: NonNullable<Dictionary["platform"]["contacts"]>["import"];
 }
 
@@ -29,6 +34,9 @@ export function ImportStepSettings({
   onTagInputChange,
   onAddBatchTag,
   onRemoveBatchTag,
+  generateDeals,
+  onGenerateDealsChange,
+
   t,
 }: ImportStepSettingsProps) {
   return (
@@ -120,6 +128,29 @@ export function ImportStepSettings({
           </div>
         )}
       </div>
+      <div className="pt-2 border-t border-border">
+        <label
+          htmlFor="generate-deals-checkbox"
+          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:border-primary/40 transition-colors"
+        >
+          <div className="space-y-0.5">
+            <span className="text-xs font-semibold text-foreground block">
+              {(t as any).generateDealsTitle || "Generate Associated CRM Deals"}
+            </span>
+            <span className="text-[11px] text-muted-foreground block">
+              {(t as any).generateDealsDesc ||
+                "Automatically generate associated CRM deals upon import using mapped deal fields or contact defaults."}
+            </span>
+          </div>
+          <Checkbox
+            id="generate-deals-checkbox"
+            checked={generateDeals}
+            onCheckedChange={(checked) => onGenerateDealsChange(Boolean(checked))}
+            className="mt-0.5 shrink-0"
+          />
+        </label>
+      </div>
+
     </div>
   );
 }

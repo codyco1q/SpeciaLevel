@@ -63,7 +63,7 @@ export default async function CrmPage({
   const activePipeline =
     pipelines.find((p) => p.id === initialPipelineId) || pipelines[0];
 
-  const initialDeals = await getDeals(activePipeline?.id);
+  const initialDeals = await getDeals();
   const initialLeads = canManage ? (await getMarketingLeads()) ?? [] : [];
 
   return (

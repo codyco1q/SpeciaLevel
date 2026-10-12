@@ -119,6 +119,8 @@ export function ImportStepPreview({
               <th className="p-2 text-start font-medium">Email</th>
               <th className="p-2 text-start font-medium">Company</th>
               <th className="p-2 text-start font-medium">Tags</th>
+              <th className="p-2 text-start font-medium">Deal</th>
+
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -127,6 +129,21 @@ export function ImportStepPreview({
                 <td className="p-2 font-medium">{rec.name || "—"}</td>
                 <td className="p-2 text-muted-foreground">{rec.email || "—"}</td>
                 <td className="p-2 text-muted-foreground">{rec.company || "—"}</td>
+                <td className="p-2 text-muted-foreground">
+                  {rec.deal_title ? (
+                    <span className="font-medium text-foreground">
+                      {rec.deal_title}{" "}
+                      {rec.deal_value ? (
+                        <span className="text-muted-foreground font-normal">
+                          (${rec.deal_value})
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+
                 <td className="p-2">
                   {rec.tags && rec.tags.length > 0 ? (
                     <div className="flex flex-wrap gap-1">

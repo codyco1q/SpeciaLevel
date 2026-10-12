@@ -2521,6 +2521,9 @@
         "batchTagsTitle": "Batch Tags",
         "batchTagsDesc": "Tags added here will be applied to every imported contact in this batch.",
         "batchTagsPlaceholder": "e.g. imported-2026, q1-leads, trade-show",
+        "generateDealsTitle": "Generate Associated CRM Deals",
+        "generateDealsDesc": "Automatically create associated CRM deals upon import using mapped deal fields or defaults.",
+
         "previewTitle": "Preview & Validation",
         "previewSubtitle": "Review the first few records before running the bulk import.",
         "recordsToImport": "Records to import",
