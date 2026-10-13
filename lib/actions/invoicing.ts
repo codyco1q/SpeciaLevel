@@ -484,18 +484,20 @@ export async function updateInvoiceStatus(
   revalidatePath("/invoicing");
 
   if (parsed.data === "paid") {
-    dispatchWorkflowTrigger({
-      type: "invoice_paid",
-      orgId: auth.organizationId,
-      payload: {
-        invoice_id: id,
-        invoice: {
-          id,
+    try {
+      await dispatchWorkflowTrigger({
+        type: "invoice_paid",
+        orgId: auth.organizationId,
+        payload: {
+          invoice_id: id,
+          invoice: {
+            id,
+          },
         },
-      },
-    }).catch((triggerErr) =>
-      console.error("[invoicing] dispatchWorkflowTrigger error:", triggerErr)
-    );
+      });
+    } catch (triggerErr) {
+      console.error("[invoicing] dispatchWorkflowTrigger error:", triggerErr);
+    }
   }
 
   return { status: "success" };

@@ -196,6 +196,22 @@ export function WorkflowStudioPage({
     updated.splice(targetIdx, 0, moved);
     setSteps(updated);
   };
+
+  const handleReorderSteps = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= steps.length ||
+      toIndex >= steps.length
+    ) {
+      return;
+    }
+    const updated = [...steps];
+    const [moved] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, moved);
+    setSteps(updated);
+  };
   const handleOpenTestModal = () => {
     let mockData: Record<string, any> = {};
     if (triggerType === "form_submitted") {
@@ -281,7 +297,7 @@ export function WorkflowStudioPage({
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 bg-muted/20">
+    <div className="flex flex-col h-[calc(100vh-4rem)] max-h-screen overflow-hidden -m-4 sm:-m-6 lg:-m-8 bg-muted/20 relative">
       {/* Studio Top Navigation Bar */}
       <StudioHeader
         name={name}
@@ -301,7 +317,7 @@ export function WorkflowStudioPage({
       {/* Status Alert Banner */}
       {statusMessage && (
         <div
-          className={`px-4 py-2.5 text-xs flex items-center justify-between border-b ${
+          className={`px-4 py-2 text-xs flex items-center justify-between border-b shrink-0 ${
             statusMessage.type === "success"
               ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
               : "bg-destructive/10 text-destructive border-destructive/20"
@@ -335,6 +351,7 @@ export function WorkflowStudioPage({
         onInsertStep={(idx) => setActionPickerInsertIndex(idx)}
         onSelectStepConfig={(step) => setSelectedStepForConfig(step)}
         onMoveStep={handleMoveStep}
+        onReorderSteps={handleReorderSteps}
         onDeleteStep={handleDeleteStep}
         platform={platform}
       />

@@ -44,6 +44,14 @@ export interface Organization {
   billing_defaults?: OrganizationBillingDefaults;
   has_social_planner_addon?: boolean;
   social_planner_subscribed_at?: string | null;
+  status?: "active" | "suspended" | "restricted" | "trial";
+  plan_tier?: "free" | "starter" | "pro" | "enterprise";
+  subscription_status?: "active" | "trialing" | "past_due" | "canceled" | "unpaid";
+  mrr?: number;
+  feature_flags?: Record<string, boolean>;
+  support_notes?: string | null;
+  suspended_reason?: string | null;
+  suspended_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -409,6 +417,8 @@ export interface UserContext {
   organization: Organization | undefined;
   roles: Role[];
   permissions: string[];
+  isImpersonating?: boolean;
+  impersonatedOrgName?: string;
 }
 
 // ============================================================
@@ -923,6 +933,52 @@ export interface MarketingEmailTemplate {
     email: string | null;
   } | null;
 }
+
+// ============================================================
+// Super Admin & Multi-Tenant Control Panel
+// ============================================================
+
+export interface SuperAdminAuditLog {
+  id: string;
+  admin_user_id: string | null;
+  admin_email: string | null;
+  target_organization_id: string;
+  target_organization_name?: string | null;
+  action: string;
+  details: Record<string, any>;
+  created_at: string;
+}
+
+export interface PlatformMetrics {
+  totalOrganizations: number;
+  activeOrganizations: number;
+  trialOrganizations: number;
+  suspendedOrganizations: number;
+  restrictedOrganizations: number;
+  totalMrr: number;
+  totalArr: number;
+  averageRevenuePerTenant: number;
+  totalUsers: number;
+  planDistribution: Record<string, number>;
+  subscriptionsByStatus: Record<string, number>;
+}
+
+export interface TenantWithMetrics extends Organization {
+  memberCount: number;
+  contactsCount: number;
+  dealsCount: number;
+  tasksCount: number;
+  workflowsCount: number;
+  invoicesCount: number;
+  invoicesVolume: number;
+  modules?: {
+    module_key: string;
+    module_name: string;
+    is_enabled: boolean;
+  }[];
+  recentAuditLogs?: SuperAdminAuditLog[];
+}
+
 
 
 

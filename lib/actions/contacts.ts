@@ -485,22 +485,51 @@ export async function createContact(
   }
 
   const supabase = await createServerClient();
-  const { error } = await supabase.from("crm_contacts").insert({
-    organization_id: auth.organizationId,
-    name: parsed.data.name,
-    email: parsed.data.email,
-    company: parsed.data.company || null,
-    phone: parsed.data.phone || null,
-    title: parsed.data.title || null,
-    address: parsed.data.address || null,
-    notes: parsed.data.notes || null,
-    tags: parsed.data.tags,
-    created_by: auth.userId,
-  });
+  const { data: created, error } = await supabase
+    .from("crm_contacts")
+    .insert({
+      organization_id: auth.organizationId,
+      name: parsed.data.name,
+      email: parsed.data.email,
+      company: parsed.data.company || null,
+      phone: parsed.data.phone || null,
+      title: parsed.data.title || null,
+      address: parsed.data.address || null,
+      notes: parsed.data.notes || null,
+      tags: parsed.data.tags,
+      created_by: auth.userId,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("[contacts] create failed:", error.message);
     return { status: "error", error: err.contactCreateFailed };
+  }
+
+  // Dispatch visual automation triggers for tags
+  if (created?.id && Array.isArray(parsed.data.tags) && parsed.data.tags.length > 0) {
+    for (const tag of parsed.data.tags) {
+      try {
+        await dispatchWorkflowTrigger({
+          type: "contact_tag_added",
+          orgId: auth.organizationId,
+          payload: {
+            contact_id: created.id,
+            tag,
+            contact: {
+              id: created.id,
+              name: parsed.data.name,
+              email: parsed.data.email,
+              phone: parsed.data.phone,
+              company: parsed.data.company,
+            },
+          },
+        });
+      } catch (triggerErr) {
+        console.error("[contacts] dispatchWorkflowTrigger error:", triggerErr);
+      }
+    }
   }
 
   revalidatePath("/contacts");
@@ -567,23 +596,25 @@ export async function updateContact(
   // Dispatch visual automation trigger for tags
   if (Array.isArray(parsed.data.tags) && parsed.data.tags.length > 0) {
     for (const tag of parsed.data.tags) {
-      dispatchWorkflowTrigger({
-        type: "contact_tag_added",
-        orgId: auth.organizationId,
-        payload: {
-          contact_id: id,
-          tag,
-          contact: {
-            id,
-            name: parsed.data.name,
-            email: parsed.data.email,
-            phone: parsed.data.phone,
-            company: parsed.data.company,
+      try {
+        await dispatchWorkflowTrigger({
+          type: "contact_tag_added",
+          orgId: auth.organizationId,
+          payload: {
+            contact_id: id,
+            tag,
+            contact: {
+              id,
+              name: parsed.data.name,
+              email: parsed.data.email,
+              phone: parsed.data.phone,
+              company: parsed.data.company,
+            },
           },
-        },
-      }).catch((triggerErr) =>
-        console.error("[contacts] dispatchWorkflowTrigger error:", triggerErr)
-      );
+        });
+      } catch (triggerErr) {
+        console.error("[contacts] dispatchWorkflowTrigger error:", triggerErr);
+      }
     }
   }
 

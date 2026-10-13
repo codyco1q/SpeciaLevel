@@ -478,19 +478,21 @@ export async function sendSms(data: unknown): Promise<SendSmsResult> {
   revalidatePath("/messaging");
 
   if (direction === "inbound") {
-    dispatchWorkflowTrigger({
-      type: "inbound_sms",
-      orgId: auth.organizationId,
-      payload: {
-        to_number: toNumber,
-        from_number: fromNumber,
-        body,
-        contact_id: contactId || null,
-        sms_id: inserted.id,
-      },
-    }).catch((triggerErr) =>
-      console.error("[telecom] dispatchWorkflowTrigger error:", triggerErr)
-    );
+    try {
+      await dispatchWorkflowTrigger({
+        type: "inbound_sms",
+        orgId: auth.organizationId,
+        payload: {
+          to_number: toNumber,
+          from_number: fromNumber,
+          body,
+          contact_id: contactId || null,
+          sms_id: inserted.id,
+        },
+      });
+    } catch (triggerErr) {
+      console.error("[telecom] dispatchWorkflowTrigger error:", triggerErr);
+    }
   }
 
   return {

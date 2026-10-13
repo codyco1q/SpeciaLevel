@@ -40,7 +40,18 @@ export function TriggerNode({
   const currentTriggerDef = WORKFLOW_TRIGGER_DEFINITIONS.find((d) => d.type === triggerType);
 
   return (
-    <div className="rounded-2xl border-2 border-primary/40 bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md">
+    <div
+      onClick={canManage ? onOpenConfig : undefined}
+      role={canManage ? "button" : undefined}
+      tabIndex={canManage ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (canManage && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onOpenConfig();
+        }
+      }}
+      className="group rounded-2xl border-2 border-primary/40 bg-card p-5 shadow-sm transition-all hover:border-primary hover:shadow-md hover:ring-2 hover:ring-primary/20 cursor-pointer text-left"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3.5">
           <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">

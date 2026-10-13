@@ -1,5 +1,7 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type {
   Profile,
   Organization,
@@ -105,10 +107,41 @@ export const getCurrentUserContext = cache(
       }
     }
 
-    const organization: Organization | undefined = profile.organization;
+    let organization: Organization | undefined = profile.organization;
     const roles: Role[] = (profile.roles ?? []).map(
       (ur: { roles: Role }) => ur.roles
     );
+
+    let isImpersonating = false;
+    let impersonatedOrgName: string | undefined;
+
+    // Check for super admin impersonation session
+    const isOwnerOrSuperAdmin = roles.some(
+      (r) => r.key === "owner" || r.key === "super_admin"
+    );
+
+    if (isOwnerOrSuperAdmin) {
+      try {
+        const cookieStore = await cookies();
+        const impersonateOrgId = cookieStore.get("impersonate_org_id")?.value;
+        if (impersonateOrgId) {
+          const adminSupabase = createServiceRoleClient();
+          const { data: impOrg } = await adminSupabase
+            .from("organizations")
+            .select("*")
+            .eq("id", impersonateOrgId)
+            .maybeSingle();
+
+          if (impOrg) {
+            organization = impOrg as Organization;
+            isImpersonating = true;
+            impersonatedOrgName = impOrg.name;
+          }
+        }
+      } catch {
+        // Fallback silently if cookies cannot be accessed
+      }
+    }
 
     return {
       user: {
@@ -119,6 +152,8 @@ export const getCurrentUserContext = cache(
       organization,
       roles,
       permissions,
+      isImpersonating,
+      impersonatedOrgName,
     };
     } catch {
       // Never throw from here: layouts/pages treat `null` as "signed out"

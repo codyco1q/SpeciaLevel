@@ -1258,22 +1258,24 @@ export async function updateDealStage(
   revalidatePath("/crm");
 
   // Dispatch visual automation trigger
-  dispatchWorkflowTrigger({
-    type: "deal_stage_changed",
-    orgId: auth.organizationId,
-    payload: {
-      deal_id: dealId,
-      stage_id: targetStageId,
-      stage: targetStageName,
-      deal: {
-        id: dealId,
+  try {
+    await dispatchWorkflowTrigger({
+      type: "deal_stage_changed",
+      orgId: auth.organizationId,
+      payload: {
+        deal_id: dealId,
         stage_id: targetStageId,
         stage: targetStageName,
+        deal: {
+          id: dealId,
+          stage_id: targetStageId,
+          stage: targetStageName,
+        },
       },
-    },
-  }).catch((triggerErr) =>
-    console.error("[crm] dispatchWorkflowTrigger error:", triggerErr)
-  );
+    });
+  } catch (triggerErr) {
+    console.error("[crm] dispatchWorkflowTrigger error:", triggerErr);
+  }
 
   return { status: "success" };
 }

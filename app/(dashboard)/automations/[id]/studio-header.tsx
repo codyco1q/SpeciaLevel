@@ -39,45 +39,45 @@ export function StudioHeader({
   const vb = platform.automations.visualBuilder;
 
   return (
-    <header className="h-16 border-b border-border bg-background px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-30">
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="min-h-14 sm:h-16 border-b border-border bg-background/95 backdrop-blur px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 shrink-0 sticky top-0 z-30 max-w-full overflow-hidden">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         <Button variant="ghost" size="icon" asChild className="size-8 shrink-0">
           <Link href="/automations">
             <ArrowLeft className="size-4 rtl:rotate-180" />
           </Link>
         </Button>
 
-        <div className="h-4 w-px bg-border shrink-0" />
+        <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
 
-        <div className="min-w-0 flex items-center gap-2.5">
-          <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <Zap className="size-4" />
+        <div className="min-w-0 flex items-center gap-2 flex-1">
+          <div className="size-7 sm:size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Zap className="size-3.5 sm:size-4" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <Input
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
               disabled={!canManage}
               placeholder="Workflow name..."
-              className="h-7 text-sm font-semibold border-transparent hover:border-border focus:border-primary px-1.5 -ml-1.5 w-48 sm:w-64"
+              className="h-7 text-xs sm:text-sm font-semibold border-transparent hover:border-border focus:border-primary px-1.5 -ml-1.5 max-w-[160px] sm:max-w-xs md:max-w-sm w-full truncate"
             />
-            <p className="text-[11px] text-muted-foreground truncate hidden sm:block">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate hidden md:block">
               {description || "Click to add a brief workflow summary..."}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Active Switch */}
-        <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-muted/40 border border-border">
+        <div className="flex items-center gap-1.5 px-2 py-0.5 sm:py-1 rounded-lg bg-muted/40 border border-border">
           <Switch
             checked={isActive}
             onCheckedChange={onIsActiveChange}
             disabled={!canManage}
             className="scale-75"
           />
-          <span className="text-xs font-medium text-foreground hidden sm:inline">
+          <span className="text-[11px] sm:text-xs font-medium text-foreground hidden sm:inline">
             {isActive ? vb.active : vb.inactive}
           </span>
         </div>
@@ -87,10 +87,11 @@ export function StudioHeader({
           variant="outline"
           size="sm"
           onClick={onOpenTest}
-          className="gap-1.5 text-xs h-8"
+          className="gap-1.5 text-xs h-7 sm:h-8 px-2 sm:px-3"
+          title={vb.runTest}
         >
           <Play className="size-3.5 fill-current text-primary" />
-          <span className="hidden sm:inline">{vb.runTest}</span>
+          <span className="hidden md:inline">{vb.runTest}</span>
         </Button>
 
         {/* Execution Logs Button */}
@@ -99,10 +100,11 @@ export function StudioHeader({
             variant="outline"
             size="sm"
             onClick={onOpenLogs}
-            className="gap-1.5 text-xs h-8"
+            className="gap-1.5 text-xs h-7 sm:h-8 px-2 sm:px-3"
+            title={vb.logsTab}
           >
             <History className="size-3.5" />
-            <span className="hidden sm:inline">{vb.logsTab}</span>
+            <span className="hidden md:inline">{vb.logsTab}</span>
           </Button>
         )}
 
@@ -112,7 +114,7 @@ export function StudioHeader({
             size="sm"
             onClick={onSave}
             disabled={isPending}
-            className="gap-1.5 text-xs h-8 font-medium shadow-xs"
+            className="gap-1.5 text-xs h-7 sm:h-8 px-2.5 sm:px-3.5 font-medium shadow-xs"
           >
             {isPending ? (
               <Loader2 className="size-3.5 animate-spin" />

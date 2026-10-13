@@ -86,6 +86,7 @@ export function StepConfigDialog({
       ...step,
       name: name.trim() || undefined,
       config,
+      action_config: config,
     });
     onOpenChange(false);
   };
@@ -459,21 +460,68 @@ export function StepConfigDialog({
 
           {step.action_type === "delay" && (
             <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">{vb.delayMinutesLabel}</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={1440}
-                  value={config.duration_minutes || 5}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      duration_minutes: Math.max(1, parseInt(e.target.value, 10) || 1),
-                    })
-                  }
-                  className="text-sm"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Wait Duration</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={config.duration ?? config.duration_minutes ?? 5}
+                    onChange={(e) => {
+                      const dur = Math.max(1, parseInt(e.target.value, 10) || 1);
+                      const unit = config.unit || "minutes";
+                      const mult = unit === "days" ? 1440 : unit === "hours" ? 60 : 1;
+                      setConfig({
+                        ...config,
+                        duration: dur,
+                        unit,
+                        duration_minutes: dur * mult,
+                        delay_minutes: dur * mult,
+                      });
+                    }}
+                    className="text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Time Unit</Label>
+                  <Select
+                    value={config.unit || (config.duration_minutes && config.duration_minutes >= 1440 && config.duration_minutes % 1440 === 0 ? "days" : config.duration_minutes && config.duration_minutes >= 60 && config.duration_minutes % 60 === 0 ? "hours" : "minutes")}
+                    onValueChange={(val) => {
+                      const dur = Number(config.duration) || Number(config.duration_minutes) || 5;
+                      const mult = val === "days" ? 1440 : val === "hours" ? 60 : 1;
+                      setConfig({
+                        ...config,
+                        unit: val,
+                        duration: dur,
+                        duration_minutes: dur * mult,
+                        delay_minutes: dur * mult,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minutes">Minutes</SelectItem>
+                      <SelectItem value="hours">Hours</SelectItem>
+                      <SelectItem value="days">Days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-muted/40 p-3 border border-border/60 text-xs text-muted-foreground flex items-center gap-2">
+                <Clock className="size-4 shrink-0 text-primary" />
+                <p>
+                  Execution will pause for{" "}
+                  <strong className="text-foreground">
+                    {config.duration ?? config.duration_minutes ?? 5}{" "}
+                    {config.unit || "minutes"}
+                  </strong>{" "}
+                  before proceeding to the next workflow step.
+                </p>
               </div>
             </div>
           )}

@@ -25,6 +25,7 @@ import {
   Blocks,
   Settings,
   Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 import { hasPermission } from "@/lib/auth/rbac";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,8 @@ export interface SidebarProps {
   userFullName?: string;
   userEmail?: string;
   locale: Locale;
+  /** True when the user is a super admin / owner. */
+  isSuperAdmin?: boolean;
   /** True when the user's only role is the restricted Client role. */
   isClient?: boolean;
   /** Platform dictionary slice — drives every label in the shell. */
@@ -55,6 +58,7 @@ export default function Sidebar({
   userFullName,
   userEmail,
   locale,
+  isSuperAdmin = false,
   isClient = false,
   platform,
 }: SidebarProps) {
@@ -278,11 +282,36 @@ export default function Sidebar({
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t border-border p-4 space-y-3">
+      <div className="border-t border-border p-4 space-y-2">
+        {isSuperAdmin && (
+          <Link
+            href="/super-admin"
+            className={cn(
+              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              pathname.startsWith("/super-admin")
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <ShieldAlert className="h-4 w-4 text-amber-500" />
+              <span>Super Admin</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              Platform
+            </span>
+          </Link>
+        )}
+
         {canViewSettings ? (
           <Link
             href="/settings"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              pathname === "/settings"
+                ? "bg-primary/10 text-primary font-semibold"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
           >
             <Settings className="h-4 w-4" />
             {t.settings}
