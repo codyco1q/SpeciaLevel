@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { BookmarkPlus, LoaderCircle, Plus, Trash2, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import {
 import { NumberStepperInput } from "./components/number-stepper-input";
 import { InvoiceLineItemRow, type LineItemModel } from "./components/invoice-line-item-row";
 import { ProductFormDialog } from "./product-form-dialog";
-import { createInvoice, createProduct } from "@/lib/actions/invoicing";
+import { createInvoice, createProduct, getProducts } from "@/lib/actions/invoicing";
 import type { InvoiceInput } from "@/lib/validations/invoicing";
 import type { Product } from "@/types/database";
 import { INVOICING_CURRENCIES, estimateTotals, formatCurrency, lineAmount } from "./invoicing-meta";
@@ -119,6 +119,18 @@ function CreateInvoiceForm({
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [targetItemKeyForProduct, setTargetItemKeyForProduct] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setAvailableProducts(products);
+    } else {
+      getProducts().then((res) => {
+        if (res && res.length > 0) {
+          setAvailableProducts(res);
+        }
+      });
+    }
+  }, [products]);
+
   const [contactId, setContactId] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [taxRate, setTaxRate] = useState("0");
@@ -163,8 +175,9 @@ function CreateInvoiceForm({
     const found = availableProducts.find((p) => p.id === productId);
     if (!found) return;
 
+    const titleVal = found.title || (found as any).name || "";
     updateItem(itemKey, {
-      title: found.title,
+      title: titleVal,
       description: found.description ?? "",
       unitPrice: String(found.unit_price ?? "0"),
     });
@@ -175,9 +188,10 @@ function CreateInvoiceForm({
     setAvailableProducts(updated);
     onProductsChange?.(updated);
 
+    const titleVal = newProduct.title || (newProduct as any).name || "";
     if (targetItemKeyForProduct) {
       updateItem(targetItemKeyForProduct, {
-        title: newProduct.title,
+        title: titleVal,
         description: newProduct.description ?? "",
         unitPrice: String(newProduct.unit_price ?? "0"),
       });
@@ -187,7 +201,7 @@ function CreateInvoiceForm({
         ...current,
         {
           key: Math.random().toString(36).slice(2),
-          title: newProduct.title,
+          title: titleVal,
           description: newProduct.description ?? "",
           quantity: "1",
           unitPrice: String(newProduct.unit_price ?? "0"),

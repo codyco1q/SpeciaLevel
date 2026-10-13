@@ -36,12 +36,14 @@ import {
 import { EditInvoiceDialog } from "../edit-invoice-dialog";
 import { ShareInvoiceDialog } from "../share-invoice-dialog";
 import type { InvoiceContactOption } from "../create-invoice-dialog";
+import type { Product } from "@/types/database";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 interface InvoiceDetailDocumentProps {
   invoice: InvoiceRow | null;
   canManage: boolean;
   contacts?: InvoiceContactOption[];
+  products?: Product[];
   organizationName: string;
   platform: Dictionary["platform"];
   locale: Locale;
@@ -61,6 +63,7 @@ export function InvoiceDetailDocument({
   invoice,
   canManage,
   contacts = [],
+  products = [],
   organizationName,
   platform,
   locale,
@@ -378,6 +381,7 @@ export function InvoiceDetailDocument({
           onOpenChange={setEditOpen}
           invoice={invoice}
           contacts={contacts}
+          products={products}
           onSaved={() => router.refresh()}
           platform={platform}
           locale={locale}

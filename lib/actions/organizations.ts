@@ -94,10 +94,32 @@ export async function updateOrganizationSettings(
   }
 
   const admin = createServiceRoleClient();
+
+  const normalizedSlug = parsed.data.slug?.toLowerCase().trim();
+  if (normalizedSlug) {
+    const { data: existingWithSlug } = await admin
+      .from("organizations")
+      .select("id")
+      .eq("slug", normalizedSlug)
+      .neq("id", auth.organizationId)
+      .maybeSingle();
+
+    if (existingWithSlug) {
+      return {
+        status: "error",
+        error: null,
+        fieldErrors: {
+          slug: ["This workspace slug is already taken. Please choose another."],
+        },
+      };
+    }
+  }
+
   const { error } = await admin
     .from("organizations")
     .update({
       name: parsed.data.name,
+      ...(normalizedSlug ? { slug: normalizedSlug } : {}),
       legal_name: parsed.data.legal_name?.trim() || null,
       tax_id: parsed.data.tax_id?.trim() || null,
       website: parsed.data.website?.trim() || null,
@@ -115,6 +137,15 @@ export async function updateOrganizationSettings(
     .eq("id", auth.organizationId);
 
   if (error) {
+    if (error.code === "23505" || error.message.toLowerCase().includes("slug")) {
+      return {
+        status: "error",
+        error: null,
+        fieldErrors: {
+          slug: ["This workspace slug is already taken. Please choose another."],
+        },
+      };
+    }
     return {
       status: "error",
       error: err.updateOrgFailed,

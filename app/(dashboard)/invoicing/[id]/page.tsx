@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/rbac";
 import { getCurrentUserContext } from "@/lib/auth/session";
-import { getInvoiceById } from "@/lib/actions/invoicing";
+import { getInvoiceById, getProducts } from "@/lib/actions/invoicing";
 import { createServerClient } from "@/lib/supabase/server";
 import { getDictionary, getLocale } from "@/lib/i18n/get-dictionary";
 import { InvoiceDetailDocument } from "./invoice-detail-document";
@@ -60,13 +60,17 @@ export default async function InvoiceDetailPage({
   );
 
   let contacts: InvoiceContactOption[] = [];
+  let products: any[] = [];
   if (canManage && userContext.organization?.id) {
     const supabase = await createServerClient();
-    const { data: contactsData } = await supabase
-      .from("crm_contacts")
-      .select("id, name, email, company")
-      .eq("organization_id", userContext.organization.id)
-      .order("name", { ascending: true });
+    const [{ data: contactsData }, prods] = await Promise.all([
+      supabase
+        .from("crm_contacts")
+        .select("id, name, email, company")
+        .eq("organization_id", userContext.organization.id)
+        .order("name", { ascending: true }),
+      getProducts(),
+    ]);
 
     contacts = (contactsData ?? []).map((c) => ({
       id: c.id,
@@ -74,6 +78,7 @@ export default async function InvoiceDetailPage({
       email: c.email,
       company: c.company,
     }));
+    products = prods;
   }
 
   return (
@@ -81,6 +86,7 @@ export default async function InvoiceDetailPage({
       invoice={invoice}
       canManage={canManage}
       contacts={contacts}
+      products={products}
       organizationName={userContext.organization.name}
       platform={platform}
       locale={locale}

@@ -54,7 +54,7 @@ export async function updateProfile(data: {
   }
 
   const supabase = await createServerClient();
-  const { error } = await supabase
+  let { error } = await supabase
     .from("profiles")
     .update({
       full_name: parsed.data.full_name,
@@ -62,6 +62,18 @@ export async function updateProfile(data: {
       timezone: parsed.data.timezone?.trim() ? parsed.data.timezone : null,
     })
     .eq("id", userContext.user.id);
+
+  // Fallback if PostgREST schema cache hasn't reloaded timezone column
+  if (error && (error.message.includes("timezone") || error.code === "PGRST204")) {
+    const fallback = await supabase
+      .from("profiles")
+      .update({
+        full_name: parsed.data.full_name,
+        job_title: parsed.data.job_title?.trim() ? parsed.data.job_title : null,
+      })
+      .eq("id", userContext.user.id);
+    error = fallback.error;
+  }
 
   if (error) {
     return {

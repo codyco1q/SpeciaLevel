@@ -672,11 +672,23 @@ export async function getProducts(): Promise<Product[]> {
   if (!auth.ok) return [];
 
   const supabase = await createServerClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("products")
     .select("id, organization_id, title, description, unit_price, image_url, created_by, created_at, updated_at")
     .eq("organization_id", auth.organizationId)
     .order("created_at", { ascending: false });
+
+  // Graceful fallback if PostgREST schema cache has not reloaded image_url
+  if (error && (error.message.includes("image_url") || error.code === "PGRST204")) {
+    const fallback = await supabase
+      .from("products")
+      .select("id, organization_id, title, description, unit_price, created_by, created_at, updated_at")
+      .eq("organization_id", auth.organizationId)
+      .order("created_at", { ascending: false });
+
+    data = (fallback.data ?? []).map((row) => ({ ...row, image_url: null }));
+    error = fallback.error;
+  }
 
   if (error) {
     console.error("[invoicing] getProducts failed:", error.message);
@@ -774,7 +786,7 @@ export async function createProduct(
   }
 
   const supabase = await createServerClient();
-  const { data: created, error } = await supabase
+  let { data: created, error } = await supabase
     .from("products")
     .insert({
       organization_id: auth.organizationId,
@@ -786,6 +798,24 @@ export async function createProduct(
     })
     .select("id, organization_id, title, description, unit_price, image_url, created_by, created_at, updated_at")
     .single();
+
+  // Graceful fallback if PostgREST schema cache has not reloaded image_url
+  if (error && (error.message.includes("image_url") || error.code === "PGRST204")) {
+    const fallback = await supabase
+      .from("products")
+      .insert({
+        organization_id: auth.organizationId,
+        title: parsed.data.title,
+        description: parsed.data.description ?? "",
+        unit_price: parsed.data.unitPrice,
+        created_by: auth.userId,
+      })
+      .select("id, organization_id, title, description, unit_price, created_by, created_at, updated_at")
+      .single();
+
+    created = fallback.data ? { ...fallback.data, image_url: null } : null;
+    error = fallback.error;
+  }
 
   if (error || !created) {
     console.error("[invoicing] product create failed:", error?.message);
@@ -825,7 +855,7 @@ export async function updateProduct(
   }
 
   const supabase = await createServerClient();
-  const { error } = await supabase
+  let { error } = await supabase
     .from("products")
     .update({
       title: parsed.data.title,
@@ -836,6 +866,22 @@ export async function updateProduct(
     })
     .eq("id", id)
     .eq("organization_id", auth.organizationId);
+
+  // Graceful fallback if PostgREST schema cache has not reloaded image_url
+  if (error && (error.message.includes("image_url") || error.code === "PGRST204")) {
+    const fallback = await supabase
+      .from("products")
+      .update({
+        title: parsed.data.title,
+        description: parsed.data.description ?? "",
+        unit_price: parsed.data.unitPrice,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("organization_id", auth.organizationId);
+
+    error = fallback.error;
+  }
 
   if (error) {
     console.error("[invoicing] product update failed:", error.message);

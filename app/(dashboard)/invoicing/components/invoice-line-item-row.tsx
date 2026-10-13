@@ -75,11 +75,14 @@ export function InvoiceLineItemRow({
                 <SelectItem value="__new__" className="font-medium text-primary">
                   + {tProd?.newProduct ?? "New product"}
                 </SelectItem>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.title} ({formatCurrency(Number(p.unit_price) || 0, currency, locale)})
-                  </SelectItem>
-                ))}
+                {products.map((p) => {
+                  const label = p.title || (p as any).name || "Item";
+                  return (
+                    <SelectItem key={p.id} value={p.id}>
+                      {label} ({formatCurrency(Number(p.unit_price) || 0, currency, locale)})
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           )}

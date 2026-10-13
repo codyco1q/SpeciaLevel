@@ -25,7 +25,6 @@ import {
   Blocks,
   Settings,
   Sparkles,
-  LogOut,
 } from "lucide-react";
 import { hasPermission } from "@/lib/auth/rbac";
 import { cn } from "@/lib/utils";
@@ -279,8 +278,18 @@ export default function Sidebar({
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t border-border p-4">
-        <div className="mb-2 flex items-end gap-2">
+      <div className="border-t border-border p-4 space-y-3">
+        {canViewSettings ? (
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Settings className="h-4 w-4" />
+            {t.settings}
+          </Link>
+        ) : null}
+
+        <div className="flex items-end gap-2 pt-1 border-t border-border/60">
           <div className="min-w-0 flex-1">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               {t.languageLabel}
@@ -300,49 +309,6 @@ export default function Sidebar({
             className="size-8"
           />
         </div>
-
-        <div className="mb-2 mt-3 flex items-center gap-3">
-          {avatarUrl ? (
-            <div className="relative flex size-8 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-full border border-border/80 bg-background shadow-xs">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={avatarUrl}
-                alt={userFullName || "Avatar"}
-                className="size-full aspect-square object-cover"
-              />
-            </div>
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-              {(userFullName || userEmail || t.user).charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">
-              {userFullName || t.user}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {userEmail}
-            </p>
-          </div>
-        </div>
-        {canViewSettings ? (
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Settings className="h-4 w-4" />
-            {t.settings}
-          </Link>
-        ) : null}
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4 rtl:rotate-180" />
-            {t.logout}
-          </button>
-        </form>
       </div>
     </aside>
   );

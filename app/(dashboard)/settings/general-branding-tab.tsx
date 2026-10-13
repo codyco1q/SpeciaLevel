@@ -81,6 +81,7 @@ export function GeneralBrandingTab({
     async (_prevState: SettingsActionState, formData: FormData) => {
       const payload: Partial<OrganizationSettingsValues> = {
         name: String(formData.get("name") ?? "").trim(),
+        slug: String(formData.get("slug") ?? "").trim().toLowerCase(),
         legal_name: String(formData.get("legal_name") ?? "").trim(),
         tax_id: String(formData.get("tax_id") ?? "").trim(),
         website: String(formData.get("website") ?? "").trim(),
@@ -112,6 +113,7 @@ export function GeneralBrandingTab({
     resolver: zodResolver(generalBrandingSchema),
     defaultValues: {
       name: organization.name ?? "",
+      slug: organization.slug ?? "",
       legal_name: organization.legal_name ?? "",
       tax_id: organization.tax_id ?? "",
       website: organization.website ?? "",
@@ -198,6 +200,7 @@ export function GeneralBrandingTab({
   async function onSubmit(values: GeneralBrandingValues) {
     const formData = new FormData();
     formData.set("name", values.name);
+    formData.set("slug", values.slug);
     if (values.legal_name) formData.set("legal_name", values.legal_name);
     if (values.tax_id) formData.set("tax_id", values.tax_id);
     if (values.website) formData.set("website", values.website);
@@ -368,14 +371,25 @@ export function GeneralBrandingTab({
           </div>
 
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="org-slug">{t.orgUrl}</Label>
-            <Input
-              id="org-slug"
-              value={organization.slug}
-              readOnly
-              disabled
-              className="bg-muted/50 text-muted-foreground"
-            />
+            <Label htmlFor="org-slug">{t.orgUrl || "Workspace Slug"}</Label>
+            <div className="relative flex items-center">
+              <span className="absolute start-3 text-xs text-muted-foreground font-mono select-none">
+                /
+              </span>
+              <Input
+                id="org-slug"
+                placeholder="acme-studio"
+                disabled={!canManage}
+                aria-invalid={Boolean(errors.slug || state.fieldErrors?.slug)}
+                className="ps-7 font-mono text-sm"
+                {...register("slug")}
+              />
+            </div>
+            {(errors.slug || state.fieldErrors?.slug) && (
+              <p role="alert" className="text-xs text-destructive">
+                {errors.slug?.message || state.fieldErrors?.slug?.[0]}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">{t.orgUrlHint}</p>
           </div>
         </CardContent>

@@ -5,6 +5,9 @@ export interface OrganizationValidationMessages {
   orgNameMax: string;
   selectTimezone: string;
   invalidEmail?: string;
+  slugMin?: string;
+  slugMax?: string;
+  slugInvalid?: string;
 }
 
 export const DEFAULT_ORG_VALIDATION_MESSAGES: OrganizationValidationMessages = {
@@ -12,6 +15,9 @@ export const DEFAULT_ORG_VALIDATION_MESSAGES: OrganizationValidationMessages = {
   orgNameMax: "Organization name must be 100 characters or fewer.",
   selectTimezone: "Select a timezone.",
   invalidEmail: "Enter a valid email address.",
+  slugMin: "Workspace URL slug must be at least 2 characters.",
+  slugMax: "Workspace URL slug must be 60 characters or fewer.",
+  slugInvalid: "Slug can only contain lowercase letters, numbers, and hyphens.",
 };
 
 export const CURRENCY_OPTIONS = [
@@ -75,6 +81,17 @@ export function createOrganizationSettingsSchema(
       .trim()
       .min(2, messages.orgNameMin)
       .max(100, messages.orgNameMax),
+    slug: z
+      .string()
+      .trim()
+      .min(2, messages.slugMin || DEFAULT_ORG_VALIDATION_MESSAGES.slugMin!)
+      .max(60, messages.slugMax || DEFAULT_ORG_VALIDATION_MESSAGES.slugMax!)
+      .regex(
+        /^[a-z0-9-]+$/,
+        messages.slugInvalid || DEFAULT_ORG_VALIDATION_MESSAGES.slugInvalid!
+      )
+      .optional()
+      .or(z.literal("")),
     legal_name: z.string().trim().max(150).optional().or(z.literal("")),
     tax_id: z.string().trim().max(50).optional().or(z.literal("")),
     website: z.string().trim().max(255).optional().or(z.literal("")),
@@ -159,6 +176,15 @@ export const generalBrandingSchema = z.object({
     .trim()
     .min(2, "Organization name must be at least 2 characters.")
     .max(100),
+  slug: z
+    .string()
+    .trim()
+    .min(2, "Workspace URL slug must be at least 2 characters.")
+    .max(60, "Workspace URL slug must be 60 characters or fewer.")
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Slug can only contain lowercase letters, numbers, and hyphens."
+    ),
   legal_name: z.string().trim().max(150).optional().or(z.literal("")),
   tax_id: z.string().trim().max(50).optional().or(z.literal("")),
   website: z.string().trim().max(255).optional().or(z.literal("")),

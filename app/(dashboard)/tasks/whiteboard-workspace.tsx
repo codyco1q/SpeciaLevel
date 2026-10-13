@@ -154,6 +154,7 @@ export function WhiteboardWorkspace({
   const pendingSaveRef = useRef<{ id: string; elements: WhiteboardElement[]; viewport: WhiteboardViewport } | null>(null);
   const isDraggingRef = useRef(false);
   const isPanningRef = useRef(false);
+  const hasPannedRef = useRef(false);
   const isMarqueeRef = useRef(false);
   const marqueeStartRef = useRef({ x: 0, y: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -500,6 +501,7 @@ export function WhiteboardWorkspace({
     // Right click (button 2) or Middle click (button 1) or Hand tool: Canvas Panning
     if (e.button === 2 || e.button === 1 || tool === "hand") {
       isPanningRef.current = true;
+      hasPannedRef.current = false;
       dragStartRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
@@ -616,7 +618,12 @@ export function WhiteboardWorkspace({
       setTool("select");
       isDraggingRef.current = false;
       return;
-    } else if (tool === "rectangle" || tool === "circle" || tool === "diamond") {
+    } else if (
+      tool === "rectangle" ||
+      tool === "circle" ||
+      tool === "diamond" ||
+      tool === "rounded-rectangle"
+    ) {
       newEl = {
         id,
         type: tool,
@@ -647,7 +654,7 @@ export function WhiteboardWorkspace({
         arrowStyle: "straight",
         startBinding: startBinding || undefined,
       };
-    } else if (tool === "pencil" || tool === "highlighter") {
+    } else if (tool === "pencil" || tool === "highlighter" || tool === "pen") {
       newEl = {
         id,
         type: tool,
@@ -671,8 +678,22 @@ export function WhiteboardWorkspace({
     if (isPanningRef.current) {
       const dx = e.clientX - dragStartRef.current.x;
       const dy = e.clientY - dragStartRef.current.y;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        hasPannedRef.current = true;
+      }
       setViewport((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
       dragStartRef.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    // Drag-to-erase
+    if (tool === "eraser" && e.buttons === 1) {
+      const targetEl = e.target as SVGElement;
+      const elId = targetEl?.getAttribute?.("data-element-id");
+      if (elId) {
+        updateElementsState((prev) => prev.filter((item) => item.id !== elId));
+        setSelectedElementIds((prev) => prev.filter((id) => id !== elId));
+      }
       return;
     }
 
@@ -700,7 +721,12 @@ export function WhiteboardWorkspace({
     // Drawing new shape/arrow/pencil
     if (currentDrawingRef.current) {
       const cur = currentDrawingRef.current;
-      if (cur.type === "rectangle" || cur.type === "circle" || cur.type === "diamond") {
+      if (
+        cur.type === "rectangle" ||
+        cur.type === "circle" ||
+        cur.type === "diamond" ||
+        cur.type === "rounded-rectangle"
+      ) {
         const width = Math.max(10, Math.abs(x - cur.x));
         const height = Math.max(10, Math.abs(y - cur.y));
         const updated = { ...cur, width, height };
@@ -720,7 +746,7 @@ export function WhiteboardWorkspace({
         };
         currentDrawingRef.current = updated;
         setElements((prev) => prev.map((el) => (el.id === cur.id ? updated : el)));
-      } else if (cur.type === "pencil" || cur.type === "highlighter") {
+      } else if (cur.type === "pencil" || cur.type === "highlighter" || cur.type === "pen") {
         const points = [...(cur.points || []), { x, y }];
         const updated = { ...cur, points };
         currentDrawingRef.current = updated;
@@ -766,7 +792,13 @@ export function WhiteboardWorkspace({
   };
 
   const handlePointerUp = () => {
-    isPanningRef.current = false;
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      if (hasPannedRef.current) {
+        hasPannedRef.current = false;
+        triggerAutoSave(elementsRef.current, viewportRef.current);
+      }
+    }
     if (isMarqueeRef.current) {
       isMarqueeRef.current = false;
       setMarqueeBox(null);
@@ -774,10 +806,27 @@ export function WhiteboardWorkspace({
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       if (currentDrawingRef.current) {
-        const finished = currentDrawingRef.current;
+        let finished = currentDrawingRef.current;
         currentDrawingRef.current = null;
+        if (!hasMovedRef.current) {
+          if (finished.type === "rectangle" || finished.type === "rounded-rectangle") {
+            finished = { ...finished, width: 140, height: 90 };
+          } else if (finished.type === "circle") {
+            finished = { ...finished, width: 100, height: 100 };
+          } else if (finished.type === "diamond") {
+            finished = { ...finished, width: 120, height: 100 };
+          } else if (finished.type === "arrow" || finished.type === "line") {
+            finished = { ...finished, endX: finished.x + 120, endY: finished.y };
+          }
+        }
         updateElementsState((prev) => prev.map((el) => (el.id === finished.id ? finished : el)));
-        setTool("select");
+        if (
+          finished.type !== "pencil" &&
+          finished.type !== "highlighter" &&
+          (finished.type as string) !== "pen"
+        ) {
+          setTool("select");
+        }
       } else if (hasMovedRef.current) {
         updateElementsState((prev) => [...prev]);
       }
@@ -807,7 +856,11 @@ export function WhiteboardWorkspace({
           return newViewport;
         });
       } else {
-        setViewport((prev) => ({ ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
+        setViewport((prev) => {
+          const newViewport = { ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+          triggerAutoSave(elementsRef.current, newViewport);
+          return newViewport;
+        });
       }
     };
 
@@ -915,26 +968,30 @@ export function WhiteboardWorkspace({
           e.preventDefault();
           handleDeleteSelected();
         }
-      } else if (e.key === "v" || e.key === "V") {
-        setTool("select");
-      } else if (e.key === "h" || e.key === "H") {
-        setTool("hand");
-      } else if (e.key === "s" || e.key === "S") {
-        setTool("sticky");
-      } else if (e.key === "t" || e.key === "T") {
-        setTool("text");
-      } else if (e.key === "r" || e.key === "R") {
-        setTool("rectangle");
-      } else if (e.key === "o" || e.key === "O") {
-        setTool("circle");
-      } else if (e.key === "d" || e.key === "D") {
-        setTool("diamond");
-      } else if (e.key === "a" || e.key === "A") {
-        setTool("arrow");
-      } else if (e.key === "p" || e.key === "P") {
-        setTool("pencil");
-      } else if (e.key === "e" || e.key === "E") {
-        setTool("eraser");
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key === "v" || e.key === "V") {
+          setTool("select");
+        } else if (e.key === "h" || e.key === "H") {
+          setTool("hand");
+        } else if (e.key === "s" || e.key === "S") {
+          setTool("sticky");
+        } else if (e.key === "t" || e.key === "T") {
+          setTool("text");
+        } else if (e.key === "r" || e.key === "R") {
+          setTool("rectangle");
+        } else if (e.key === "o" || e.key === "O") {
+          setTool("circle");
+        } else if (e.key === "d" || e.key === "D") {
+          setTool("diamond");
+        } else if (e.key === "a" || e.key === "A") {
+          setTool("arrow");
+        } else if (e.key === "l" || e.key === "L") {
+          setTool("line");
+        } else if (e.key === "p" || e.key === "P") {
+          setTool("pencil");
+        } else if (e.key === "e" || e.key === "E") {
+          setTool("eraser");
+        }
       }
     };
 
@@ -1028,7 +1085,8 @@ export function WhiteboardWorkspace({
       );
     }
 
-    if (el.type === "rectangle") {
+    if (el.type === "rectangle" || el.type === "rounded-rectangle") {
+      const isRounded = el.type === "rounded-rectangle";
       return (
         <rect
           key={el.id}
@@ -1036,8 +1094,8 @@ export function WhiteboardWorkspace({
           y={el.y}
           width={el.width || 100}
           height={el.height || 60}
-          rx={6}
-          ry={6}
+          rx={isRounded ? 16 : 6}
+          ry={isRounded ? 16 : 6}
           fill={el.fillColor || "rgba(59, 130, 246, 0.1)"}
           stroke={isSelected ? "#3b82f6" : el.strokeColor || "#3b82f6"}
           strokeWidth={isSelected ? Math.max((el.strokeWidth || 2), 2) + 1 : el.strokeWidth || 2}
@@ -1205,8 +1263,11 @@ export function WhiteboardWorkspace({
 
     if (el.type === "pencil" || el.type === "highlighter" || el.type === "pen") {
       const pts = el.points || [];
-      if (pts.length < 2) return null;
-      const d = `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ");
+      if (pts.length === 0) return null;
+      const d =
+        pts.length === 1
+          ? `M ${pts[0].x} ${pts[0].y} L ${pts[0].x + 0.1} ${pts[0].y}`
+          : `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ");
       return (
         <g key={el.id} data-element-id={el.id} className="cursor-move">
           {/* Thick transparent hit target */}
