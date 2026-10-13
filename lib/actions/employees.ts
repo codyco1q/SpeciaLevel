@@ -129,47 +129,111 @@ export async function createEmployee(
     };
   }
 
+  const email = parsed.data.email.trim().toLowerCase();
+  const fullName = parsed.data.fullName.trim();
   const admin = createServiceRoleClient();
 
-  // 1. Create the Auth user. `email_confirm: true` means they can sign in
-  //    once they set a password (or via a later invite flow).
-  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-    email: parsed.data.email,
-    email_confirm: true,
-    user_metadata: { full_name: parsed.data.fullName },
-  });
+  // Check if an employee with this email already belongs to this organization
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id, organization_id, status")
+    .eq("email", email)
+    .maybeSingle();
 
-  if (authError) {
-    if (authError.message?.toLowerCase().includes("already registered")) {
-      return {
-        status: "error",
-        error: "An account with this email already exists.",
-      };
+  if (
+    existingProfile &&
+    existingProfile.organization_id === auth.organizationId &&
+    existingProfile.status !== "suspended"
+  ) {
+    return {
+      status: "error",
+      error: "An employee with this email already exists in your organization.",
+    };
+  }
+
+  let authUserId: string | null = existingProfile?.id ?? null;
+
+  if (authUserId) {
+    // Account already exists in auth/profiles — update metadata to allow initial password registration
+    await admin.auth.admin.updateUserById(authUserId, {
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        direct_add: true,
+        needs_password_setup: true,
+        organization_id: auth.organizationId,
+      },
+    });
+  } else {
+    // Create new Auth user with direct_add and needs_password_setup metadata
+    const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        direct_add: true,
+        needs_password_setup: true,
+        organization_id: auth.organizationId,
+      },
+    });
+
+    if (authError) {
+      if (
+        authError.code === "email_exists" ||
+        authError.status === 422 ||
+        authError.message?.toLowerCase().includes("already registered") ||
+        authError.message?.toLowerCase().includes("already been registered") ||
+        authError.message?.toLowerCase().includes("already exists")
+      ) {
+        const { data: userList } = await admin.auth.admin.listUsers();
+        const found = userList?.users?.find(
+          (u) => (u.email ?? "").toLowerCase() === email
+        );
+        if (found) {
+          authUserId = found.id;
+          await admin.auth.admin.updateUserById(found.id, {
+            email_confirm: true,
+            user_metadata: {
+              ...found.user_metadata,
+              full_name: fullName,
+              direct_add: true,
+              needs_password_setup: true,
+              organization_id: auth.organizationId,
+            },
+          });
+        }
+      }
+
+      if (!authUserId) {
+        console.error("[employees] createEmployee auth creation failed:", authError);
+        return {
+          status: "error",
+          error:
+            authError.message ||
+            "Could not create the employee account. Please try again.",
+        };
+      }
+    } else if (authUser?.user) {
+      authUserId = authUser.user.id;
     }
+  }
+
+  if (!authUserId) {
     return {
       status: "error",
       error: "Could not create the employee account. Please try again.",
     };
   }
 
-  if (!authUser.user) {
-    return {
-      status: "error",
-      error: "Could not create the employee account. Please try again.",
-    };
-  }
-
-  // 2. Create / update the profile. Since the `on_auth_user_created` trigger
-  //    on auth.users automatically inserts a bare profile row with null organization_id,
-  //    we must upsert onConflict: "id" so the employee profile is reliably populated.
+  // 2. Upsert profile
   const { error: profileError } = await admin
     .from("profiles")
     .upsert(
       {
-        id: authUser.user.id,
+        id: authUserId,
         organization_id: auth.organizationId,
-        full_name: parsed.data.fullName,
-        email: parsed.data.email,
+        full_name: fullName,
+        email,
         job_title: parsed.data.jobTitle || null,
         department_id: parsed.data.departmentId || null,
         status: parsed.data.status,
@@ -179,34 +243,117 @@ export async function createEmployee(
 
   if (profileError) {
     console.error("[employees] profile upsert error:", profileError);
-    // Roll back the auth user so we don't leave a dangling account.
-    await admin.auth.admin.deleteUser(authUser.user.id);
     return {
       status: "error",
       error: "Could not create the employee profile. Please try again.",
     };
   }
 
-  // 3. Assign the role, if one was chosen.
+  // 3. Assign role if provided
   if (parsed.data.roleId) {
-    const { error: roleError } = await admin.from("user_roles").insert({
-      user_id: authUser.user.id,
-      role_id: parsed.data.roleId,
-      organization_id: auth.organizationId,
-    });
+    const { error: roleError } = await admin.from("user_roles").upsert(
+      {
+        user_id: authUserId,
+        role_id: parsed.data.roleId,
+        organization_id: auth.organizationId,
+      },
+      { onConflict: "user_id,role_id" }
+    );
 
     if (roleError) {
-      // Non-fatal: the employee exists, just without a role. Surface a hint.
-      return {
-        status: "error",
-        error:
-          "The employee was created, but their role could not be assigned. Please edit them to assign a role.",
-      };
+      console.warn("[employees] role assignment warning:", roleError);
     }
   }
 
+  // 4. Mark any pending invitation for this employee in this org as accepted
+  await admin
+    .from("organization_invitations")
+    .update({ status: "accepted" })
+    .eq("organization_id", auth.organizationId)
+    .eq("email", email)
+    .eq("status", "pending");
+
   revalidatePath("/employees");
+  revalidatePath("/dashboard");
   return { status: "success" };
+}
+
+/**
+ * Handles the initial login attempt for directly added employees:
+ * validates that their profile belongs to an active workspace, sets their initial
+ * chosen password, and clears the setup flag so they can enter the workspace.
+ */
+export async function handleInitialEmployeeLogin({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}): Promise<
+  | { status: "registered" }
+  | { status: "invalid_credentials" }
+  | { status: "error"; error: string }
+> {
+  const lowerEmail = email.trim().toLowerCase();
+  if (!lowerEmail || !password) {
+    return { status: "invalid_credentials" };
+  }
+
+  const admin = createServiceRoleClient();
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, organization_id, status")
+    .eq("email", lowerEmail)
+    .maybeSingle();
+
+  if (!profile || !profile.organization_id || profile.status === "suspended") {
+    return { status: "invalid_credentials" };
+  }
+
+  const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(profile.id);
+  if (userErr || !userRes?.user) {
+    return { status: "invalid_credentials" };
+  }
+
+  const user = userRes.user;
+
+  const needsPasswordSetup =
+    user.user_metadata?.needs_password_setup === true ||
+    user.user_metadata?.direct_add === true ||
+    !user.user_metadata?.password_registered_at;
+
+  if (!needsPasswordSetup) {
+    return { status: "invalid_credentials" };
+  }
+
+  if (password.length < 8) {
+    return {
+      status: "error",
+      error: "Your password must be at least 8 characters to set up your account.",
+    };
+  }
+
+  const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
+    password,
+    email_confirm: true,
+    user_metadata: {
+      ...user.user_metadata,
+      needs_password_setup: false,
+      direct_add: false,
+      password_registered_at: new Date().toISOString(),
+    },
+  });
+
+  if (updateErr) {
+    console.error("[employees] handleInitialEmployeeLogin error:", updateErr);
+    return {
+      status: "error",
+      error: updateErr.message || "Could not set up your password. Please try again.",
+    };
+  }
+
+  return { status: "registered" };
 }
 
 /**

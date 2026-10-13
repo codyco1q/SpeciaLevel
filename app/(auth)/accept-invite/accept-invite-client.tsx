@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Monogram } from "@/components/brand";
-import { acceptInvitation } from "@/lib/actions/invites";
+import { acceptInvitation, completeInvitation } from "@/lib/actions/invites";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { InvitationDetails } from "@/lib/validations/invites";
 
@@ -81,31 +81,39 @@ export function AcceptInviteClient({
     if (!token || !invitation) return;
     setError(null);
     setNotice(null);
+
+    if (!fullName.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const supabase = createBrowserClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: invitation.email.toLowerCase(),
-        password,
-        options: { data: { full_name: fullName } },
-      });
-      if (signUpError) {
-        if (/already registered/i.test(signUpError.message)) {
-          setError("This email is already registered. Sign in below, then revisit this link.");
-        } else {
-          setError(signUpError.message);
-        }
-        return;
-      }
-      if (!data.session) {
-        setNotice("Account created! Check your inbox to confirm your email, then sign in and revisit this link.");
-        return;
-      }
-      const result = await acceptInvitation(token, fullName);
+      const result = await completeInvitation(token, fullName, password);
       if (result.status !== "success") {
         setError(result.error ?? "Could not complete your invitation.");
         return;
       }
+
+      const supabase = createBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invitation.email.toLowerCase(),
+        password,
+      });
+
+      if (signInError) {
+        // If client session sign-in had a problem, redirect to login page
+        sessionStorage.removeItem("uplevel.pendingInviteToken");
+        router.push("/login");
+        return;
+      }
+
+      sessionStorage.removeItem("uplevel.pendingInviteToken");
       router.refresh();
       router.push("/dashboard");
     } catch (err) {
@@ -362,7 +370,7 @@ function SignUpState({
                 className="w-full"
                 size="lg"
               >
-                {loading ? "Creating account…" : "Create account & join"}
+                {loading ? "Setting up account…" : "Set password & enter workspace"}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}

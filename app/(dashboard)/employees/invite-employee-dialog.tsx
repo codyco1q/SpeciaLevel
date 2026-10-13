@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useActionState } from "react";
+import { useEffect, useState, useActionState } from "react";
 import { Controller, useWatch, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Loader2, UserPlus } from "lucide-react";
+import { Check, CheckCircle2, Copy, Loader2, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -56,14 +56,31 @@ export function InviteEmployeeDialog({
 }: InviteEmployeeDialogProps) {
   const t = platform.settings;
   const tEmp = platform.employees;
+  const [createdInvite, setCreatedInvite] = useState<{
+    inviteUrl?: string;
+    token?: string;
+    email?: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const [state, formAction, isPending] = useActionState(
-    async (_prevState: InviteActionState, formData: FormData) =>
-      createInvitation({
-        email: String(formData.get("email") ?? ""),
+    async (_prevState: InviteActionState, formData: FormData) => {
+      const email = String(formData.get("email") ?? "");
+      const res = await createInvitation({
+        email,
         role_id: String(formData.get("role_id") ?? ""),
         department_id: String(formData.get("department_id") ?? "") || undefined,
         contact_id: String(formData.get("contact_id") ?? "") || undefined,
-      }),
+      });
+      if (res.status === "success") {
+        setCreatedInvite({
+          inviteUrl: res.inviteUrl,
+          token: res.token,
+          email,
+        });
+      }
+      return res;
+    },
     initialInviteActionState
   );
 
@@ -91,16 +108,10 @@ export function InviteEmployeeDialog({
   useEffect(() => {
     if (open) {
       reset({ email: "", role_id: "", department_id: "", contact_id: "" });
+      setCreatedInvite(null);
+      setCopied(false);
     }
   }, [open, reset]);
-
-  useEffect(() => {
-    if (state.status === "success") {
-      reset({ email: "", role_id: "", department_id: "", contact_id: "" });
-      const timeout = setTimeout(() => onOpenChange(false), 600);
-      return () => clearTimeout(timeout);
-    }
-  }, [state.status, reset, onOpenChange]);
 
   const emailError = errors.email?.message ?? state.fieldErrors?.email?.[0];
   const roleError = errors.role_id?.message ?? state.fieldErrors?.role_id?.[0];
@@ -116,6 +127,77 @@ export function InviteEmployeeDialog({
     if (values.department_id) formData.set("department_id", values.department_id);
     if (values.contact_id) formData.set("contact_id", values.contact_id);
     formAction(formData);
+  }
+
+  if (createdInvite) {
+    const fullInviteUrl =
+      createdInvite.inviteUrl ||
+      `${typeof window !== "undefined" ? window.location.origin : ""}/accept-invite?token=${createdInvite.token}`;
+
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+              <CheckCircle2 className="size-6" />
+            </div>
+            <DialogTitle className="text-center">Invitation Link Created</DialogTitle>
+            <DialogDescription className="text-center">
+              An organization-scoped invitation link is ready for{" "}
+              <span className="font-medium text-foreground">{createdInvite.email}</span>.
+              Share this link with them so they can confirm their details, set their password, and enter your workspace.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={fullInviteUrl}
+                className="font-mono text-xs"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(fullInviteUrl);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  } catch {
+                    // ignore
+                  }
+                }}
+              >
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copied ? platform.common.copied || "Copied" : platform.common.copyLink || "Copy"}
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Done
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setCreatedInvite(null);
+                setCopied(false);
+                reset({ email: "", role_id: "", department_id: "", contact_id: "" });
+              }}
+            >
+              Invite another
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (

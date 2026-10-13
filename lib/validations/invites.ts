@@ -74,6 +74,8 @@ export interface InviteActionState {
   status: "idle" | "success" | "error";
   error?: string | null;
   fieldErrors?: Record<string, string[] | undefined>;
+  inviteUrl?: string;
+  token?: string;
 }
 
 export const initialInviteActionState: InviteActionState = {

@@ -275,8 +275,10 @@ export function TasksView({
 
   const boardRef = useRef<HTMLDivElement>(null);
 
-  const handleTaskDeleted = (deletedTaskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== deletedTaskId));
+  const handleTaskDeleted = (deletedTaskId?: string) => {
+    if (deletedTaskId) {
+      setTasks((prev) => prev.filter((t) => t.id !== deletedTaskId));
+    }
     setDetailTask(null);
     void handleRefreshTasks();
   };

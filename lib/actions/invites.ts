@@ -53,8 +53,10 @@ function getCanonicalSiteUrl(): string {
 }
 
 /**
- * Dispatches an invitation email using the primary outbound auth mailer
- * and outbound notification webhooks.
+ * Dispatches an invitation notification using the outbound notification webhook.
+ * The invite link directs the recipient directly to the organization-scoped
+ * acceptance page (/accept-invite?token=<token>) where they confirm details
+ * and set their password.
  */
 async function dispatchInvitationEmail({
   email,
@@ -71,45 +73,8 @@ async function dispatchInvitationEmail({
 }) {
   const siteUrl = getCanonicalSiteUrl();
   const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${token}`;
-  const admin = createServiceRoleClient();
 
-  // 1. Primary outbound mailer dispatch via Supabase Auth
-  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: inviteRedirectUrl,
-    data: {
-      organization_id: organizationId,
-      invite_token: token,
-      role_name: roleName,
-      org_name: orgName,
-    },
-  });
-
-  if (inviteError) {
-    console.warn("[invites] Supabase inviteUserByEmail primary attempt:", inviteError.message);
-    try {
-      // Fallback link generation if the user is already registered in auth or needs recovery
-      const { error: linkErr } = await admin.auth.admin.generateLink({
-        type: "invite",
-        email,
-        options: {
-          redirectTo: inviteRedirectUrl,
-          data: { organization_id: organizationId, invite_token: token },
-        },
-      });
-
-      if (linkErr) {
-        await admin.auth.admin.generateLink({
-          type: "magiclink",
-          email,
-          options: { redirectTo: inviteRedirectUrl },
-        });
-      }
-    } catch (genErr) {
-      console.warn("[invites] Fallback invite link generation:", genErr);
-    }
-  }
-
-  // 2. Outbound webhook notification for external email deliverability
+  // Outbound webhook notification for external email deliverability
   const webhookUrl = process.env.ORGANIZATION_WEBHOOK_URL || process.env.MARKETING_LEADS_WEBHOOK_URL;
   if (webhookUrl) {
     try {
@@ -338,7 +303,10 @@ export async function createInvitation(data: {
     };
   }
 
-  // Deliver the invitation email using the primary outbound mail setup.
+  const siteUrl = getCanonicalSiteUrl();
+  const inviteUrl = `${siteUrl}/accept-invite?token=${token}`;
+
+  // Deliver the invitation email using the outbound webhook notification setup.
   await dispatchInvitationEmail({
     email,
     token,
@@ -349,7 +317,7 @@ export async function createInvitation(data: {
 
   revalidatePath("/employees");
   revalidatePath("/settings");
-  return { status: "success" };
+  return { status: "success", inviteUrl, token };
 }
 
 /**
@@ -411,6 +379,9 @@ export async function resendInvitation(
   const orgRecord = invite.organization as unknown as { name?: string } | { name?: string }[] | null;
   const orgName = Array.isArray(orgRecord) ? orgRecord[0]?.name : orgRecord?.name;
 
+  const siteUrl = getCanonicalSiteUrl();
+  const inviteUrl = `${siteUrl}/accept-invite?token=${invite.token}`;
+
   await dispatchInvitationEmail({
     email: invite.email,
     token: invite.token,
@@ -421,7 +392,7 @@ export async function resendInvitation(
 
   revalidatePath("/employees");
   revalidatePath("/settings");
-  return { status: "success" };
+  return { status: "success", inviteUrl, token: invite.token };
 }
 
 /**
@@ -697,6 +668,221 @@ export async function acceptInvitation(
   // Bust cached layout data so /dashboard renders the member's new org,
   // role, and permissions on the very next request.
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/", "layout");
+
+  return { status: "success" };
+}
+
+/**
+ * Public invitation acceptance:
+ * Verifies the invitation token, sets up the Auth user with their chosen password,
+ * marks email as confirmed, connects their profile to the organization with their
+ * assigned role, and marks the invitation accepted.
+ */
+export async function completeInvitation(
+  token: string,
+  fullName: string,
+  password: string
+): Promise<AcceptInvitationResult> {
+  if (!token || token.length > 512) {
+    return {
+      status: "error",
+      error: "This invitation link is invalid or has expired.",
+    };
+  }
+
+  const trimmedName = fullName?.trim();
+  if (!trimmedName) {
+    return {
+      status: "error",
+      error: "Full name is required.",
+    };
+  }
+
+  if (!password || password.length < 8) {
+    return {
+      status: "error",
+      error: "Password must be at least 8 characters.",
+    };
+  }
+
+  const admin = createServiceRoleClient();
+
+  const { data: invitation, error: fetchError } = await admin
+    .from("organization_invitations")
+    .select(
+      "id, email, organization_id, role_id, department_id, contact_id, status, expires_at"
+    )
+    .eq("token", token)
+    .maybeSingle();
+
+  if (fetchError || !invitation) {
+    return {
+      status: "error",
+      error: "This invitation link is invalid or has expired.",
+    };
+  }
+
+  if (invitation.status === "accepted") {
+    return {
+      status: "error",
+      error: "This invitation has already been accepted.",
+    };
+  }
+
+  if (invitation.status !== "pending") {
+    return {
+      status: "error",
+      error: "This invitation link is invalid or has expired.",
+    };
+  }
+
+  if (new Date(invitation.expires_at).getTime() <= Date.now()) {
+    return {
+      status: "error",
+      error: "This invitation link has expired.",
+    };
+  }
+
+  const email = invitation.email.toLowerCase();
+
+  // Find or create the Auth user
+  let authUserId: string | null = null;
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existingProfile) {
+    authUserId = existingProfile.id;
+    const { error: updateErr } = await admin.auth.admin.updateUserById(existingProfile.id, {
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: trimmedName,
+        needs_password_setup: false,
+        organization_id: invitation.organization_id,
+      },
+    });
+    if (updateErr) {
+      console.error("[invites] Error updating auth user in completeInvitation:", updateErr);
+      return {
+        status: "error",
+        error: updateErr.message || "Could not set up account credentials.",
+      };
+    }
+  } else {
+    const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: trimmedName,
+        needs_password_setup: false,
+        organization_id: invitation.organization_id,
+      },
+    });
+
+    if (createErr) {
+      if (
+        createErr.code === "email_exists" ||
+        createErr.status === 422 ||
+        createErr.message?.toLowerCase().includes("already registered") ||
+        createErr.message?.toLowerCase().includes("already been registered") ||
+        createErr.message?.toLowerCase().includes("already exists")
+      ) {
+        const { data: userList } = await admin.auth.admin.listUsers();
+        const found = userList?.users?.find(
+          (u) => (u.email ?? "").toLowerCase() === email
+        );
+        if (found) {
+          authUserId = found.id;
+          await admin.auth.admin.updateUserById(found.id, {
+            password,
+            email_confirm: true,
+            user_metadata: {
+              ...found.user_metadata,
+              full_name: trimmedName,
+              needs_password_setup: false,
+              organization_id: invitation.organization_id,
+            },
+          });
+        }
+      }
+
+      if (!authUserId) {
+        console.error("[invites] createUser error in completeInvitation:", createErr);
+        return {
+          status: "error",
+          error: createErr.message || "Could not create user account.",
+        };
+      }
+    } else if (newUser?.user) {
+      authUserId = newUser.user.id;
+    }
+  }
+
+  if (!authUserId) {
+    return {
+      status: "error",
+      error: "Could not process user account.",
+    };
+  }
+
+  // 1. Link / update profile
+  const { error: profileError } = await admin
+    .from("profiles")
+    .upsert(
+      {
+        id: authUserId,
+        organization_id: invitation.organization_id,
+        department_id: invitation.department_id,
+        contact_id: invitation.contact_id,
+        full_name: trimmedName,
+        email,
+        status: "active",
+      },
+      { onConflict: "id" }
+    );
+
+  if (profileError) {
+    console.error("[invites] completeInvitation profile upsert error:", profileError);
+    return {
+      status: "error",
+      error: "Could not link account to organization.",
+    };
+  }
+
+  // 2. Assign role
+  const { error: roleError } = await admin
+    .from("user_roles")
+    .upsert(
+      {
+        user_id: authUserId,
+        role_id: invitation.role_id,
+        organization_id: invitation.organization_id,
+      },
+      { onConflict: "user_id,role_id" }
+    );
+
+  if (roleError) {
+    console.error("[invites] completeInvitation role assign error:", roleError);
+    return {
+      status: "error",
+      error: "Could not assign role permissions.",
+    };
+  }
+
+  // 3. Mark invitation accepted
+  await admin
+    .from("organization_invitations")
+    .update({ status: "accepted" })
+    .eq("id", invitation.id)
+    .eq("status", "pending");
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/employees");
   revalidatePath("/", "layout");
 
   return { status: "success" };

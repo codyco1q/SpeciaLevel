@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { acceptInvitation } from "@/lib/actions/invites";
+import { acceptInvitation, completeInvitation } from "@/lib/actions/invites";
 import { createBrowserClient } from "@/lib/supabase/client";
 import {
   PENDING_INVITE_STORAGE_KEY,
@@ -45,11 +45,45 @@ export default function SignupForm({
     setLoading(true);
 
     try {
-      // Persist the invite token before signing up so the invite can still be
-      // finalized afterwards: after email confirmation + sign-in, or when the
-      // email is already registered and the user signs in (login page).
       if (invitation) {
-        sessionStorage.setItem(PENDING_INVITE_STORAGE_KEY, invitation.token);
+        if (!fullName.trim()) {
+          setError("Please enter your full name.");
+          setLoading(false);
+          return;
+        }
+
+        if (password.length < 8) {
+          setError("Password must be at least 8 characters.");
+          setLoading(false);
+          return;
+        }
+
+        const result = await completeInvitation(invitation.token, fullName, password);
+        if (result.status !== "success") {
+          setError(
+            result.error ??
+              "Could not complete your invitation. Please try again."
+          );
+          setLoading(false);
+          return;
+        }
+
+        const supabase = createBrowserClient();
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: joinedEmail.toLowerCase(),
+          password,
+        });
+
+        if (signInError) {
+          sessionStorage.removeItem(PENDING_INVITE_STORAGE_KEY);
+          router.push("/login");
+          return;
+        }
+
+        sessionStorage.removeItem(PENDING_INVITE_STORAGE_KEY);
+        router.refresh();
+        router.push("/dashboard");
+        return;
       }
 
       const supabase = createBrowserClient();
@@ -62,9 +96,9 @@ export default function SignupForm({
       });
 
       if (signUpError) {
-        if (invitation && /already registered/i.test(signUpError.message)) {
+        if (/already registered|already in use|email_exists/i.test(signUpError.message)) {
           setError(
-            `${signUpError.message} Sign in and your invitation will be applied automatically.`
+            "This email is already registered. If you are an employee, sign in at the login page to set up your password and access your workspace."
           );
         } else {
           setError(signUpError.message);
@@ -72,29 +106,10 @@ export default function SignupForm({
         return;
       }
 
-      // Email confirmation is enabled — no session yet. The pending token is
-      // already in sessionStorage; the login page finalizes it after sign-in.
       if (!data.session) {
         setNotice(
-          "Account created. Check your inbox to confirm your email, then sign in to accept your invitation."
+          "Account created. Check your inbox to confirm your email, then sign in to access your workspace."
         );
-        return;
-      }
-
-      if (invitation) {
-        const result = await acceptInvitation(invitation.token, fullName);
-        sessionStorage.removeItem(PENDING_INVITE_STORAGE_KEY);
-        if (result.status !== "success") {
-          setError(
-            result.error ??
-              "Could not complete your invitation. Please try again."
-          );
-          return;
-        }
-        // Invited signups skip onboarding entirely — the profile now points
-        // at the inviting org with the assigned role/permissions.
-        router.refresh();
-        router.push("/dashboard");
         return;
       }
 

@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { acceptInvitation } from "@/lib/actions/invites";
+import { handleInitialEmployeeLogin } from "@/lib/actions/employees";
 import { Monogram } from "@/components/brand";
 import { PENDING_INVITE_STORAGE_KEY } from "@/lib/validations/invites";
 
@@ -28,10 +29,25 @@ export default function LoginPage() {
       });
 
       if (signInError) {
-        // Supabase covers invalid credentials, unconfirmed email, etc.
-        // Always surface the message — never fail silently.
-        setError(signInError.message);
-        return;
+        // If credentials failed, check if this is a directly added employee's
+        // initial login attempt where their chosen password needs to be registered.
+        const initialResult = await handleInitialEmployeeLogin({ email, password });
+        if (initialResult.status === "registered") {
+          const retry = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (retry.error) {
+            setError(retry.error.message);
+            return;
+          }
+        } else if (initialResult.status === "error") {
+          setError(initialResult.error);
+          return;
+        } else {
+          setError(signInError.message);
+          return;
+        }
       }
 
       // If the user signed up through an invitation link and then confirmed
@@ -120,6 +136,9 @@ export default function LoginPage() {
               required
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
+            <p className="text-xs text-muted-foreground">
+              Directly added employees can set their password on their first login.
+            </p>
           </div>
 
           {error && (
