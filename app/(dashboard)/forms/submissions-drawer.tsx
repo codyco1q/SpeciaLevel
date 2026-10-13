@@ -25,8 +25,10 @@ import {
   User,
   Briefcase,
   ExternalLink,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
+import { SubmissionDetailDialog } from "./submission-detail-dialog";
 import { getFormSubmissions } from "@/lib/actions/forms";
 import type { FormRow, FormSubmissionRow } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
@@ -47,6 +49,8 @@ export function SubmissionsDialog({
   locale,
 }: SubmissionsDialogProps) {
   const [submissions, setSubmissions] = useState<FormSubmissionRow[]>([]);
+  const [selectedSub, setSelectedSub] = useState<FormSubmissionRow | null>(null);
+
   const [isPending, startTransition] = useTransition();
 
   const t = dictionary.submissions;
@@ -148,6 +152,7 @@ export function SubmissionsDialog({
                     <TableHead>{t.submissionData}</TableHead>
                     <TableHead className="w-[180px]">{t.contactLinked}</TableHead>
                     <TableHead className="w-[180px]">{t.dealLinked}</TableHead>
+                    <TableHead className="w-[110px] text-end">{locale === "ar" ? "الإجراءات" : "Actions"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -239,6 +244,17 @@ export function SubmissionsDialog({
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
+                      <TableCell className="align-top text-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => setSelectedSub(sub)}
+                        >
+                          <Eye className="size-3 text-muted-foreground" />
+                          <span>{locale === "ar" ? "تفاصيل" : "Details"}</span>
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -247,6 +263,15 @@ export function SubmissionsDialog({
           )}
         </div>
       </DialogContent>
+
+      <SubmissionDetailDialog
+        submission={selectedSub}
+        form={form}
+        open={Boolean(selectedSub)}
+        onOpenChange={(open) => !open && setSelectedSub(null)}
+        platform={dictionary}
+        locale={locale}
+      />
     </Dialog>
   );
 }

@@ -7,8 +7,8 @@ interface ChatPageProps {
 export default async function ChatRedirectPage({ searchParams }: ChatPageProps) {
   const params = await searchParams;
   if (params?.channel) {
-    redirect(`/messaging?tab=internal&channel=${encodeURIComponent(params.channel)}`);
+    redirect(`/messaging/internal/${encodeURIComponent(params.channel)}`);
   }
-  redirect("/messaging?tab=internal");
+  redirect("/messaging/internal");
 }
 

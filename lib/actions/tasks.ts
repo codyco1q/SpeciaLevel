@@ -15,6 +15,8 @@ import {
 } from "@/lib/validations/tasks";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import type { RichTextBlock, TaskPriority, TaskStage, TaskStatus } from "@/types/database";
+import { dispatchNotification } from "@/lib/services/notifications";
+
 
 export interface TaskPerson {
   id: string;
@@ -458,6 +460,17 @@ export async function createTask(
     };
   }
 
+  if (parsed.data.assignedTo && inserted?.id) {
+    void dispatchNotification({
+      orgId: auth.organizationId,
+      userId: parsed.data.assignedTo,
+      title: "New Task Assigned",
+      message: `You have been assigned to task "${parsed.data.title}"`,
+      type: "info",
+      link: `/tasks?taskId=${inserted.id}`,
+    });
+  }
+
   revalidatePath("/tasks");
   return { status: "success", taskId: inserted?.id };
 }
@@ -616,6 +629,28 @@ export async function updateTask(
   if (parsed.data.orderIndex !== undefined) updates.order_index = parsed.data.orderIndex;
 
   const supabase = await createServerClient();
+
+  // If task is being assigned or reassigned to a user, notify the assignee
+  if (parsed.data.assignedTo) {
+    const { data: existingTask } = await supabase
+      .from("tasks")
+      .select("assigned_to, title")
+      .eq("id", taskId)
+      .eq("organization_id", auth.organizationId)
+      .maybeSingle();
+
+    if (existingTask && existingTask.assigned_to !== parsed.data.assignedTo) {
+      const taskTitle = parsed.data.title || existingTask.title || "Task";
+      void dispatchNotification({
+        orgId: auth.organizationId,
+        userId: parsed.data.assignedTo,
+        title: "Task Assigned",
+        message: `You have been assigned to task "${taskTitle}"`,
+        type: "info",
+        link: `/tasks?taskId=${taskId}`,
+      });
+    }
+  }
 
   const { data: updated, error } = await supabase
     .from("tasks")

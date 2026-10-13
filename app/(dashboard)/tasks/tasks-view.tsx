@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import {
   BookOpen,
   CalendarDays,
@@ -60,6 +60,8 @@ import { TaskDetailDialog } from "./task-detail-dialog";
 import { ManageTaskStagesDialog } from "./manage-task-stages-dialog";
 import { DocsWorkspace } from "./docs-workspace";
 import { WhiteboardWorkspace } from "./whiteboard-workspace";
+import { BoardFloatingScrollbar } from "@/components/board-floating-scrollbar";
+
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 
 export type TaskActiveView = "board" | "list" | "docs" | "whiteboard";
@@ -270,6 +272,14 @@ export function TasksView({
   const [dialogInitialStageId, setDialogInitialStageId] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<TaskRow | null>(null);
   const [manageStagesOpen, setManageStagesOpen] = useState(false);
+
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  const handleTaskDeleted = (deletedTaskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== deletedTaskId));
+    setDetailTask(null);
+    void handleRefreshTasks();
+  };
 
   const [isPending, startTransition] = useTransition();
 
@@ -541,8 +551,12 @@ export function TasksView({
 
       {/* VIEW 1: DYNAMIC BOARD (KANBAN) */}
       {activeView === "board" && (
-        <div className="grid grid-flow-col auto-cols-[280px] sm:auto-cols-[310px] gap-4 overflow-x-auto pb-6 items-start">
-          {stages.map((stage) => {
+        <div className="space-y-2">
+          <div
+            ref={boardRef}
+            className="grid grid-flow-col auto-cols-[280px] sm:auto-cols-[310px] gap-4 overflow-x-auto pb-4 items-start"
+          >
+            {stages.map((stage) => {
             const stageTasks = filteredTasks.filter((t) => (t.stageId ? t.stageId === stage.id : t.status === stage.name.toLowerCase()));
 
             return (
@@ -657,6 +671,8 @@ export function TasksView({
               </div>
             );
           })}
+          </div>
+          <BoardFloatingScrollbar boardRef={boardRef} />
         </div>
       )}
 
@@ -881,7 +897,7 @@ export function TasksView({
         onStageChange={handleStageChange}
         onStatusChange={handleStatusChange}
         onEditRequest={handleOpenEditTask}
-        onDeleted={handleRefreshTasks}
+        onDeleted={handleTaskDeleted}
         onOpenWhiteboard={(boardId) => {
           setDetailTask(null);
           setSelectedWhiteboardId(boardId);

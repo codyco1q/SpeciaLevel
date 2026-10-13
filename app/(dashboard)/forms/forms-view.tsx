@@ -15,6 +15,7 @@ import {
   LoaderCircle,
   TrendingUp,
   FileSpreadsheet,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,8 @@ import {
 } from "@/components/ui/dialog";
 import { FormBuilderDialog } from "./form-builder-dialog";
 import { SubmissionsDialog } from "./submissions-drawer";
+import { SubmissionDetailDialog } from "./submission-detail-dialog";
+
 import { deleteForm, toggleFormPublished } from "@/lib/actions/forms";
 import type { FormRow, FormSubmissionRow } from "@/lib/validations/forms";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
@@ -71,6 +74,8 @@ export function FormsView({
   const [activeTab, setActiveTab] = useState<"forms" | "submissions">("forms");
   const [deletingForm, setDeletingForm] = useState<FormRow | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<FormSubmissionRow | null>(null);
+
   const [isPending, startTransition] = useTransition();
 
   const t = dictionary;
@@ -257,10 +262,14 @@ export function FormsView({
                         {new Date(sub.createdAt).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/contacts/${sub.contact?.id || ''}`} className="text-xs">
-                            View details
-                          </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedSubmission(sub)}
+                          className="text-xs gap-1.5 h-8"
+                        >
+                          <Eye className="size-3.5 text-muted-foreground" />
+                          <span>{locale === "ar" ? "عرض التفاصيل" : "View Details"}</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -467,6 +476,16 @@ export function FormsView({
       />
 
 
+
+      {/* Submission Payload Details View */}
+      <SubmissionDetailDialog
+        submission={selectedSubmission}
+        form={forms.find((f) => f.id === selectedSubmission?.formId)}
+        open={Boolean(selectedSubmission)}
+        onOpenChange={(open) => !open && setSelectedSubmission(null)}
+        platform={dictionary}
+        locale={locale}
+      />
 
       {/* Delete Confirmation Alert */}
       <DeleteConfirmationDialog

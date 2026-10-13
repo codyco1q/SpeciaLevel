@@ -57,7 +57,7 @@ interface TaskDetailDialogProps {
   onStageChange?: (taskId: string, stageId: string) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onEditRequest: (task: TaskRow) => void;
-  onDeleted: () => void;
+  onDeleted: (taskId?: string) => void;
   onOpenWhiteboard?: (whiteboardId: string) => void;
   onWhiteboardCreated?: (board: WorkspaceWhiteboard) => void;
   /** Localized copy + formatters for the current render. */
@@ -206,7 +206,11 @@ export function TaskDetailDialog({
       setConfirmingDelete(false);
       return;
     }
-    onDeleted();
+    const deletedId = task.id;
+    setDeleting(false);
+    setConfirmingDelete(false);
+    onOpenChange(false);
+    onDeleted(deletedId);
   }
 
   const handleOpenChange = (next: boolean) => {

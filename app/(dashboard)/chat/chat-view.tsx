@@ -16,6 +16,8 @@ import {
   Settings,
   Smile,
   X,
+  Reply,
+  CornerDownRight,
 } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import {
   getMessages,
   sendMessage,
+  toggleMessageReaction,
   type ChatChannelRow,
   type ChatMessageRow,
   type ChatPerson,
@@ -60,6 +63,8 @@ interface RealtimeMessageRow {
   channel_id: string;
   user_id: string;
   content: string;
+  reply_to_id?: string | null;
+  reactions?: Record<string, string[]> | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,6 +132,8 @@ export function ChatView({
   const [composer, setComposer] = useState("");
   const [sendPending, setSendPending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ChatMessageRow | null>(null);
+
   const [feedLoading, setFeedLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -197,13 +204,26 @@ export function ChatView({
         channelId: row.channel_id,
         userId: row.user_id,
         content: row.content,
+        replyToId: row.reply_to_id ?? null,
+        reactions: (row.reactions as Record<string, string[]>) ?? {},
         createdAt: row.created_at,
         user: cached ?? { id: row.user_id, fullName: null, email: null },
       };
 
-      setMessages((prev) =>
-        prev.some((m) => m.id === base.id) ? prev : [...prev, base]
-      );
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === base.id)) return prev;
+        if (base.replyToId) {
+          const parent = prev.find((m) => m.id === base.replyToId);
+          if (parent) {
+            base.replyTo = {
+              id: parent.id,
+              content: parent.content,
+              user: parent.user,
+            };
+          }
+        }
+        return [...prev, base];
+      });
 
       if (!cached) {
         void refreshPerson(row.user_id);
@@ -212,7 +232,7 @@ export function ChatView({
     [refreshPerson]
   );
 
-  // Live listener: append INSERT events & broadcast attachments for the active channel.
+  // Live listener: append INSERT events, sync UPDATE events (reactions), & broadcast attachments
   useEffect(() => {
     if (!activeChannelId) return;
 
@@ -260,6 +280,26 @@ export function ChatView({
           }
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_messages",
+          filter: `channel_id=eq.${activeChannelId}`,
+        },
+        (payload) => {
+          const row = payload.new as RealtimeMessageRow;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === row.id
+                ? { ...m, reactions: (row.reactions as Record<string, string[]>) ?? {} }
+                : m
+            )
+          );
+        }
+      )
+
       .on("broadcast", { event: "chat_attachment_uploaded" }, (payload) => {
         const data = (payload.payload ?? {}) as {
           messageId?: string;
@@ -402,21 +442,56 @@ export function ChatView({
     if (channelId === activeChannelId) return;
     setActiveChannelId(channelId);
     setSendError(null);
+    setReplyingTo(null);
     setFeedLoading(true);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `/messaging/internal/${encodeURIComponent(channelId)}`);
+    }
     const result = await getMessages(channelId);
     setMessages(result ?? []);
     setFeedLoading(false);
   }
 
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const currentReactions = { ...(m.reactions || {}) };
+        const userList = new Set<string>(currentReactions[emoji] || []);
+        if (userList.has(currentUser.id)) {
+          userList.delete(currentUser.id);
+        } else {
+          userList.add(currentUser.id);
+        }
+        if (userList.size === 0) {
+          delete currentReactions[emoji];
+        } else {
+          currentReactions[emoji] = Array.from(userList);
+        }
+        return { ...m, reactions: currentReactions };
+      })
+    );
+
+    const res = await toggleMessageReaction(messageId, emoji);
+    if (res.status === "success") {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, reactions: res.reactions } : m
+        )
+      );
+    }
+  };
+
   async function handleSend() {
-    if (!activeChannelId || sendPending) return;
+    if (!activeChannelId) return;
 
     const files = pendingFiles;
     const content = composer.trim() || (files.length > 0 ? t.fileOnlyBody : "");
     if (!content && files.length === 0) return;
 
-    // Optimistic send: append a local copy immediately, then swap it for
-    // the persisted row (realtime will also echo it — deduped by id).
+    const replyTarget = replyingTo;
+
+    // Optimistic send: append a local copy immediately
     const optimisticId = `optimistic-${Date.now()}`;
     const optimistic: ChatMessageRow = {
       id: optimisticId,
@@ -425,6 +500,15 @@ export function ChatView({
       content,
       createdAt: new Date().toISOString(),
       user: currentUser,
+      replyToId: replyTarget?.id || null,
+      replyTo: replyTarget
+        ? {
+            id: replyTarget.id,
+            content: replyTarget.content,
+            user: replyTarget.user,
+          }
+        : null,
+      reactions: {},
     };
 
     // Instant optimistic attachments for the sender so file cards render immediately
@@ -454,16 +538,15 @@ export function ChatView({
     }
 
     setComposer("");
+    setReplyingTo(null);
     setMentionQuery(null);
     setPendingFiles([]);
     setSendError(null);
     setSendPending(true);
     setMessages((prev) => [...prev, optimistic]);
-    setTimeout(() => {
-      composerRef.current?.focus();
-    }, 0);
+    composerRef.current?.focus();
 
-    const result = await sendMessage(activeChannelId, content);
+    const result = await sendMessage(activeChannelId, content, replyTarget?.id);
 
     if (result.status === "error") {
       setSendError(result.error ?? t.errors.sendFailed);
@@ -474,11 +557,10 @@ export function ChatView({
         return next;
       });
       setComposer(content);
+      setReplyingTo(replyTarget);
       setPendingFiles(files);
       setSendPending(false);
-      setTimeout(() => {
-        composerRef.current?.focus();
-      }, 0);
+      composerRef.current?.focus();
       return;
     }
 
@@ -803,6 +885,12 @@ export function ChatView({
                   attachments={attachmentMap[message.id]}
                   onRequestAttachments={requestAttachments}
                   onMentionUser={handleMentionUser}
+                  onReply={(msg) => {
+                    setReplyingTo(msg);
+                    composerRef.current?.focus();
+                  }}
+                  onToggleReaction={handleToggleReaction}
+                  currentUserId={currentUser.id}
                   platform={platform}
                   locale={locale}
                 />
@@ -844,6 +932,30 @@ export function ChatView({
                   <span className="truncate">{item.label}</span>
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Replying banner */}
+          {replyingTo && (
+            <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/70 border border-border px-3 py-1.5 text-xs">
+              <div className="flex items-center gap-1.5 truncate">
+                <Reply className="size-3.5 text-primary shrink-0" />
+                <span className="font-semibold text-primary">
+                  {locale === "ar" ? "الرد على" : "Replying to"}{" "}
+                  {replyingTo.user.fullName ?? replyingTo.user.email ?? "User"}:
+                </span>
+                <span className="truncate text-muted-foreground italic">
+                  &ldquo;{replyingTo.content}&rdquo;
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="p-1 text-muted-foreground hover:text-foreground rounded-md cursor-pointer"
+                title="Cancel reply"
+              >
+                <X className="size-3.5" />
+              </button>
             </div>
           )}
 
@@ -890,7 +1002,7 @@ export function ChatView({
                 }
                 rows={2}
                 maxLength={2000}
-                disabled={!activeChannel || sendPending}
+                disabled={!activeChannel}
                 className="min-h-0 flex-1"
               />
               <DropdownMenu>
@@ -1003,6 +1115,9 @@ interface MessageBubbleProps {
   attachments?: AttachmentRow[];
   onRequestAttachments?: (messageId: string) => void;
   onMentionUser?: (name: string) => void;
+  onReply?: (message: ChatMessageRow) => void;
+  onToggleReaction?: (messageId: string, emoji: string) => void;
+  currentUserId: string;
   /** Localized copy + formatters for the current render. */
   platform: Dictionary["platform"];
   locale: Locale;
@@ -1032,6 +1147,9 @@ function MessageBubble({
   attachments,
   onRequestAttachments,
   onMentionUser,
+  onReply,
+  onToggleReaction,
+  currentUserId,
   platform,
   locale,
 }: MessageBubbleProps) {
@@ -1053,7 +1171,39 @@ function MessageBubble({
     message.content.trim() === "ملفات مرفقة";
 
   return (
-    <div className={cn("flex items-start gap-3", isOwn && "flex-row-reverse")}>
+    <div className={cn("group relative flex items-start gap-3", isOwn && "flex-row-reverse")}>
+      {/* Quick reaction & reply action bar */}
+      <div
+        className={cn(
+          "absolute -top-3 z-10 hidden group-hover:flex items-center gap-0.5 rounded-full border border-border/80 bg-popover px-1.5 py-0.5 shadow-sm backdrop-blur-xs transition-all",
+          isOwn ? "left-11" : "right-11"
+        )}
+      >
+        {["👍", "❤️", "😂", "🎉", "🚀"].map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => onToggleReaction?.(message.id, emoji)}
+            className="size-6 flex items-center justify-center text-xs rounded-full hover:bg-muted transition-transform active:scale-125 cursor-pointer"
+            title={`React ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+        {onReply && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6 rounded-full text-muted-foreground hover:text-foreground"
+            onClick={() => onReply(message)}
+            title="Reply"
+          >
+            <Reply className="size-3" />
+          </Button>
+        )}
+      </div>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -1156,6 +1306,24 @@ function MessageBubble({
           </time>
         </div>
 
+        {/* Reply quote banner if replying to a message */}
+        {message.replyTo && (
+          <div
+            className={cn(
+              "mt-1 mb-0.5 inline-flex items-center gap-1.5 rounded-md border-s-2 border-primary bg-muted/60 px-2 py-1 text-xs text-muted-foreground max-w-sm",
+              isOwn ? "ms-auto text-right" : "text-left"
+            )}
+          >
+            <CornerDownRight className="size-3 text-primary shrink-0 rtl:rotate-90" />
+            <span className="font-semibold text-foreground truncate">
+              {message.replyTo.user.fullName ?? message.replyTo.user.email ?? "User"}:
+            </span>
+            <span className="truncate italic">
+              {message.replyTo.content}
+            </span>
+          </div>
+        )}
+
         {/* When a message consists purely of file attachments, render file cards directly without raw text */}
         {isFileOnly ? (
           (!attachments || attachments.length === 0) && (
@@ -1206,6 +1374,32 @@ function MessageBubble({
                 <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </a>
             ))}
+          </div>
+        )}
+
+        {/* Reaction pills */}
+        {message.reactions && Object.keys(message.reactions).length > 0 && (
+          <div className={cn("mt-1.5 flex flex-wrap gap-1", isOwn && "justify-end")}>
+            {Object.entries(message.reactions).map(([emoji, userIds]) => {
+              const hasReacted = userIds.includes(currentUserId);
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onToggleReaction?.(message.id, emoji)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors hover:scale-105 active:scale-95 cursor-pointer",
+                    hasReacted
+                      ? "border-primary/40 bg-primary/10 text-primary font-medium"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  )}
+                  title={`${userIds.length} reaction${userIds.length > 1 ? "s" : ""}`}
+                >
+                  <span>{emoji}</span>
+                  <span className="text-[11px] font-mono">{userIds.length}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

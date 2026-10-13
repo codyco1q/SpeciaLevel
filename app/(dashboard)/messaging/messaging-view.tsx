@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { MessageSquare, Users, MessagesSquare } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatView } from "@/app/(dashboard)/chat/chat-view";
@@ -47,10 +48,20 @@ export function MessagingView({
   platform,
   locale,
 }: MessagingViewProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>(
     initialTab === "internal" ? "internal" : "external"
   );
   const t = platform.messaging;
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    if (val === "internal") {
+      router.push(activeChannelId ? `/messaging/internal/${activeChannelId}` : "/messaging/internal");
+    } else {
+      router.push("/messaging");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -63,7 +74,7 @@ export function MessagingView({
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
           <TabsList className="grid grid-cols-2 w-[340px]">
             <TabsTrigger value="external" className="gap-2 text-xs">
               <MessagesSquare className="h-3.5 w-3.5" />

@@ -151,7 +151,35 @@ export function PublicFormView({
     if (!validate()) return;
 
     startTransition(async () => {
-      const res = await submitPublicForm(form.slug, formData);
+      const payload: Record<string, unknown> = { ...formData };
+      if (typeof window !== "undefined") {
+        const sp = new URLSearchParams(window.location.search);
+        const utmSource = sp.get("utm_source");
+        const utmMedium = sp.get("utm_medium");
+        const utmCampaign = sp.get("utm_campaign");
+        const utmTerm = sp.get("utm_term");
+        const utmContent = sp.get("utm_content");
+
+        const tracking: Record<string, string> = {};
+        if (utmSource) tracking.utm_source = utmSource;
+        if (utmMedium) tracking.utm_medium = utmMedium;
+        if (utmCampaign) tracking.utm_campaign = utmCampaign;
+        if (utmTerm) tracking.utm_term = utmTerm;
+        if (utmContent) tracking.utm_content = utmContent;
+        if (document.referrer) tracking.referrer = document.referrer;
+        tracking.page_url = window.location.href;
+
+        if (Object.keys(tracking).length > 0) {
+          payload._tracking = tracking;
+          if (utmSource && !payload.utm_source) payload.utm_source = utmSource;
+          if (utmMedium && !payload.utm_medium) payload.utm_medium = utmMedium;
+          if (utmCampaign && !payload.utm_campaign) payload.utm_campaign = utmCampaign;
+          if (utmTerm && !payload.utm_term) payload.utm_term = utmTerm;
+          if (utmContent && !payload.utm_content) payload.utm_content = utmContent;
+        }
+      }
+
+      const res = await submitPublicForm(form.slug, payload);
       if (res.status === "success") {
         if (res.redirectUrl) {
           window.location.href = res.redirectUrl;

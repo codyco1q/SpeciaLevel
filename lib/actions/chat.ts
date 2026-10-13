@@ -59,6 +59,13 @@ export interface ChatMessageRow {
   content: string;
   createdAt: string;
   user: ChatPerson;
+  replyToId?: string | null;
+  replyTo?: {
+    id: string;
+    content: string;
+    user: ChatPerson;
+  } | null;
+  reactions?: Record<string, string[]>;
 }
 
 export interface ChannelMemberInfo {
@@ -76,6 +83,8 @@ interface ChatMessageJoinRow {
   channel_id: string;
   user_id: string;
   content: string;
+  reply_to_id?: string | null;
+  reactions?: Record<string, string[]> | null;
   created_at: string;
   user:
     | { id: string; full_name: string | null; email: string | null; avatar_url?: string | null }
@@ -194,6 +203,8 @@ function toChatMessageRow(row: ChatMessageJoinRow): ChatMessageRow {
     userId: row.user_id,
     content: row.content,
     createdAt: row.created_at,
+    replyToId: row.reply_to_id ?? null,
+    reactions: (row.reactions as Record<string, string[]>) ?? {},
     user: sender
       ? {
           id: sender.id,
@@ -262,7 +273,8 @@ export async function getMessages(
 
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let rows: ChatMessageJoinRow[] = [];
+  const primaryQuery = await supabase
     .from("chat_messages")
     .select(
       `
@@ -270,6 +282,8 @@ export async function getMessages(
         channel_id,
         user_id,
         content,
+        reply_to_id,
+        reactions,
         created_at,
         user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)
       `
@@ -279,12 +293,49 @@ export async function getMessages(
     .order("created_at", { ascending: true })
     .limit(safeLimit);
 
-  if (error || !data) {
-    console.error("[chat] messages fetch failed:", error?.message ?? "no rows");
-    return null;
+  if (primaryQuery.error) {
+    const fallbackQuery = await supabase
+      .from("chat_messages")
+      .select(
+        `
+          id,
+          channel_id,
+          user_id,
+          content,
+          created_at,
+          user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)
+        `
+      )
+      .eq("organization_id", organizationId)
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: true })
+      .limit(safeLimit);
+
+    if (fallbackQuery.error || !fallbackQuery.data) {
+      console.error("[chat] messages fetch failed:", fallbackQuery.error?.message ?? "no rows");
+      return null;
+    }
+    rows = fallbackQuery.data as unknown as ChatMessageJoinRow[];
+  } else {
+    rows = (primaryQuery.data as unknown as ChatMessageJoinRow[]) ?? [];
   }
 
-  return (data as unknown as ChatMessageJoinRow[]).map(toChatMessageRow);
+  const messageList = rows.map(toChatMessageRow);
+
+  // Link up replyTo references
+  const msgMap = new Map(messageList.map((m) => [m.id, m]));
+  for (const msg of messageList) {
+    if (msg.replyToId && msgMap.has(msg.replyToId)) {
+      const parent = msgMap.get(msg.replyToId)!;
+      msg.replyTo = {
+        id: parent.id,
+        content: parent.content,
+        user: parent.user,
+      };
+    }
+  }
+
+  return messageList;
 }
 
 export type SendMessageResult =
@@ -371,7 +422,7 @@ async function handleMessageMentions({
           title: `${senderName} mentioned you in #${channelName}`,
           message: previewMessage,
           type: "info",
-          link: `/messaging?tab=internal&channel=${channelId}`,
+          link: `/messaging/internal/${channelId}`,
         });
       }
     }
@@ -404,7 +455,7 @@ async function handleMessageMentions({
               title: `${senderName} mentioned @${dept.name} in #${channelName}`,
               message: previewMessage,
               type: "info",
-              link: `/messaging?tab=internal&channel=${channelId}`,
+              link: `/messaging/internal/${channelId}`,
             });
           }
         }
@@ -435,7 +486,7 @@ async function handleMessageMentions({
           title: `${senderName} mentioned @channel in #${channelName}`,
           message: previewMessage,
           type: "info",
-          link: `/messaging?tab=internal&channel=${channelId}`,
+          link: `/messaging/internal/${channelId}`,
         });
       }
     }
@@ -452,7 +503,8 @@ async function handleMessageMentions({
  */
 export async function sendMessage(
   channelId: string,
-  content: string
+  content: string,
+  replyToId?: string | null
 ): Promise<SendMessageResult> {
   const auth = await requireChatPermission("chat.view");
   if (!auth.ok) return { status: "error", error: auth.error };
@@ -489,20 +541,27 @@ export async function sendMessage(
     };
   }
 
+  const insertPayload: Record<string, unknown> = {
+    organization_id: auth.organizationId,
+    channel_id: channelId,
+    user_id: auth.userId,
+    content: parsed.data,
+  };
+  if (replyToId) {
+    insertPayload.reply_to_id = replyToId;
+  }
+
   const { data: inserted, error } = await supabase
     .from("chat_messages")
-    .insert({
-      organization_id: auth.organizationId,
-      channel_id: channelId,
-      user_id: auth.userId,
-      content: parsed.data,
-    })
+    .insert(insertPayload)
     .select(
       `
         id,
         channel_id,
         user_id,
         content,
+        reply_to_id,
+        reactions,
         created_at,
         user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)
       `
@@ -510,10 +569,38 @@ export async function sendMessage(
     .single();
 
   if (error) {
-    console.error("[chat] send failed:", error.message);
+    // If reply_to_id column is not yet present, fallback to basic insert
+    const fallbackRes = await supabase
+      .from("chat_messages")
+      .insert({
+        organization_id: auth.organizationId,
+        channel_id: channelId,
+        user_id: auth.userId,
+        content: parsed.data,
+      })
+      .select(
+        `
+          id,
+          channel_id,
+          user_id,
+          content,
+          created_at,
+          user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)
+        `
+      )
+      .single();
+
+    if (fallbackRes.error || !fallbackRes.data) {
+      console.error("[chat] send failed:", error.message);
+      return {
+        status: "error",
+        error: err.sendFailed,
+      };
+    }
+
     return {
-      status: "error",
-      error: err.sendFailed,
+      status: "success",
+      message: toChatMessageRow(fallbackRes.data as unknown as ChatMessageJoinRow),
     };
   }
 
@@ -528,10 +615,90 @@ export async function sendMessage(
     content: parsed.data,
   });
 
+  const messageRow = toChatMessageRow(inserted as unknown as ChatMessageJoinRow);
+
+  // If replied to, fetch parent message details
+  if (replyToId) {
+    const { data: parent } = await supabase
+      .from("chat_messages")
+      .select(`id, content, user:profiles!fk_chat_messages_user(id, full_name, email, avatar_url)`)
+      .eq("id", replyToId)
+      .maybeSingle();
+
+    if (parent) {
+      const pUser = Array.isArray(parent.user) ? parent.user[0] : parent.user;
+      messageRow.replyTo = {
+        id: parent.id,
+        content: parent.content,
+        user: pUser
+          ? {
+              id: pUser.id,
+              fullName: pUser.full_name ?? null,
+              email: pUser.email ?? null,
+              avatarUrl: pUser.avatar_url ?? null,
+            }
+          : { id: "", fullName: null, email: null, avatarUrl: null },
+      };
+    }
+  }
+
   return {
     status: "success",
-    message: toChatMessageRow(inserted as unknown as ChatMessageJoinRow),
+    message: messageRow,
   };
+}
+
+/**
+ * Toggles an emoji reaction on a message for the current authenticated user.
+ */
+export async function toggleMessageReaction(
+  messageId: string,
+  emoji: string
+): Promise<{ status: "success"; reactions: Record<string, string[]> } | { status: "error"; error: string }> {
+  const auth = await requireChatPermission("chat.view");
+  if (!auth.ok) return { status: "error", error: auth.error };
+
+  const supabase = await createServerClient();
+  const { data: msg, error: fetchErr } = await supabase
+    .from("chat_messages")
+    .select("id, reactions")
+    .eq("id", messageId)
+    .eq("organization_id", auth.organizationId)
+    .maybeSingle();
+
+  if (fetchErr || !msg) {
+    return { status: "error", error: "Message not found" };
+  }
+
+  const currentReactions: Record<string, string[]> = (msg.reactions as Record<string, string[]>) || {};
+  const userList = new Set<string>(currentReactions[emoji] || []);
+
+  if (userList.has(auth.userId)) {
+    userList.delete(auth.userId);
+  } else {
+    userList.add(auth.userId);
+  }
+
+  const updatedReactions = { ...currentReactions };
+  if (userList.size === 0) {
+    delete updatedReactions[emoji];
+  } else {
+    updatedReactions[emoji] = Array.from(userList);
+  }
+
+  const { error: updateErr } = await supabase
+    .from("chat_messages")
+    .update({ reactions: updatedReactions })
+    .eq("id", messageId)
+    .eq("organization_id", auth.organizationId);
+
+  if (updateErr) {
+    console.error("[chat] reaction update failed:", updateErr.message);
+    return { status: "error", error: "Failed to update reaction" };
+  }
+
+  revalidatePath("/messaging");
+  return { status: "success", reactions: updatedReactions };
 }
 
 export type CreateChannelResult =

@@ -359,6 +359,8 @@ export interface ChatMessage {
   channel_id: string;
   user_id: string;
   content: string;
+  reply_to_id?: string | null;
+  reactions?: Record<string, string[]>;
   created_at: string;
   updated_at: string;
 }

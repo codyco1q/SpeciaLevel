@@ -104,6 +104,56 @@ html[lang="ar"] *::after {
 }
 
 
+/* ------------------------------------------------------------------
+ * Global Native Scrollbars & Horizontal Scrolling
+ * Calibrated native scrollbars for wide interfaces, tables, and boards
+ * ------------------------------------------------------------------ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.705 0.015 286.067 / 0.45) transparent;
+}
+
+.dark * {
+  scrollbar-color: oklch(0.552 0.016 285.938 / 0.45) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: oklch(0.705 0.015 286.067 / 0.35);
+  border-radius: 9999px;
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0.705 0.015 286.067 / 0.65);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: oklch(0.552 0.016 285.938 / 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0.552 0.016 285.938 / 0.7);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+
 
 /* ------------------------------------------------------------------
  * Print — dedicated print-friendly invoice view (/invoicing/[id]).
