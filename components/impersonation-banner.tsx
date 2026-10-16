@@ -15,7 +15,7 @@ export function ImpersonationBanner({ orgName }: ImpersonationBannerProps) {
   const handleExit = () => {
     startTransition(async () => {
       await stopTenantImpersonation();
-      window.location.href = "/super-admin";
+      window.location.href = "/admin";
     });
   };
 

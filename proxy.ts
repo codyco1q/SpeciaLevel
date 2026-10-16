@@ -48,6 +48,19 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Platform admin routes manage their own isolated admin auth session.
+  // Never redirect admin routes to tenant /login or /dashboard.
+  const isAdminRoute =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/super-admin" ||
+    pathname.startsWith("/super-admin/") ||
+    pathname.startsWith("/api/admin/");
+
+  if (isAdminRoute) {
+    return response;
+  }
+
   // Public routes that don't require auth.
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");

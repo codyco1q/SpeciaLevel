@@ -2,6 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { ADMIN_COOKIE_NAME, verifyAdminToken } from "@/lib/auth/admin";
 import type {
   Profile,
   Organization,
@@ -115,32 +116,29 @@ export const getCurrentUserContext = cache(
     let isImpersonating = false;
     let impersonatedOrgName: string | undefined;
 
-    // Check for super admin impersonation session
-    const isOwnerOrSuperAdmin = roles.some(
-      (r) => r.key === "owner" || r.key === "super_admin"
-    );
+    // Check for platform admin impersonation session (only valid admin session can impersonate)
+    try {
+      const cookieStore = await cookies();
+      const adminToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+      const isAdmin = verifyAdminToken(adminToken).valid;
+      const impersonateOrgId = cookieStore.get("impersonate_org_id")?.value;
 
-    if (isOwnerOrSuperAdmin) {
-      try {
-        const cookieStore = await cookies();
-        const impersonateOrgId = cookieStore.get("impersonate_org_id")?.value;
-        if (impersonateOrgId) {
-          const adminSupabase = createServiceRoleClient();
-          const { data: impOrg } = await adminSupabase
-            .from("organizations")
-            .select("*")
-            .eq("id", impersonateOrgId)
-            .maybeSingle();
+      if (isAdmin && impersonateOrgId) {
+        const adminSupabase = createServiceRoleClient();
+        const { data: impOrg } = await adminSupabase
+          .from("organizations")
+          .select("*")
+          .eq("id", impersonateOrgId)
+          .maybeSingle();
 
-          if (impOrg) {
-            organization = impOrg as Organization;
-            isImpersonating = true;
-            impersonatedOrgName = impOrg.name;
-          }
+        if (impOrg) {
+          organization = impOrg as Organization;
+          isImpersonating = true;
+          impersonatedOrgName = impOrg.name;
         }
-      } catch {
-        // Fallback silently if cookies cannot be accessed
       }
+    } catch {
+      // Fallback silently if cookies cannot be accessed
     }
 
     return {

@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { getCurrentUserContext } from "@/lib/auth/session";
-import { hasPermission } from "@/lib/auth/rbac";
+import { getAdminSession } from "@/lib/auth/admin";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
   updateTenantStatusSchema,
@@ -28,39 +27,27 @@ export async function checkIsSuperAdmin(): Promise<{
   email?: string;
   error?: string;
 }> {
-  const userContext = await getCurrentUserContext();
-  if (!userContext) {
-    return { isSuperAdmin: false, error: "Not authenticated" };
+  // Super Admin is strictly restricted to platform admins authenticated via admin credentials.
+  // Normal organization roles (owners/admins) and tenant permissions do NOT grant platform admin rights.
+  const adminSession = await getAdminSession();
+  if (adminSession.isAuthenticated) {
+    return {
+      isSuperAdmin: true,
+      userId: "platform_admin",
+      email: adminSession.username || "admin",
+    };
   }
 
-  const isOwner = userContext.roles.some((r) => r.key === "owner" || r.key === "super_admin");
-  const hasPerm =
-    hasPermission("super_admin.view", userContext.permissions) ||
-    hasPermission("super_admin.manage", userContext.permissions) ||
-    hasPermission("settings.manage", userContext.permissions);
-
-  const envSuperAdmins = (process.env.SUPER_ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
-  const isEmailSuperAdmin =
-    envSuperAdmins.length > 0 &&
-    envSuperAdmins.includes((userContext.user.email || "").toLowerCase());
-
-  const isSuperAdmin = isOwner || hasPerm || isEmailSuperAdmin;
-
   return {
-    isSuperAdmin,
-    userId: userContext.user.id,
-    email: userContext.user.email,
+    isSuperAdmin: false,
+    error: "Unauthorized: Platform Admin credentials required.",
   };
 }
 
 async function requireSuperAdmin() {
   const auth = await checkIsSuperAdmin();
-  if (!auth.isSuperAdmin || !auth.userId) {
-    throw new Error("Unauthorized: Super Admin access required.");
+  if (!auth.isSuperAdmin) {
+    throw new Error("Unauthorized: Platform Admin access required.");
   }
   return auth;
 }
@@ -75,8 +62,8 @@ export async function logSuperAdminAction(params: {
     const auth = await checkIsSuperAdmin();
     const supabase = createServiceRoleClient();
     await supabase.from("super_admin_audit_logs").insert({
-      admin_user_id: auth.userId || null,
-      admin_email: auth.email || null,
+      admin_user_id: null,
+      admin_email: auth.email || "admin",
       target_organization_id: params.targetOrgId,
       target_organization_name: params.targetOrgName || null,
       action: params.action,
@@ -377,6 +364,7 @@ export async function updateTenantStatus(input: {
     details: { status, reason },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/super-admin");
   revalidatePath("/dashboard");
   return { status: "success" };
@@ -430,6 +418,7 @@ export async function updateTenantPlan(input: {
     details: { planTier, mrr: calculatedMrr, subscriptionStatus },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/super-admin");
   return { status: "success" };
 }
@@ -477,6 +466,7 @@ export async function toggleTenantFeatureFlag(input: {
     details: { flagKey, isEnabled },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/super-admin");
   return { status: "success" };
 }
@@ -523,6 +513,7 @@ export async function toggleTenantModule(input: {
     details: { moduleKey, isEnabled },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/super-admin");
   revalidatePath("/modules");
   return { status: "success" };
@@ -562,6 +553,7 @@ export async function saveTenantSupportNotes(input: {
     details: { hasNotes: !!notes },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/super-admin");
   return { status: "success" };
 }

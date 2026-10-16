@@ -2,6 +2,6 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminPageRedirect() {
-  redirect("/super-admin");
+export default function SuperAdminRedirectPage() {
+  redirect("/admin");
 }

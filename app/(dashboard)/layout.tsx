@@ -41,11 +41,6 @@ export default async function DashboardLayout({
     userContext.roles.length > 0 &&
     userContext.roles.every((role) => role.key === "client");
 
-  const isSuperAdmin =
-    userContext.roles.some((r) => r.key === "owner" || r.key === "super_admin") ||
-    hasPermission("super_admin.view", userContext.permissions) ||
-    hasPermission("settings.manage", userContext.permissions);
-
   return (
     <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible flex-col">
       {userContext.isImpersonating && (
@@ -62,7 +57,6 @@ export default async function DashboardLayout({
           userFullName={userContext.profile.full_name ?? undefined}
           userEmail={userContext.user.email}
           locale={locale}
-          isSuperAdmin={isSuperAdmin}
           isClient={isClient}
           platform={dict.platform}
         />

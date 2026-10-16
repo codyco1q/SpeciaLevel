@@ -283,26 +283,6 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="border-t border-border p-4 space-y-2">
-        {isSuperAdmin && (
-          <Link
-            href="/super-admin"
-            className={cn(
-              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              pathname.startsWith("/super-admin")
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="h-4 w-4 text-amber-500" />
-              <span>Super Admin</span>
-            </div>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">
-              Platform
-            </span>
-          </Link>
-        )}
-
         {canViewSettings ? (
           <Link
             href="/settings"
