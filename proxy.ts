@@ -62,17 +62,19 @@ export async function proxy(request: NextRequest) {
   }
 
   // Public routes that don't require auth.
+  const isInviteRoute = pathname.startsWith("/accept-invite");
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
   const isPublicRoute =
     isAuthRoute ||
+    isInviteRoute ||
     pathname.startsWith("/pay/") ||
     pathname.startsWith("/f/") ||
     pathname.startsWith("/book/") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api/public/");
 
-  // Allow auth pages and public routes to load; redirect all other unauthenticated routes to /login.
+  // Allow auth pages, invitation acceptance, and public routes to load; redirect all other unauthenticated routes to /login.
   if (!user && !isPublicRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";

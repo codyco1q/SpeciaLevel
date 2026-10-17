@@ -10,6 +10,8 @@ import {
   type EmployeeFormValues,
 } from "@/lib/validations/employees";
 import { z } from "zod";
+import { completeInvitation } from "@/lib/actions/invites";
+
 
 /**
  * Employee (profile) management server actions.
@@ -278,17 +280,149 @@ export async function createEmployee(
   return { status: "success" };
 }
 
+
+export type AccountPendingStatusResult =
+  | {
+      status: "pending_invite";
+      organizationName: string;
+      roleName: string;
+      token: string;
+      suggestedName?: string;
+    }
+  | {
+      status: "needs_password_setup";
+      organizationName: string;
+      fullName?: string;
+    }
+  | {
+      status: "normal";
+    };
+
 /**
- * Handles the initial login attempt for directly added employees:
- * validates that their profile belongs to an active workspace, sets their initial
- * chosen password, and clears the setup flag so they can enter the workspace.
+ * Checks if an email corresponds to an active pending organization invitation
+ * or a directly added account that requires its initial password setup.
+ * Used by the login flow to proactively detect invited and setup accounts.
+ */
+export async function checkAccountPendingStatus(
+  email: string
+): Promise<AccountPendingStatusResult> {
+  const lowerEmail = email.trim().toLowerCase();
+  if (!lowerEmail || !lowerEmail.includes("@")) {
+    return { status: "normal" };
+  }
+
+  const admin = createServiceRoleClient();
+
+  // 1. Check for active pending invitation in organization_invitations
+  const { data: invite } = await admin
+    .from("organization_invitations")
+    .select(`
+      id,
+      token,
+      organization_id,
+      role_id,
+      contact_id,
+      status,
+      expires_at,
+      organization:organizations!fk_organization_invitations_organization(name),
+      role:roles!fk_organization_invitations_role(name)
+    `)
+    .ilike("email", lowerEmail)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (invite) {
+    let suggestedName: string | undefined;
+    if (invite.contact_id) {
+      const { data: contact } = await admin
+        .from("crm_contacts")
+        .select("name, first_name, last_name")
+        .eq("id", invite.contact_id)
+        .maybeSingle();
+      if (contact?.name) suggestedName = contact.name.trim();
+      else if (contact?.first_name) {
+        suggestedName = `${contact.first_name} ${contact.last_name || ""}`.trim();
+      }
+    }
+
+    const orgRecord = invite.organization as unknown as { name?: string } | { name?: string }[] | null;
+    const orgName = Array.isArray(orgRecord) ? orgRecord[0]?.name : orgRecord?.name;
+    const roleRecord = invite.role as unknown as { name?: string } | { name?: string }[] | null;
+    const roleName = Array.isArray(roleRecord) ? roleRecord[0]?.name : roleRecord?.name;
+
+    return {
+      status: "pending_invite",
+      organizationName: orgName || "your workspace",
+      roleName: roleName || "team member",
+      token: invite.token,
+      suggestedName,
+    };
+  }
+
+  // 2. Check for directly added employees in profiles / auth
+  const { data: profile } = await admin
+    .from("profiles")
+    .select(`
+      id,
+      organization_id,
+      full_name,
+      status,
+      organization:organizations(name)
+    `)
+    .ilike("email", lowerEmail)
+    .maybeSingle();
+
+  if (profile && profile.organization_id && profile.status !== "suspended") {
+    let { data: userRes } = await admin.auth.admin.getUserById(profile.id);
+    let user = userRes?.user;
+
+    if (!user) {
+      const { data: listData } = await admin.auth.admin.listUsers({ perPage: 1000 });
+      user =
+        listData?.users?.find(
+          (u) => (u.email ?? "").toLowerCase() === lowerEmail
+        ) ?? null;
+    }
+
+    if (user) {
+      const needsPasswordSetup =
+        user.user_metadata?.needs_password_setup === true ||
+        user.user_metadata?.direct_add === true ||
+        !user.user_metadata?.password_registered_at;
+
+      if (needsPasswordSetup) {
+        const orgRecord = profile.organization as unknown as { name?: string } | { name?: string }[] | null;
+        const orgName = Array.isArray(orgRecord) ? orgRecord[0]?.name : orgRecord?.name;
+        return {
+          status: "needs_password_setup",
+          organizationName: orgName || "your workspace",
+          fullName: profile.full_name || user.user_metadata?.full_name,
+        };
+      }
+    }
+  }
+
+  return { status: "normal" };
+}
+
+/**
+ * Handles the initial login attempt for directly added or invited employees:
+ * 1. If the user has an active pending invitation, completes the invitation using
+ *    their chosen password (and name), marks the invite accepted, and links them.
+ * 2. If the user was directly added to an organization without a password, registers
+ *    their chosen password, confirms email, and clears the setup flag.
  */
 export async function handleInitialEmployeeLogin({
   email,
   password,
+  fullName,
 }: {
   email: string;
   password: string;
+  fullName?: string;
 }): Promise<
   | { status: "registered" }
   | { status: "invalid_credentials" }
@@ -301,59 +435,177 @@ export async function handleInitialEmployeeLogin({
 
   const admin = createServiceRoleClient();
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("id, organization_id, status")
-    .eq("email", lowerEmail)
+  // 1. Check if the user has an active pending invitation
+  const { data: pendingInvite } = await admin
+    .from("organization_invitations")
+    .select(
+      "id, token, organization_id, role_id, department_id, contact_id, status, expires_at"
+    )
+    .ilike("email", lowerEmail)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (!profile || !profile.organization_id || profile.status === "suspended") {
-    return { status: "invalid_credentials" };
-  }
+  if (pendingInvite) {
+    if (password.length < 8) {
+      return {
+        status: "error",
+        error: "Your password must be at least 8 characters to set up your account.",
+      };
+    }
 
-  const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(profile.id);
-  if (userErr || !userRes?.user) {
-    return { status: "invalid_credentials" };
-  }
+    let resolvedName = fullName?.trim();
+    if (!resolvedName && pendingInvite.contact_id) {
+      const { data: contact } = await admin
+        .from("crm_contacts")
+        .select("name, first_name, last_name")
+        .eq("id", pendingInvite.contact_id)
+        .maybeSingle();
+      if (contact?.name) resolvedName = contact.name.trim();
+      else if (contact?.first_name) {
+        resolvedName = `${contact.first_name} ${contact.last_name || ""}`.trim();
+      }
+    }
 
-  const user = userRes.user;
+    if (!resolvedName) {
+      const local = lowerEmail.split("@")[0] || "Team Member";
+      resolvedName =
+        local
+          .replace(/[._+-]+/g, " ")
+          .split(" ")
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ") || "Team Member";
+    }
 
-  const needsPasswordSetup =
-    user.user_metadata?.needs_password_setup === true ||
-    user.user_metadata?.direct_add === true ||
-    !user.user_metadata?.password_registered_at;
+    const completeResult = await completeInvitation(
+      pendingInvite.token,
+      resolvedName,
+      password
+    );
 
-  if (!needsPasswordSetup) {
-    return { status: "invalid_credentials" };
-  }
+    if (completeResult.status === "success") {
+      return { status: "registered" };
+    }
 
-  if (password.length < 8) {
     return {
       status: "error",
-      error: "Your password must be at least 8 characters to set up your account.",
+      error: completeResult.error || "Could not set up your account credentials.",
     };
   }
 
-  const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
-    password,
-    email_confirm: true,
-    user_metadata: {
-      ...user.user_metadata,
-      needs_password_setup: false,
-      direct_add: false,
-      password_registered_at: new Date().toISOString(),
-    },
-  });
+  // 2. Check directly added employees with a profile in an active organization
 
-  if (updateErr) {
-    console.error("[employees] handleInitialEmployeeLogin error:", updateErr);
-    return {
-      status: "error",
-      error: updateErr.message || "Could not set up your password. Please try again.",
-    };
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, organization_id, status, full_name")
+    .ilike("email", lowerEmail)
+    .maybeSingle();
+
+  if (profile && profile.organization_id && profile.status !== "suspended") {
+    let { data: userRes } = await admin.auth.admin.getUserById(profile.id);
+    let user = userRes?.user;
+
+    if (!user) {
+      const { data: listData } = await admin.auth.admin.listUsers({ perPage: 1000 });
+      user =
+        listData?.users?.find(
+          (u) => (u.email ?? "").toLowerCase() === lowerEmail
+        ) ?? null;
+    }
+
+    if (user) {
+      const needsPasswordSetup =
+        user.user_metadata?.needs_password_setup === true ||
+        user.user_metadata?.direct_add === true ||
+        !user.user_metadata?.password_registered_at;
+
+      if (needsPasswordSetup) {
+        if (password.length < 8) {
+          return {
+            status: "error",
+            error: "Your password must be at least 8 characters to set up your account.",
+          };
+        }
+
+        const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
+          password,
+          email_confirm: true,
+          user_metadata: {
+            ...user.user_metadata,
+            full_name: fullName?.trim() || profile.full_name || user.user_metadata?.full_name,
+            needs_password_setup: false,
+            direct_add: false,
+            password_registered_at: new Date().toISOString(),
+          },
+        });
+
+        if (updateErr) {
+          console.error("[employees] handleInitialEmployeeLogin error:", updateErr);
+          return {
+            status: "error",
+            error: updateErr.message || "Could not set up your password. Please try again.",
+          };
+        }
+
+        // Clean up any lingering pending invitations for this email
+        await admin
+          .from("organization_invitations")
+          .update({ status: "accepted" })
+          .ilike("email", lowerEmail)
+          .eq("status", "pending");
+
+        return { status: "registered" };
+      }
+    }
   }
 
-  return { status: "registered" };
+  // 3. Fallback: Check auth.users directly if profile was not found but auth user exists
+  const { data: listData } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const authUser = listData?.users?.find(
+    (u) => (u.email ?? "").toLowerCase() === lowerEmail
+  );
+
+  if (authUser) {
+    const needsPasswordSetup =
+      authUser.user_metadata?.needs_password_setup === true ||
+      authUser.user_metadata?.direct_add === true ||
+      !authUser.user_metadata?.password_registered_at;
+
+    if (needsPasswordSetup) {
+      if (password.length < 8) {
+        return {
+          status: "error",
+          error: "Your password must be at least 8 characters to set up your account.",
+        };
+      }
+
+      const { error: updateErr } = await admin.auth.admin.updateUserById(authUser.id, {
+        password,
+        email_confirm: true,
+        user_metadata: {
+          ...authUser.user_metadata,
+          full_name: fullName?.trim() || authUser.user_metadata?.full_name,
+          needs_password_setup: false,
+          direct_add: false,
+          password_registered_at: new Date().toISOString(),
+        },
+      });
+
+      if (updateErr) {
+        return {
+          status: "error",
+          error: updateErr.message || "Could not set up your password. Please try again.",
+        };
+      }
+
+      return { status: "registered" };
+    }
+  }
+
+  return { status: "invalid_credentials" };
 }
 
 /**

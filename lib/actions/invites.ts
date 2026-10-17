@@ -839,7 +839,7 @@ export async function completeInvitation(
         createErr.message?.toLowerCase().includes("already been registered") ||
         createErr.message?.toLowerCase().includes("already exists")
       ) {
-        const { data: userList } = await admin.auth.admin.listUsers();
+        const { data: userList } = await admin.auth.admin.listUsers({ perPage: 1000 });
         const found = userList?.users?.find(
           (u) => (u.email ?? "").toLowerCase() === email
         );

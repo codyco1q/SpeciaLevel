@@ -101,13 +101,23 @@ export function AcceptInviteClient({
       }
 
       const supabase = createBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: invitation.email.toLowerCase(),
+      const cleanEmail = invitation.email.trim().toLowerCase();
+      let { error: signInError } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
         password,
       });
 
       if (signInError) {
-        // If client session sign-in had a problem, redirect to login page
+        // Retry once if needed
+        const retry = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        signInError = retry.error;
+      }
+
+      if (signInError) {
+        // If client session sign-in had a problem, redirect to login page where their password is now recognized
         sessionStorage.removeItem("uplevel.pendingInviteToken");
         router.push("/login");
         return;
