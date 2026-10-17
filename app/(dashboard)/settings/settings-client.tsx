@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import type { Organization } from "@/types/database";
@@ -18,6 +20,8 @@ export interface SettingsClientProps {
   };
   userEmail: string;
   canManage: boolean;
+  canViewOrgSettings?: boolean;
+  initialTab?: string;
   platform: Dictionary["platform"];
   locale: Locale;
 }
@@ -27,10 +31,41 @@ export function SettingsClient({
   profile,
   userEmail,
   canManage,
+  canViewOrgSettings = true,
+  initialTab,
   platform,
   locale,
 }: SettingsClientProps) {
   const t = platform.settings;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get("tab") || initialTab;
+
+  const validTabs = canViewOrgSettings
+    ? ["general", "security", "billing", "profile"]
+    : ["profile"];
+
+  const defaultTab =
+    urlTab && validTabs.includes(urlTab)
+      ? urlTab
+      : canViewOrgSettings
+      ? "general"
+      : "profile";
+
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
+
+  useEffect(() => {
+    if (urlTab && validTabs.includes(urlTab)) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab, canViewOrgSettings]);
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", val);
+    router.replace(`/settings?${params.toString()}`, { scroll: false });
+  };
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -39,37 +74,51 @@ export function SettingsClient({
         <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="general">{t.tabGeneral || "General & Branding"}</TabsTrigger>
-          <TabsTrigger value="security">{t.tabSecurity || "Security & Controls"}</TabsTrigger>
-          <TabsTrigger value="billing">{t.tabBilling || "Invoicing & Defaults"}</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <TabsList
+          className={
+            canViewOrgSettings
+              ? "grid w-full grid-cols-2 sm:grid-cols-4"
+              : "grid w-full grid-cols-1 max-w-[200px]"
+          }
+        >
+          {canViewOrgSettings && (
+            <>
+              <TabsTrigger value="general">{t.tabGeneral || "General & Branding"}</TabsTrigger>
+              <TabsTrigger value="security">{t.tabSecurity || "Security & Controls"}</TabsTrigger>
+              <TabsTrigger value="billing">{t.tabBilling || "Invoicing & Defaults"}</TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="profile">{t.tabProfile || "Profile"}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-4">
-          <GeneralBrandingTab
-            organization={organization}
-            canManage={canManage}
-            platform={platform}
-          />
-        </TabsContent>
+        {canViewOrgSettings && (
+          <>
+            <TabsContent value="general" className="space-y-4">
+              <GeneralBrandingTab
+                organization={organization}
+                canManage={canManage}
+                platform={platform}
+              />
+            </TabsContent>
 
-        <TabsContent value="security" className="space-y-4">
-          <SecurityTab
-            organization={organization}
-            canManage={canManage}
-            platform={platform}
-          />
-        </TabsContent>
+            <TabsContent value="security" className="space-y-4">
+              <SecurityTab
+                organization={organization}
+                canManage={canManage}
+                platform={platform}
+              />
+            </TabsContent>
 
-        <TabsContent value="billing" className="space-y-4">
-          <BillingDefaultsTab
-            organization={organization}
-            canManage={canManage}
-            platform={platform}
-          />
-        </TabsContent>
+            <TabsContent value="billing" className="space-y-4">
+              <BillingDefaultsTab
+                organization={organization}
+                canManage={canManage}
+                platform={platform}
+              />
+            </TabsContent>
+          </>
+        )}
 
         <TabsContent value="profile" className="space-y-4">
           <ProfileTab

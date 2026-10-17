@@ -7,7 +7,12 @@ import { SettingsClient } from "./settings-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage(props: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const searchParams = props.searchParams ? await props.searchParams : undefined;
+  const initialTab = searchParams?.tab;
+
   const userContext = await getCurrentUserContext();
   if (!userContext) redirect("/login");
   if (!userContext.organization) redirect("/onboarding");
@@ -19,7 +24,7 @@ export default async function SettingsPage() {
   const isOwnerOrAdmin = userContext.roles.some(
     (role) => role.key === "owner" || role.key === "admin"
   );
-  const canView =
+  const canViewOrgSettings =
     isOwnerOrAdmin ||
     hasPermission("settings.view", userContext.permissions) ||
     hasPermission("settings.manage", userContext.permissions) ||
@@ -29,19 +34,6 @@ export default async function SettingsPage() {
     isOwnerOrAdmin ||
     hasPermission("settings.manage", userContext.permissions) ||
     hasPermission("organization.manage", userContext.permissions);
-
-  if (!canView && !canManage) {
-    return (
-      <div className="p-8">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t.noPermissionBody}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const organization = userContext.organization;
 
@@ -57,6 +49,8 @@ export default async function SettingsPage() {
         }}
         userEmail={userContext.user.email}
         canManage={canManage}
+        canViewOrgSettings={canViewOrgSettings}
+        initialTab={initialTab}
         platform={platform}
         locale={locale}
       />

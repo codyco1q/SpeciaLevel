@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, PhoneCall, User, Settings, LogOut } from "lucide-react";
+import { Search, PhoneCall, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,14 +14,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NotificationsPopover } from "@/components/notifications-popover";
 import { openGlobalDialer } from "@/lib/stores/dialer-store";
-import { hasPermission } from "@/lib/auth/rbac";
+import { createBrowserClient } from "@/lib/supabase/client";
 import type { Dictionary, Locale } from "@/lib/i18n/get-dictionary";
 import { cn } from "@/lib/utils";
 
 interface DashboardHeaderProps {
   platform: Dictionary["platform"];
   locale: Locale;
-  permissions: string[];
+  permissions?: string[];
   organizationName?: string;
   logoUrl?: string | null;
   avatarUrl?: string | null;
@@ -40,6 +40,7 @@ export function DashboardHeader({
   userEmail,
 }: DashboardHeaderProps) {
   const [isMac, setIsMac] = React.useState(false);
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -57,12 +58,38 @@ export function DashboardHeader({
     openGlobalDialer();
   };
 
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      // 1. Terminate server session, auto-clockout, and clear cookies
+      await fetch("/auth/signout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("Server signout error:", err);
+    }
+
+    try {
+      // 2. Clear browser supabase auth session
+      const supabase = createBrowserClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Browser client signout error:", err);
+    }
+
+    // 3. Clear session storage and hard redirect to /login
+    if (typeof window !== "undefined") {
+      sessionStorage.clear();
+      window.location.href = "/login";
+    }
+  };
+
   const t = platform.commandPalette;
   const tSidebar = platform.sidebar;
   const shortcutLabel = isMac ? t.shortcutMac : t.shortcutWin;
-  const canViewSettings =
-    hasPermission("settings.view", permissions) ||
-    hasPermission("settings.manage", permissions);
   const initial = (userFullName || userEmail || "U").charAt(0).toUpperCase();
 
   return (
@@ -88,7 +115,7 @@ export function DashboardHeader({
         </button>
       </div>
 
-      {/* ── Header Right: Phone Dialer, Notifications & Org Context ── */}
+      {/* ── Header Right: Phone Dialer, Notifications & Profile Avatar ── */}
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -103,24 +130,6 @@ export function DashboardHeader({
         </Button>
 
         <NotificationsPopover platform={platform} locale={locale} />
-
-        {organizationName && (
-          <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground font-medium border-s border-border/60 ps-3 me-1">
-            {logoUrl ? (
-              <div className="relative flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border/70 bg-background">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logoUrl}
-                  alt={organizationName}
-                  className="size-full object-contain p-0.5"
-                />
-              </div>
-            ) : (
-              <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
-            )}
-            <span className="truncate max-w-[180px]">{organizationName}</span>
-          </div>
-        )}
 
         {/* ── Profile Dropdown ────────────────────────────────────────── */}
         <DropdownMenu>
@@ -161,37 +170,36 @@ export function DashboardHeader({
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link
-                href="/settings"
+                href="/settings?tab=profile"
                 className="flex w-full items-center gap-2 cursor-pointer"
               >
                 <User className="size-4" />
-                <span>{platform.settings?.profileTitle || "Profile"}</span>
+                <span>
+                  {locale === "ar"
+                    ? "إعدادات الملف الشخصي"
+                    : "Profile Settings"}
+                </span>
               </Link>
             </DropdownMenuItem>
-            {canViewSettings && (
-              <DropdownMenuItem asChild>
-                <Link
-                  href="/settings"
-                  className="flex w-full items-center gap-2 cursor-pointer"
-                >
-                  <Settings className="size-4" />
-                  <span>{tSidebar.settings || "Settings"}</span>
-                </Link>
-              </DropdownMenuItem>
-            )}
             <DropdownMenuSeparator />
-            <form action="/auth/signout" method="post" className="w-full">
-              <DropdownMenuItem
-                asChild
-                variant="destructive"
-                className="cursor-pointer"
-              >
-                <button type="submit" className="flex w-full items-center gap-2">
-                  <LogOut className="size-4 rtl:rotate-180" />
-                  <span>{tSidebar.logout || "Log out"}</span>
-                </button>
-              </DropdownMenuItem>
-            </form>
+            <DropdownMenuItem
+              variant="destructive"
+              className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+              disabled={isSigningOut}
+              onSelect={(e) => {
+                e.preventDefault();
+                handleSignOut();
+              }}
+            >
+              <LogOut className="size-4 rtl:rotate-180" />
+              <span>
+                {isSigningOut
+                  ? locale === "ar"
+                    ? "جارٍ تسجيل الخروج…"
+                    : "Signing out…"
+                  : tSidebar.logout || "Sign out"}
+              </span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
