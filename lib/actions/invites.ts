@@ -14,6 +14,7 @@ import {
   type InviteActionState,
 } from "@/lib/validations/invites";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { sendInvitationEmailViaBrevo } from "@/lib/services/brevo";
 
 function parseFieldErrors(
   issues: z.ZodIssue[]
@@ -53,7 +54,8 @@ function getCanonicalSiteUrl(): string {
 }
 
 /**
- * Dispatches an invitation notification using the outbound notification webhook.
+ * Dispatches an automated invitation notification.
+ * Primary delivery is routed through Brevo's transactional email REST API.
  * The invite link directs the recipient directly to the organization-scoped
  * acceptance page (/accept-invite?token=<token>) where they confirm details
  * and set their password.
@@ -64,17 +66,35 @@ async function dispatchInvitationEmail({
   organizationId,
   roleName,
   orgName,
+  inviterName,
+  inviterEmail,
 }: {
   email: string;
   token: string;
   organizationId: string;
   roleName?: string;
   orgName?: string;
+  inviterName?: string;
+  inviterEmail?: string;
 }) {
   const siteUrl = getCanonicalSiteUrl();
   const inviteRedirectUrl = `${siteUrl}/accept-invite?token=${token}`;
 
-  // Outbound webhook notification for external email deliverability
+  // 1. Outbound transactional email delivery via Brevo REST API
+  try {
+    await sendInvitationEmailViaBrevo({
+      recipientEmail: email,
+      inviteUrl: inviteRedirectUrl,
+      organizationName: orgName,
+      roleName,
+      inviterName,
+      inviterEmail,
+    });
+  } catch (brevoErr) {
+    console.error("[invites] Brevo invitation email dispatch error:", brevoErr);
+  }
+
+  // 2. Outbound webhook notification for external email deliverability / integrations
   const webhookUrl = process.env.ORGANIZATION_WEBHOOK_URL || process.env.MARKETING_LEADS_WEBHOOK_URL;
   if (webhookUrl) {
     try {
@@ -87,6 +107,7 @@ async function dispatchInvitationEmail({
           organization_id: organizationId,
           organization_name: orgName,
           role_name: roleName,
+          inviter_name: inviterName,
           invite_link: inviteRedirectUrl,
           token,
           timestamp: new Date().toISOString(),
@@ -101,7 +122,14 @@ async function dispatchInvitationEmail({
 }
 
 async function requireInviteManage(): Promise<
-  | { ok: true; organizationId: string; userId: string; orgName?: string }
+  | {
+      ok: true;
+      organizationId: string;
+      userId: string;
+      orgName?: string;
+      inviterName?: string;
+      inviterEmail?: string;
+    }
   | { ok: false; error: InviteActionState }
 > {
   const userContext = await getCurrentUserContext();
@@ -151,6 +179,8 @@ async function requireInviteManage(): Promise<
     organizationId,
     userId: userContext.user.id,
     orgName: userContext.organization?.name,
+    inviterName: userContext.profile?.full_name || undefined,
+    inviterEmail: userContext.profile?.email || userContext.user?.email || undefined,
   };
 }
 /**
@@ -306,13 +336,15 @@ export async function createInvitation(data: {
   const siteUrl = getCanonicalSiteUrl();
   const inviteUrl = `${siteUrl}/accept-invite?token=${token}`;
 
-  // Deliver the invitation email using the outbound webhook notification setup.
+  // Deliver the invitation email using Brevo and outbound webhook setup.
   await dispatchInvitationEmail({
     email,
     token,
     organizationId: auth.organizationId,
     roleName: role.name,
     orgName: auth.orgName,
+    inviterName: auth.inviterName,
+    inviterEmail: auth.inviterEmail,
   });
 
   revalidatePath("/employees");
@@ -335,14 +367,16 @@ export async function resendInvitation(
 
   const admin = createServiceRoleClient();
   
-  // 1. Fetch invite to get the token, email, role, and organization
+  // 1. Fetch invite to get the token, email, role, organization, and inviter
   const { data: invite, error: fetchError } = await admin
     .from("organization_invitations")
     .select(`
+      id,
       email,
       token,
-      role:roles(name),
-      organization:organizations(name)
+      role:roles!fk_organization_invitations_role(name),
+      organization:organizations!fk_organization_invitations_organization(name),
+      invited_by_profile:profiles!fk_organization_invitations_invited_by(full_name, email)
     `)
     .eq("id", invitationId)
     .eq("organization_id", auth.organizationId)
@@ -352,14 +386,18 @@ export async function resendInvitation(
     return { status: "error", error: "Invitation not found." };
   }
 
-  // 2. Extend expiration
+  // 2. Extend expiration by 7 days and reset status to pending
   const newExpiration = new Date(
     Date.now() + 7 * 24 * 60 * 60 * 1000
   ).toISOString();
 
+  // Ensure invitation has a valid token
+  const token = invite.token || generateInviteToken();
+
   const { error: updateError } = await admin
     .from("organization_invitations")
     .update({
+      token,
       expires_at: newExpiration,
       status: "pending",
     })
@@ -373,26 +411,35 @@ export async function resendInvitation(
     };
   }
 
-  // 3. Deliver the renewed invitation email using the primary outbound mail setup
+  // 3. Deliver the renewed invitation email using Brevo
   const roleRecord = invite.role as unknown as { name?: string } | { name?: string }[] | null;
   const roleName = Array.isArray(roleRecord) ? roleRecord[0]?.name : roleRecord?.name;
   const orgRecord = invite.organization as unknown as { name?: string } | { name?: string }[] | null;
   const orgName = Array.isArray(orgRecord) ? orgRecord[0]?.name : orgRecord?.name;
+  const inviterProfile = invite.invited_by_profile as unknown as
+    | { full_name?: string; email?: string }
+    | { full_name?: string; email?: string }[]
+    | null;
+  const inviterRecord = Array.isArray(inviterProfile) ? inviterProfile[0] : inviterProfile;
+  const inviterName = inviterRecord?.full_name || auth.inviterName;
+  const inviterEmail = inviterRecord?.email || auth.inviterEmail;
 
   const siteUrl = getCanonicalSiteUrl();
-  const inviteUrl = `${siteUrl}/accept-invite?token=${invite.token}`;
+  const inviteUrl = `${siteUrl}/accept-invite?token=${token}`;
 
   await dispatchInvitationEmail({
     email: invite.email,
-    token: invite.token,
+    token,
     organizationId: auth.organizationId,
     roleName,
     orgName: orgName || auth.orgName,
+    inviterName,
+    inviterEmail,
   });
 
   revalidatePath("/employees");
   revalidatePath("/settings");
-  return { status: "success", inviteUrl, token: invite.token };
+  return { status: "success", inviteUrl, token };
 }
 
 /**

@@ -141,11 +141,11 @@ export function InviteEmployeeDialog({
             <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
               <CheckCircle2 className="size-6" />
             </div>
-            <DialogTitle className="text-center">Invitation Link Created</DialogTitle>
+            <DialogTitle className="text-center">Invitation Sent &amp; Link Ready</DialogTitle>
             <DialogDescription className="text-center">
-              An organization-scoped invitation link is ready for{" "}
+              An invitation email has been dispatched to{" "}
               <span className="font-medium text-foreground">{createdInvite.email}</span>.
-              Share this link with them so they can confirm their details, set their password, and enter your workspace.
+              You can also copy and share this link directly with them so they can accept their invitation.
             </DialogDescription>
           </DialogHeader>
 
